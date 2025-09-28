@@ -1,0 +1,35 @@
+{
+  "name": "express-app",
+  "version": "1.0.0",
+  "description": "A simple Express application",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "nodemon src/app.js",
+    "test": "jest",
+    "migrate:up": "migrate-mongo up",
+    "migrate:down": "migrate-mongo down",
+    "migrate:status": "migrate-mongo status",
+    "migrate:create": "migrate-mongo create",
+    "seed": "node src/scripts/seed.js",
+    "seed:clear": "node src/scripts/seed.js --clear",
+    "db:reset": "npm run migrate:down && npm run migrate:up && npm run seed"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^10.0.0",
+    "ejs": "^3.1.6",
+    "express": "^4.17.1",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.18.2"
+  },
+  "devDependencies": {
+    "jest": "^27.0.6",
+    "migrate-mongo": "^12.1.3",
+    "nodemon": "^3.1.10",
+    "supertest": "^6.1.6"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
