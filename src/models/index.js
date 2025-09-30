@@ -6,6 +6,7 @@ const Exam = require('./Exam');
 const Assignment = require('./Assignment');
 const Submission = require('./Submission');
 const ProctorLog = require('./ProctorLog');
+const Mindmap = require('./Mindmap');
 const mongoose = require('mongoose');
 console.log(process.env.DATABASE_MG_URL);
 
@@ -19,5 +20,6 @@ module.exports = {
   Exam,
   Assignment,
   Submission,
-  ProctorLog
+  ProctorLog,
+  Mindmap
 };
