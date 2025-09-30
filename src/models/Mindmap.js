@@ -1,45 +1,37 @@
-"use strict"
-const { Model } = require("sequelize")
-module.exports = (sequelize, DataTypes) => {
-  class Mindmap extends Model {
-    /**
-     * Helper method for defining associations.
-     * This method is not a part of Sequelize lifecycle.
-     * The `models/index` file will call this method automatically.
-     */
-    static associate(models) {
-      // define association here
-      Mindmap.belongsTo(models.User, {
-        foreignKey: "user_id",
-        as: "user",
-      })
-    }
+const mongoose = require("mongoose");
+
+const MindmapSchema = new mongoose.Schema(
+  {
+    _id: { type: String, required: true },
+
+    user_id: { type: String, ref: "User", required: false },
+
+    title: { type: String },
+    desc: { type: String },
+    img: { type: String },
+
+    status: { type: Boolean, default: true },
+
+    nodes: [{ type: mongoose.Schema.Types.Mixed }],
+    edges: [{ type: mongoose.Schema.Types.Mixed }],
+
+    favorite: { type: Boolean, default: false },
+
+    deleted_at: { type: Date, default: null },
+  },
+  {
+    collection: "mindmaps",
+
+    timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
   }
-  Mindmap.init(
-    {
-      id: {
-        type: DataTypes.STRING,
-        primaryKey: true,
-      },
-      user_id: DataTypes.STRING,
-      title: DataTypes.STRING,
-      desc: DataTypes.TEXT,
-      img: DataTypes.STRING,
-      status: DataTypes.BOOLEAN,
-      nodes: DataTypes.ARRAY(DataTypes.JSONB),
-      edges: DataTypes.ARRAY(DataTypes.JSONB),
-      favorite: DataTypes.BOOLEAN,
-    },
-    {
-      sequelize,
-      modelName: "Mindmap",
-      tableName: "mindmaps",
-      createdAt: "created_at",
-      updatedAt: "updated_at",
-      deletedAt: "deleted_at",
-      timestamps: true,
-      paranoid: true,
-    }
-  )
-  return Mindmap
-}
+);
+MindmapSchema.virtual("id")
+  .get(function () {
+    return this._id;
+  })
+  .set(function (v) {
+    this._id = v;
+  });
+
+
+module.exports = mongoose.models.Mindmap || mongoose.model("Mindmap", MindmapSchema);
