@@ -4,6 +4,7 @@ require('dotenv').config();
 const cors = require("cors");
 const passport = require('passport');
 require('./config/passport');
+const authRoutes = require('./routes/auth');
 const configureRoutes = require('./routes/index');
 
 
@@ -21,6 +22,7 @@ app.use((err, req, res, next) => {
 });
 
 // Routes version 1
+app.use('/auth', authRoutes);
 configureRoutes(app);
 
 // Start the server

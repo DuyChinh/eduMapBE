@@ -1,14 +1,54 @@
-const { get } = require("mongoose");
-
+const User = require('../models/User');
 
 const userController = {
     async getProfile(req, res){
         try {
-            const user = await User.findById(req.user.id);
-            if (!user) return res.status(404).json({ message: 'User not found' });
-            res.json(user);
+            // Check if req.user exists
+            if (!req.user) {
+                console.log('req.user is undefined');
+                return res.status(401).json({
+                    success: false,
+                    message: 'Authentication required - user not in request'
+                });
+            }
+            
+            // Log entire user object to see what we have
+            console.log('req.user content:', JSON.stringify(req.user, null, 2));
+            
+            // Try to find user ID from different possible fields
+            const userId = req.user.id || req.user._id || req.user.userId || req.user.sub;
+            
+            if (!userId) {
+                console.log('No user ID found in token payload. Available fields:', Object.keys(req.user));
+                return res.status(401).json({
+                    success: false,
+                    message: 'Authentication required - missing user ID'
+                });
+            }
+            
+            console.log('Attempting to find user with ID:', userId);
+            
+            // Find user by ID from token
+            const user = await User.findById(userId);
+            if (!user) {
+                console.log('User not found in database with ID:', userId);
+                return res.status(404).json({ 
+                    success: false, 
+                    message: 'User not found in database' 
+                });
+            }
+            
+            // Return formatted response according to API docs
+            res.json({
+                success: true,
+                data: user,
+            });
         } catch (error) {
-            res.status(500).json({ message: 'Server error' });
+            console.error('Error in getProfile:', error);
+            res.status(500).json({ 
+                success: false, 
+                message: 'Server error: ' + error.message
+            });
         }
     },
 
