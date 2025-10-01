@@ -12,8 +12,7 @@ const authMiddleware = (req, res, next) => {
     }
 
     // Get token from header
-    const authHeader = req.header('Authorization');
-    console.log('Auth Header:', authHeader);
+    const authHeader = req.header('Authorization')
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
@@ -24,13 +23,9 @@ const authMiddleware = (req, res, next) => {
 
     // Extract token from header (remove "Bearer " prefix)
     const token = authHeader.substring(7);
-    console.log('Token extracted, attempting to verify...');
 
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Log the entire decoded token to see its structure
-    console.log('Decoded token:', JSON.stringify(decoded, null, 2));
     
     // Check if we have some form of user identifier in the token
     if (!decoded.id && !decoded._id && !decoded.userId && !decoded.sub) {
@@ -41,7 +36,6 @@ const authMiddleware = (req, res, next) => {
       if (decoded.userId) decoded.id = decoded.userId;
       if (decoded.sub) decoded.id = decoded.sub;
       
-      console.log('User ID extracted:', decoded.id);
     }
     
     // Set user info in request

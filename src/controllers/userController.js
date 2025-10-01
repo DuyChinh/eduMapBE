@@ -5,15 +5,12 @@ const userController = {
         try {
             // Check if req.user exists
             if (!req.user) {
-                console.log('req.user is undefined');
                 return res.status(401).json({
                     success: false,
                     message: 'Authentication required - user not in request'
                 });
             }
             
-            // Log entire user object to see what we have
-            console.log('req.user content:', JSON.stringify(req.user, null, 2));
             
             // Try to find user ID from different possible fields
             const userId = req.user.id || req.user._id || req.user.userId || req.user.sub;
