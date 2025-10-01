@@ -6,12 +6,16 @@ const config = require('./config/index');
 require('dotenv').config();
 const authRoutes = require('./routes/auth');
 const cors = require("cors");
+const passport = require('passport');
+require('./config/passport');
+
 
 // Middleware setup
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
+app.use(passport.initialize());
 
 // Error handling middleware
 app.use((err, req, res, next) => {

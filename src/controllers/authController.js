@@ -1,5 +1,5 @@
 const authService = require('../services/authService');
-
+const jwt = require('jsonwebtoken');
 
 const authController = {
     async register(req, res) {        
@@ -27,6 +27,22 @@ const authController = {
         } catch (error) {
             res.status(500).json({ message: error.message });
         }
+    },
+
+    handleLoginGoogle(req, res, next) { 
+        next();
+    },
+
+    handleLoginGoogleCallback(req, res) { 
+        const payload = {
+            userId: req.user.id,
+            email: req.user.email,
+            role: req.user.role
+        };
+        const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_ACCESS_EXPIRES });
+        
+        const redirectUrl = process.env.FE_REDIRECT_URL || 'http://localhost:5173/auth/callback';
+        res.redirect(redirectUrl + '?token=' + token);
     }
 }
 
