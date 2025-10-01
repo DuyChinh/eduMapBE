@@ -13,7 +13,4 @@ const config = {
   migrationFileExtension: '.js'
 };
 
-// Debug log để kiểm tra
-console.log('Database URL:', config.mongodb.url);
-
 module.exports = config;

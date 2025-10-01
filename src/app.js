@@ -1,13 +1,10 @@
 const express = require('express');
-const router = express.Router();
 const app = express();
-const indexRoutes = require('./routes/index');
-const config = require('./config/index');
 require('dotenv').config();
-const authRoutes = require('./routes/auth');
 const cors = require("cors");
 const passport = require('passport');
 require('./config/passport');
+const configureRoutes = require('./routes/index');
 
 
 // Middleware setup
@@ -23,8 +20,8 @@ app.use((err, req, res, next) => {
     res.status(500).send('Something broke!');
 });
 
-app.use('/', indexRoutes);
-app.use('/auth', authRoutes);
+// Routes version 1
+configureRoutes(app);
 
 // Start the server
 const PORT = process.env.PORT || 3000;

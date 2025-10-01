@@ -10,7 +10,7 @@ class Seeder {
   async connect() {
     try {
       await mongoose.connect(process.env.DB_URI || 'mongodb://localhost:27017/edumap');
-      console.log('Connected to MongoDB for seeding');
+      ('Connected to MongoDB for seeding');
     } catch (error) {
       console.error('MongoDB connection error:', error);
       process.exit(1);

@@ -8,7 +8,6 @@ const Submission = require('./Submission');
 const ProctorLog = require('./ProctorLog');
 const Mindmap = require('./Mindmap');
 const mongoose = require('mongoose');
-console.log(process.env.DATABASE_MG_URL);
 
 mongoose.connect(process.env.DATABASE_MG_URL);
 

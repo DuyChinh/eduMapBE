@@ -1,22 +1,24 @@
 const express = require('express');
 const router = express.Router();
-const mongoose = require('mongoose');
+const authRoutes = require('./auth');
+const userRoutes = require('./users');
 
-router.get('/', function(req, res) {
-    res.send('Welcome to the Home Page');
-});
+const configureRoutes = (app) => {
+  const v1 = express.Router();
+  app.use('/v1/api', v1);
+  
+  v1.use('/', (req, res) => {
+    res.send('Welcome to the API EduMap');
+  });
+  v1.use('/auth', authRoutes);
+  v1.use('/users', userRoutes);
+  
+  v1.use((req, res) => {
+    res.status(404).json({
+      success: false,
+      message: 'API endpoint not found'
+    });
+  });
+};
 
-router.get('/health', async function(req, res) {    
-    try {
-        const conn = await mongoose.connect(process.env.DATABASE_MG_URL);
-        console.log('Database connected:', conn.connection.host);
-        
-        
-        res.send('connect success!');
-    } catch (error) {
-        console.error('Database connection error:', error);
-        res.status(500).send('Internal Server Error');
-    }
-});
-
-module.exports = router;
+module.exports = configureRoutes;
