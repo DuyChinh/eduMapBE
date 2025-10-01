@@ -22,7 +22,7 @@ app.use((err, req, res, next) => {
 });
 
 // Routes version 1
-app.use('/auth', authRoutes);
+// app.use('/auth', authRoutes);
 configureRoutes(app);
 
 // Start the server
