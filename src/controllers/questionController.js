@@ -3,6 +3,10 @@ const service = require('../services/questionService');
 
 const ALLOWED_TYPES = ['mcq', 'tf', 'short', 'essay'];
 
+const getOrgIdSoft = (req) =>
+  req.user?.orgId || req.user?.org?.id || req.query.orgId || null;
+
+
 const parseBool = (v) => {
   if (v === undefined) return undefined;
   if (typeof v === 'boolean') return v;
@@ -71,54 +75,60 @@ function canEdit(user, doc) {
 
 async function list(req, res, next) {
   try {
-    const orgId = req.user?.orgId || req.user?.org?.id;
-    if (!orgId) return res.status(400).json({ ok: false, message: 'orgId missing on user' });
+    const orgId = getOrgIdSoft(req);
 
     const { page, limit, sort, q, tags, type, level, isPublic, ownerId } = req.query;
-
-    const tagsArr =
-      typeof tags === 'string' ? tags.split(',').map((t) => t.trim()).filter(Boolean) : tags;
+    const tagsArr = typeof tags === 'string'
+      ? tags.split(',').map(t => t.trim()).filter(Boolean)
+      : tags;
 
     const enforcedIsPublic =
-      req.user?.role === 'student' ? true : parseBool(isPublic);
+      req.user?.role === 'student' ? true :
+      (typeof isPublic === 'string'
+        ? ['true','1','yes'].includes(isPublic.toLowerCase()) ? true
+          : ['false','0','no'].includes(isPublic.toLowerCase()) ? false
+          : undefined
+        : isPublic);
+
+    // nếu không có orgId và user không phải admin => mặc định chỉ trả câu hỏi của chính user
+    const ownerFilter = (!orgId && req.user?.role !== 'admin')
+      ? (ownerId || req.user?.id)
+      : ownerId;
 
     const data = await service.list({
-      orgId,
-      page,
-      limit,
-      sort,
-      q,
-      tags: tagsArr,
-      type,
-      level,
+      orgId, page, limit, sort, q,
+      tags: tagsArr, type, level,
       isPublic: enforcedIsPublic,
-      ownerId,
+      ownerId: ownerFilter,
     });
 
     res.json({ ok: true, ...data });
-  } catch (e) {
-    next(e);
-  }
+  } catch (e) { next(e); }
 }
+
 
 async function getOne(req, res, next) {
   try {
-    const orgId = req.user?.orgId || req.user?.org?.id;
     const id = req.params.id;
-    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ ok: false, message: 'invalid id' });
+    if (!mongoose.isValidObjectId(id))
+      return res.status(400).json({ ok: false, message: 'invalid id' });
 
-    const doc = await service.getById({ orgId, id });
+    // gọi service không truyền orgId
+    const doc = await service.getById({ id });
     if (!doc) return res.status(404).json({ ok: false, message: 'Question not found' });
 
-    if (req.user?.role === 'student' && !doc.isPublic) {
+    if (req.user?.role === 'student' && !doc.isPublic)
       return res.status(403).json({ ok: false, message: 'Forbidden' });
-    }
+
+    // nếu cả 2 bên đều có orgId thì kiểm tra cho chắc
+    const orgId = getOrgIdSoft(req);
+    if (orgId && doc.orgId && String(doc.orgId) !== String(orgId) && req.user?.role !== 'admin')
+      return res.status(403).json({ ok: false, message: 'Forbidden' });
 
     res.json({ ok: true, data: doc });
-  } catch (e) {
-    next(e);
-  }
+  } catch (e) { next(e); }
 }
+
 
 async function create(req, res, next) {
   try {
@@ -138,44 +148,40 @@ async function create(req, res, next) {
 
 async function update(req, res, next) {
   try {
-    const orgId = req.user?.orgId || req.user?.org?.id;
     const id = req.params.id;
-    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ ok: false, message: 'invalid id' });
+    if (!mongoose.isValidObjectId(id))
+      return res.status(400).json({ ok: false, message: 'invalid id' });
 
-    const existing = await service.getById({ orgId, id });
+    const existing = await service.getById({ id });
     if (!existing) return res.status(404).json({ ok: false, message: 'Question not found' });
-    if (!canEdit(req.user, existing)) {
+    if (!canEdit(req.user, existing))
       return res.status(403).json({ ok: false, message: 'Forbidden' });
-    }
 
     const merged = { ...existing.toObject(), ...req.body };
     const errors = validateByType(merged);
     if (errors.length) return res.status(400).json({ ok: false, errors });
 
-    const updated = await service.update({ orgId, id, payload: req.body });
+    const updated = await service.update({ id, payload: req.body }); // bỏ orgId
     res.json({ ok: true, data: updated });
-  } catch (e) {
-    next(e);
-  }
+  } catch (e) { next(e); }
 }
+
 
 async function remove(req, res, next) {
   try {
-    const orgId = req.user?.orgId || req.user?.org?.id;
     const id = req.params.id;
-    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ ok: false, message: 'invalid id' });
+    if (!mongoose.isValidObjectId(id))
+      return res.status(400).json({ ok: false, message: 'invalid id' });
 
-    const existing = await service.getById({ orgId, id });
+    const existing = await service.getById({ id });
     if (!existing) return res.status(404).json({ ok: false, message: 'Question not found' });
-    if (!canEdit(req.user, existing)) {
+    if (!canEdit(req.user, existing))
       return res.status(403).json({ ok: false, message: 'Forbidden' });
-    }
 
-    const deleted = await service.hardDelete({ orgId, id });
+    const deleted = await service.hardDelete({ id }); // bỏ orgId
     res.json({ ok: true, data: deleted });
-  } catch (e) {
-    next(e);
-  }
+  } catch (e) { next(e); }
 }
+
 
 module.exports = { list, getOne, create, update, remove };
