@@ -2,22 +2,35 @@
 const mongoose = require('mongoose');
 const Question = require('../models/Question');
 
-// helper: cast chuỗi sang ObjectId an toàn
 const toOID = (v) =>
   (v && mongoose.isValidObjectId(v)) ? new mongoose.Types.ObjectId(v) : undefined;
 
-// CHỈ CÒN: orgId (optional), tags, type, level, isPublic
-function buildFilter({ orgId, tags, type, level, isPublic }) {
+const escapeRegExp = (s = "") => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// q: search rộng (text / choices.text / tags)
+// name: filter theo "tên question" (text contains)
+function buildFilter({ orgId, q, name, tags, type, level, isPublic, ownerId }) {
   const filter = {};
 
   const org = toOID(orgId);
   if (org) filter.orgId = org;
 
-  // tags: bắt buộc chứa tất cả tag truyền vào (giữ nguyên $all như trước)
-  if (Array.isArray(tags) && tags.length) {
-    filter.tags = { $all: tags };
+  // --- full-text (fallback regex) ---
+  if (q && typeof q === 'string' && q.trim()) {
+    // Nếu có text index, bạn có thể chuyển sang:
+    // filter.$text = { $search: q.trim() };
+    const safe = escapeRegExp(q.trim());
+    const re = new RegExp(safe, 'i');
+    filter.$or = [{ text: re }, { 'choices.text': re }, { tags: re }];
   }
 
+  // --- filter theo "tên question" (text contains) ---
+  if (name && typeof name === 'string' && name.trim()) {
+    const safe = escapeRegExp(name.trim());
+    filter.text = { $regex: safe, $options: 'i' };
+  }
+
+  if (Array.isArray(tags) && tags.length) filter.tags = { $all: tags };
   if (type) filter.type = type;
 
   if (level != null) {
@@ -25,9 +38,10 @@ function buildFilter({ orgId, tags, type, level, isPublic }) {
     if (!Number.isNaN(lv)) filter.level = lv;
   }
 
-  if (typeof isPublic === 'boolean') {
-    filter.isPublic = isPublic;
-  }
+  if (typeof isPublic === 'boolean') filter.isPublic = isPublic;
+
+  const owner = toOID(ownerId);
+  if (owner) filter.ownerId = owner;
 
   return filter;
 }
@@ -38,13 +52,17 @@ async function list(params) {
     page = 1,
     limit = 20,
     sort = '-createdAt',
+    q,
+    name,
     tags,
     type,
     level,
     isPublic,
+    ownerId,
   } = params;
 
-  const filter = buildFilter({ orgId, tags, type, level, isPublic });
+  const filter = buildFilter({ orgId, q, name, tags, type, level, isPublic, ownerId });
+
   const nPage = Number(page) || 1;
   const nLimit = Number(limit) || 20;
   const skip = (nPage - 1) * nLimit;

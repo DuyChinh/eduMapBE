@@ -145,7 +145,7 @@ Content-Type: application/json
 ## Xóa tài khoản người dùng
 ### call: https://edu-map-be.vercel.app/v1/api/users/{id}
 #### method: DELETE
-#### headers: 
+#### headers:
 ```
 Authorization: Bearer {token}
 ```

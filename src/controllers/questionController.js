@@ -77,27 +77,35 @@ async function list(req, res, next) {
   try {
     const orgId = getOrgIdSoft(req);
 
-    const { page, limit, sort, q, tags, type, level, isPublic, ownerId } = req.query;
+    const { page, limit, sort, q, name, tags, type, level, isPublic, ownerId } = req.query;
+
     const tagsArr = typeof tags === 'string'
       ? tags.split(',').map(t => t.trim()).filter(Boolean)
       : tags;
 
     const enforcedIsPublic =
-      req.user?.role === 'student' ? true :
-      (typeof isPublic === 'string'
-        ? ['true','1','yes'].includes(isPublic.toLowerCase()) ? true
-          : ['false','0','no'].includes(isPublic.toLowerCase()) ? false
-          : undefined
-        : isPublic);
+      req.user?.role === 'student'
+        ? true
+        : (typeof isPublic === 'string'
+            ? (['true','1','yes'].includes(isPublic.toLowerCase()) ? true
+              : ['false','0','no'].includes(isPublic.toLowerCase()) ? false
+              : undefined)
+            : isPublic);
 
-    // nếu không có orgId và user không phải admin => mặc định chỉ trả câu hỏi của chính user
     const ownerFilter = (!orgId && req.user?.role !== 'admin')
       ? (ownerId || req.user?.id)
       : ownerId;
 
     const data = await service.list({
-      orgId, page, limit, sort, q,
-      tags: tagsArr, type, level,
+      orgId,
+      page,
+      limit,
+      sort,
+      q,                 // search rộng
+      name,              // filter theo text
+      tags: tagsArr,
+      type,
+      level,
       isPublic: enforcedIsPublic,
       ownerId: ownerFilter,
     });
@@ -105,7 +113,6 @@ async function list(req, res, next) {
     res.json({ ok: true, ...data });
   } catch (e) { next(e); }
 }
-
 
 async function getOne(req, res, next) {
   try {
