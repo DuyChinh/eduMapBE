@@ -88,6 +88,54 @@ const userController = {
             res.status(500).json({ message: 'Server error' });
         }
     },
+
+    // Update user role (admin only)
+    async updateUserRole(req, res) {
+        try {
+            const { id } = req.params;
+            const { role } = req.body;
+
+            // Validate role
+            const validRoles = ['teacher', 'student'];
+            if (!role || !validRoles.includes(role)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid role. Must be one of: teacher, student'
+                });
+            }
+
+            // Find and update user
+            const user = await User.findByIdAndUpdate(
+                id, 
+                { role }, 
+                { new: true, runValidators: true }
+            );
+
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+
+            res.json({
+                success: true,
+                message: 'User role updated successfully',
+                data: {
+                    id: user._id,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role
+                }
+            });
+        } catch (error) {
+            console.error('Error updating user role:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Server error: ' + error.message
+            });
+        }
+    },
 }
 
 module.exports = userController;

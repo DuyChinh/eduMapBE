@@ -20,6 +20,64 @@
   "password": "yourpassword",
 }
 
+## api/forgot-password
+###🔄 Luồng hoạt động:
+```
+User nhập email → API tạo token → Gửi email
+User click link trong email → Frontend nhận token
+User nhập password mới → API verify token → Cập nhật password
+Token được đánh dấu đã sử dụng
+```
+### call: https://edu-map-be.vercel.app/v1/api/auth/forgot-password
+#### method: POST
+-- body --
+{
+  "email": "nguyenvana@example.com"
+}
+#### response:
+```
+{
+  "success": true,
+  "message": "If the email exists, a reset link has been sent"
+}
+```
+
+## api/reset-password
+### call: https://edu-map-be.vercel.app/v1/api/auth/reset-password
+#### method: POST
+-- body --
+{
+  "token": "reset_token_from_email",
+  "newPassword": "newpassword123"
+}
+#### response:
+```
+{
+  "success": true,
+  "message": "Password reset successfully"
+}
+```
+#### error responses:
+```
+// Missing fields
+{
+  "success": false,
+  "message": "Token and new password are required"
+}
+
+// Invalid token
+{
+  "success": false,
+  "message": "Invalid or expired reset token"
+}
+
+// Password too short
+{
+  "success": false,
+  "message": "Password must be at least 6 characters long"
+}
+```
+
 
 ## SSO Google (OAuth 2.0)
 
@@ -35,6 +93,11 @@ CLIENT_SECRET_GOOGLE=your_google_client_secret
 GOOGLE_CALLBACK_URL=http(s)://<BE_HOST>/v1/api/auth/google/callback
 JWT_SECRET=your_jwt_secret
 FE_REDIRECT_URL=http(s)://<FE_HOST>/v1/api/auth/callback  # tuỳ chọn nếu muốn redirect kèm token
+
+# Email service (for forgot password)
+EMAIL_USER=your_email@gmail.com
+EMAIL_PASS=your_app_password  # App password cho Gmail
+FRONTEND_URL=http(s)://<FE_HOST>  # URL frontend để tạo reset link
 ```
 
 ### 3) Endpoints
@@ -142,6 +205,53 @@ Content-Type: application/json
 }
 ```
 
+## Cập nhật role người dùng (Chỉ admin)
+### call: https://edu-map-be.vercel.app/v1/api/users/{id}/role
+#### method: PATCH
+#### headers: 
+```
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+#### body:
+```
+{
+  "role": "teacher" // hoặc "student", "admin"
+}
+```
+#### response:
+```
+{
+  "success": true,
+  "message": "User role updated successfully",
+  "data": {
+    "id": "user_id",
+    "name": "Nguyễn Văn A",
+    "email": "nguyenvana@example.com",
+    "role": "teacher"
+  }
+}
+```
+#### error responses:
+```
+// Invalid role
+{
+  "success": false,
+  "message": "Invalid role. Must be one of: teacher, student, admin"
+}
+
+// User not found
+{
+  "success": false,
+  "message": "User not found"
+}
+
+// Admin access required
+{
+  "message": "Admin access required"
+}
+```
+
 ## Xóa tài khoản người dùng
 ### call: https://edu-map-be.vercel.app/v1/api/users/{id}
 #### method: DELETE
@@ -157,4 +267,47 @@ Authorization: Bearer {token}
 }
 ```
 
-Lưu ý: Đối với các API user, người dùng phải được xác thực bằng token JWT trước khi truy cập. Token JWT nhận được sau khi đăng nhập hoặc đăng nhập qua Google.
+Lưu ý: Đối với các API user, người dùng phải được xác thực bằng token JWT trước khi truy cập. Token JWT nhận được sau khi đăng nhập hoặc đăng nhập qua Google. API cập nhật role chỉ dành cho admin.
+
+# CLASS
+
+## Học sinh tham gia lớp học bằng mã
+### call: https://edu-map-be.vercel.app/v1/api/classes/{code}/join
+#### method: POST
+#### headers: 
+```
+Authorization: Bearer {token}
+```
+#### response:
+```
+{
+  "success": true,
+  "message": "Successfully joined the class",
+  "data": {
+    "classId": "class_id",
+    "className": "Toán 12A",
+    "classCode": "MATH12A"
+  }
+}
+```
+
+#### error responses:
+```
+// Class not found
+{
+  "success": false,
+  "message": "Class not found with the provided code"
+}
+
+// Already a member
+{
+  "success": false,
+  "message": "You are already a member of this class"
+}
+
+// Not authenticated
+{
+  "success": false,
+  "message": "Authentication required - missing user ID"
+}
+```
