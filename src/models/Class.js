@@ -4,7 +4,7 @@ const ClassSchema = new mongoose.Schema({
   orgId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Organization',
-    required: false,  //true
+    required: false,
     index: true
   },
   name: {

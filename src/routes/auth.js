@@ -6,6 +6,8 @@ const passport = require('passport');
 // Standard auth routes
 router.post('/register', authController.register);
 router.post('/login', authController.login);
+router.post('/forgot-password', authController.forgotPassword);
+router.post('/reset-password', authController.resetPassword);
 
 // Google OAuth routes
 router.get('/google',
