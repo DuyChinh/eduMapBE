@@ -1,4 +1,90 @@
 # AUTH
+
+## 🔐 Password Requirements
+Tất cả password phải đáp ứng các yêu cầu bảo mật sau:
+- **Độ dài:** Tối thiểu 8 ký tự, tối đa 128 ký tự
+- **Chữ hoa:** Ít nhất 1 ký tự hoa (A-Z)
+- **Chữ thường:** Ít nhất 1 ký tự thường (a-z)
+- **Số:** Ít nhất 1 chữ số (0-9)
+- **Ký tự đặc biệt:** Ít nhất 1 ký tự đặc biệt (!@#$%^&*()_+-=[]{}|;:,.<>?)
+- **Không được chứa:** Hơn 2 ký tự giống nhau liên tiếp
+- **Không được chứa:** Các từ thông dụng (password, 123456, qwerty, admin, user, v.v.)
+
+### Ví dụ password hợp lệ:
+- `MyPass123!`
+- `SecureP@ssw0rd`
+- `Strong#Pass2024`
+
+### Ví dụ password không hợp lệ:
+- `password` (thiếu ký tự hoa, số, đặc biệt)
+- `PASS123!` (thiếu ký tự thường)
+- `MyPass` (thiếu số và ký tự đặc biệt)
+- `aaa123!` (có 3 ký tự giống nhau liên tiếp)
+
+## 💡 Hướng dẫn cho Frontend
+
+### Password Validation trên Frontend
+FE nên implement client-side validation để cải thiện UX:
+
+```javascript
+// Password validation function cho FE
+const validatePassword = (password) => {
+  const errors = [];
+  
+  if (password.length < 8) {
+    errors.push('Mật khẩu phải có ít nhất 8 ký tự');
+  }
+  
+  if (password.length > 128) {
+    errors.push('Mật khẩu không được quá 128 ký tự');
+  }
+  
+  if (!/[A-Z]/.test(password)) {
+    errors.push('Mật khẩu phải có ít nhất 1 chữ hoa');
+  }
+  
+  if (!/[a-z]/.test(password)) {
+    errors.push('Mật khẩu phải có ít nhất 1 chữ thường');
+  }
+  
+  if (!/[0-9]/.test(password)) {
+    errors.push('Mật khẩu phải có ít nhất 1 số');
+  }
+  
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password)) {
+    errors.push('Mật khẩu phải có ít nhất 1 ký tự đặc biệt');
+  }
+  
+  if (/(.)\1{2,}/.test(password)) {
+    errors.push('Mật khẩu không được có hơn 2 ký tự giống nhau liên tiếp');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors: errors
+  };
+};
+```
+
+### Password Strength Indicator
+```javascript
+const getPasswordStrength = (password) => {
+  let score = 0;
+  
+  if (password.length >= 8) score += 20;
+  if (password.length >= 12) score += 20;
+  if (/[A-Z]/.test(password)) score += 20;
+  if (/[a-z]/.test(password)) score += 20;
+  if (/[0-9]/.test(password)) score += 10;
+  if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password)) score += 10;
+  
+  if (score < 30) return { level: 'weak', color: 'red' };
+  if (score < 60) return { level: 'fair', color: 'orange' };
+  if (score < 90) return { level: 'good', color: 'blue' };
+  return { level: 'strong', color: 'green' };
+};
+```
+
 ## api/register
 ### call: https://edu-map-be.vercel.app/v1/api/auth/register
 #### method: POST
@@ -6,9 +92,36 @@
 {
   "name": "Nguyễn Văn A",
   "email": "nguyenvana@example.com",
-  "password": "yourpassword",
+  "password": "MyPass123!",
   "role": "student", // or teacher
 }
+#### response:
+```
+{
+  "success": true,
+  "message": "User registered successfully",
+  "data": {
+    "id": "user_id",
+    "name": "Nguyễn Văn A",
+    "email": "nguyenvana@example.com",
+    "role": "student"
+  }
+}
+```
+#### error responses:
+```
+// Password validation failed
+{
+  "success": false,
+  "message": "Password validation failed: Password must be at least 8 characters long, Password must contain at least one uppercase letter (A-Z), Password must contain at least one number (0-9)"
+}
+
+// User already exists
+{
+  "success": false,
+  "message": "User already exists"
+}
+```
 
 
 ## api/login
@@ -48,7 +161,7 @@ Token được đánh dấu đã sử dụng
 -- body --
 {
   "token": "reset_token_from_email",
-  "newPassword": "newpassword123"
+  "newPassword": "MyNewPass123!"
 }
 #### response:
 ```
@@ -71,10 +184,15 @@ Token được đánh dấu đã sử dụng
   "message": "Invalid or expired reset token"
 }
 
-// Password too short
+// Password validation failed
 {
   "success": false,
-  "message": "Password must be at least 6 characters long"
+  "message": "Password validation failed",
+  "errors": [
+    "Password must be at least 8 characters long",
+    "Password must contain at least one uppercase letter (A-Z)",
+    "Password must contain at least one number (0-9)"
+  ]
 }
 ```
 

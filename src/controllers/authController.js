@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const User = require('../models/User');
 const ResetToken = require('../models/ResetToken');
 const emailService = require('../services/emailService');
+const { validatePassword } = require('../utils/passwordValidator');
 
 const authController = {
     async register(req, res) {        
@@ -15,7 +16,21 @@ const authController = {
                 data: result
             });
         } catch (error) {
-            res.status(500).json({ message: error.message });
+            // Check if it's a password validation error
+            if (error.message.includes('Password validation failed')) {
+                const errors = error.message.replace('Password validation failed: ', '').split(', ');
+                return res.status(400).json({
+                    success: false,
+                    message: 'Password validation failed',
+                    errors: errors
+                });
+            }
+            
+            // Other errors
+            res.status(500).json({ 
+                success: false,
+                message: error.message 
+            });
         }
     },
 
@@ -111,10 +126,13 @@ const authController = {
                 });
             }
 
-            if (newPassword.length < 6) {
+            // Validate password strength
+            const passwordValidation = validatePassword(newPassword);
+            if (!passwordValidation.isValid) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Password must be at least 6 characters long'
+                    message: 'Password validation failed',
+                    errors: passwordValidation.errors
                 });
             }
 

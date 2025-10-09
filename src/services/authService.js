@@ -1,10 +1,18 @@
 const { User } = require('../models/index');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const { validatePassword } = require('../utils/passwordValidator');
 
 const authService = {
     async register(UserData) {
         const { name, email, password, role } = UserData;
+        
+        // Validate password
+        const passwordValidation = validatePassword(password);
+        if (!passwordValidation.isValid) {
+            throw new Error(`Password validation failed: ${passwordValidation.errors.join(', ')}`);
+        }
+        
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             throw new Error('User already exists');
