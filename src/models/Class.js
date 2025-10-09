@@ -4,7 +4,7 @@ const ClassSchema = new mongoose.Schema({
   orgId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Organization',
-    // required: true,
+    required: false,
     index: true
   },
   name: {
@@ -42,7 +42,15 @@ const ClassSchema = new mongoose.Schema({
 });
 
 // Indexes
-ClassSchema.index({ orgId: 1, code: 1 }, { unique: true });
+// Khi có orgId: đảm bảo (orgId, code) là duy nhất
+ClassSchema.index(
+  { orgId: 1, code: 1 }, 
+  { unique: true, 
+    partialFilterExpression: { orgId: { $exists: true } } 
+  });
+  
+// Khi KHÔNG có orgId: tạm thời đảm bảo code duy nhất toàn hệ thống
+ClassSchema.index({ code: 1 }, { unique: true });
 ClassSchema.index({ orgId: 1, teacherId: 1 });
 ClassSchema.index({ orgId: 1, 'studentIds': 1 });
 

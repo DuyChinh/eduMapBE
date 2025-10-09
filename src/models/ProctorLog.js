@@ -31,7 +31,7 @@ const ProctorLogSchema = new mongoose.Schema({
   ts: {
     type: Date,
     default: Date.now,
-    index: true
+    //index: true
   },
   meta: {
     visible: Boolean,
