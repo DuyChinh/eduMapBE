@@ -66,18 +66,48 @@ function validateByType(body) {
   return errors;
 }
 
-function canEdit(user, doc) {
-  if (!user || !doc) return false;
-  if (user.role === 'admin') return true;
-  if (user.role === 'teacher' && String(doc.ownerId) === String(user.id)) return true;
-  return false;
+function isOwner(user, doc) {
+  const uid = String(user?.id || user?._id || user?.userId || '');
+  const oid = String(doc?.ownerId || '');
+  return uid && oid && uid === oid;
 }
+
+
+async function patch(req, res, next) {
+  try {
+    const id = req.params.id;
+    if (!mongoose.isValidObjectId(id))
+      return res.status(400).json({ ok: false, message: 'invalid id' });
+
+    const existing = await service.getById({ id });
+    if (!existing) return res.status(404).json({ ok: false, message: 'Question not found' });
+
+    // chỉ chủ sở hữu được sửa
+    if (!isOwner(req.user, existing))
+      return res.status(403).json({ ok: false, message: 'Only owner can modify this question' });
+
+    // chỉ cho phép set các field whitelisted
+    const allowed = ['text', 'type', 'choices', 'answer', 'tags', 'level', 'isPublic', 'metadata'];
+    const payload = {};
+    for (const k of allowed) if (k in req.body) payload[k] = req.body[k];
+
+    // validate theo type sau khi merge
+    const merged = { ...existing.toObject(), ...payload };
+    const errors = validateByType(merged);
+    if (errors.length) return res.status(400).json({ ok: false, errors });
+
+    const updated = await service.updatePartial({ id, payload, ownerIdEnforce: req.user.id });
+    res.json({ ok: true, data: updated });
+  } catch (e) { next(e); }
+}
+
+
 
 async function list(req, res, next) {
   try {
     const orgId = getOrgIdSoft(req);
 
-    const { page, limit, sort, q, name, tags, type, level, isPublic, ownerId } = req.query;
+    const { page, limit, sort, q, name, tags, type, level, isPublic, ownerId, subjectCode, subjectId } = req.query;
 
     const tagsArr = typeof tags === 'string'
       ? tags.split(',').map(t => t.trim()).filter(Boolean)
@@ -92,9 +122,14 @@ async function list(req, res, next) {
               : undefined)
             : isPublic);
 
-    const ownerFilter = (!orgId && req.user?.role !== 'admin')
-      ? (ownerId || req.user?.id)
-      : ownerId;
+    let publicOrOwnerUserId;
+    if (req.user?.role === 'teacher') {
+      const ownerProvided = !!ownerId;
+      const isPublicProvided = (typeof enforcedIsPublic === 'boolean');
+      if (!ownerProvided && !isPublicProvided) {
+        publicOrOwnerUserId = req.user.id; // xem public của mọi người + private của mình
+      }
+    }
 
     const data = await service.list({
       orgId,
@@ -107,7 +142,10 @@ async function list(req, res, next) {
       type,
       level,
       isPublic: enforcedIsPublic,
-      ownerId: ownerFilter,
+      ownerId,
+      publicOrOwnerUserId,
+      subjectCode,
+      subjectId,
     });
 
     res.json({ ok: true, ...data });
@@ -127,6 +165,11 @@ async function getOne(req, res, next) {
     if (req.user?.role === 'student' && !doc.isPublic)
       return res.status(403).json({ ok: false, message: 'Forbidden' });
 
+    if (req.user?.role === 'teacher' && !doc.isPublic) {
+      const isOwnerView = String(doc.ownerId) === String(req.user.id);
+      if (!isOwnerView) return res.status(403).json({ ok: false, message: 'Forbidden' });
+    }
+
     // nếu cả 2 bên đều có orgId thì kiểm tra cho chắc
     const orgId = getOrgIdSoft(req);
     if (orgId && doc.orgId && String(doc.orgId) !== String(orgId) && req.user?.role !== 'admin')
@@ -141,6 +184,11 @@ async function create(req, res, next) {
   try {
     if (!['teacher', 'admin'].includes(req.user?.role)) {
       return res.status(403).json({ ok: false, message: 'Forbidden' });
+    }
+
+    const { subjectId, subjectCode } = req.body;
+    if (!subjectId && !subjectCode) {
+      return res.status(400).json({ ok: false, message: 'subjectId or subjectCode is required' });
     }
 
     const errors = validateByType(req.body);
@@ -161,18 +209,19 @@ async function update(req, res, next) {
 
     const existing = await service.getById({ id });
     if (!existing) return res.status(404).json({ ok: false, message: 'Question not found' });
-    if (!canEdit(req.user, existing))
-      return res.status(403).json({ ok: false, message: 'Forbidden' });
+
+    // CHỈ owner được cập nhật (PUT toàn phần)
+    if (!isOwner(req.user, existing))
+      return res.status(403).json({ ok: false, message: 'Only owner can modify this question' });
 
     const merged = { ...existing.toObject(), ...req.body };
     const errors = validateByType(merged);
     if (errors.length) return res.status(400).json({ ok: false, errors });
 
-    const updated = await service.update({ id, payload: req.body }); // bỏ orgId
+    const updated = await service.update({ id, payload: req.body, ownerIdEnforce: req.user.id });
     res.json({ ok: true, data: updated });
   } catch (e) { next(e); }
 }
-
 
 async function remove(req, res, next) {
   try {
@@ -182,13 +231,16 @@ async function remove(req, res, next) {
 
     const existing = await service.getById({ id });
     if (!existing) return res.status(404).json({ ok: false, message: 'Question not found' });
-    if (!canEdit(req.user, existing))
-      return res.status(403).json({ ok: false, message: 'Forbidden' });
 
-    const deleted = await service.hardDelete({ id }); // bỏ orgId
-    res.json({ ok: true, data: deleted });
+    // CHỈ owner được xoá
+    if (!isOwner(req.user, existing))
+      return res.status(403).json({ ok: false, message: 'Only owner can delete this question' });
+
+    const deleted = await service.hardDelete({ id, ownerIdEnforce: req.user.id });
+    res.json({ ok: true, message: 'Question deleted', data: deleted });
   } catch (e) { next(e); }
 }
 
 
-module.exports = { list, getOne, create, update, remove };
+
+module.exports = { list, getOne, create, update, patch, remove };

@@ -1,6 +1,6 @@
-// services/questionService.js
 const mongoose = require('mongoose');
 const Question = require('../models/Question');
+const Subject  = require('../models/Subject');
 
 const toOID = (v) =>
   (v && mongoose.isValidObjectId(v)) ? new mongoose.Types.ObjectId(v) : undefined;
@@ -9,11 +9,26 @@ const escapeRegExp = (s = "") => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // q: search rộng (text / choices.text / tags)
 // name: filter theo "tên question" (text contains)
-function buildFilter({ orgId, q, name, tags, type, level, isPublic, ownerId }) {
+function buildFilter({ orgId, q, name, tags, type, level, isPublic, ownerId, publicOrOwnerUserId, subjectId, subjectCode }) {
   const filter = {};
 
   const org = toOID(orgId);
   if (org) filter.orgId = org;
+
+  // --- filter theo môn ---
+  if (subjectId && mongoose.isValidObjectId(subjectId)) {
+    filter.subjectId = new mongoose.Types.ObjectId(subjectId);
+  } else if (subjectCode) {
+    filter.subjectCode = String(subjectCode).toUpperCase();
+  }
+
+  // filter theo subject
+  if (subjectId && mongoose.isValidObjectId(subjectId)) {
+    filter.subjectId = new mongoose.Types.ObjectId(subjectId);
+  }
+  if (subjectCode) {
+    filter.subjectCode = String(subjectCode).toUpperCase();
+  }
 
   // --- full-text (fallback regex) ---
   if (q && typeof q === 'string' && q.trim()) {
@@ -43,6 +58,25 @@ function buildFilter({ orgId, q, name, tags, type, level, isPublic, ownerId }) {
   const owner = toOID(ownerId);
   if (owner) filter.ownerId = owner;
 
+  if (!('isPublic' in (typeof isPublic === 'boolean' ? { isPublic } : {}))
+      && !owner
+      && publicOrOwnerUserId
+  ) {
+    const uid = toOID(publicOrOwnerUserId);
+    if (uid) {
+      const orScope = { $or: [{ isPublic: true }, { ownerId: uid }] };
+      if (filter.$or) {
+        const existingOr = filter.$or;
+        delete filter.$or;
+        filter.$and = [{ $or: existingOr }, orScope];
+      } else if (filter.$and) {
+        filter.$and.push(orScope);
+      } else {
+        filter.$and = [orScope];
+      }
+    }
+  }
+
   return filter;
 }
 
@@ -59,9 +93,12 @@ async function list(params) {
     level,
     isPublic,
     ownerId,
+    publicOrOwnerUserId,
+    subjectId,
+    subjectCode,
   } = params;
 
-  const filter = buildFilter({ orgId, q, name, tags, type, level, isPublic, ownerId });
+  const filter = buildFilter({ orgId, q, name, tags, type, level, isPublic, ownerId, publicOrOwnerUserId, subjectId, subjectCode });
 
   const nPage = Number(page) || 1;
   const nLimit = Number(limit) || 20;
@@ -89,30 +126,61 @@ async function getById({ orgId, id }) {
 }
 
 async function create({ payload, user }) {
+  const ownerId = user?.id || user?._id;
+
+  let subjectId = payload.subjectId;
+  if (!subjectId && payload.subjectCode) {
+    const s = await Subject.findOne({
+    ...(user?.orgId ? { orgId: user.orgId } : {}),
+      code: String(payload.subjectCode).toUpperCase()
+    }).select('_id code');
+    if (!s) {
+      const err = new Error('Subject not found for subjectCode');
+      err.status = 400;
+      throw err;
+    }
+    subjectId = s._id;
+    payload.subjectCode = s.code; // chuẩn hoá
+  }
   const doc = await Question.create({
     ...payload,
+    subjectId,
     ...(user?.orgId ? { orgId: user.orgId } : {}),
-    ownerId: user?.id,
+    ownerId,
   });
   return doc;
 }
 
-async function update({ orgId, id, payload }) {
+
+async function update({ orgId, id, payload, ownerIdEnforce }) {
+  const filter = { _id: id };
+  if (orgId && mongoose.isValidObjectId(orgId)) filter.orgId = new mongoose.Types.ObjectId(orgId);
+  if (ownerIdEnforce && mongoose.isValidObjectId(ownerIdEnforce)) {
+    filter.ownerId = new mongoose.Types.ObjectId(ownerIdEnforce);
+  }
+  return Question.findOneAndUpdate(filter, payload, { new: true, runValidators: true });
+}
+
+
+async function hardDelete({ orgId, id, ownerIdEnforce }) {
+  const filter = { _id: id };
+  if (orgId && mongoose.isValidObjectId(orgId)) filter.orgId = new mongoose.Types.ObjectId(orgId);
+  if (ownerIdEnforce && mongoose.isValidObjectId(ownerIdEnforce)) {
+    filter.ownerId = new mongoose.Types.ObjectId(ownerIdEnforce);
+  }
+  return Question.findOneAndDelete(filter);
+}
+
+
+async function updatePartial({ orgId, id, payload }) {
   if (orgId && mongoose.isValidObjectId(orgId)) {
     return Question.findOneAndUpdate(
       { _id: id, orgId: new mongoose.Types.ObjectId(orgId) },
-      payload,
+      { $set: payload },
       { new: true }
     );
   }
-  return Question.findByIdAndUpdate(id, payload, { new: true });
+  return Question.findByIdAndUpdate(id, { $set: payload }, { new: true });
 }
 
-async function hardDelete({ orgId, id }) {
-  if (orgId && mongoose.isValidObjectId(orgId)) {
-    return Question.findOneAndDelete({ _id: id, orgId: new mongoose.Types.ObjectId(orgId) });
-  }
-  return Question.findByIdAndDelete(id);
-}
-
-module.exports = { list, getById, create, update, hardDelete };
+module.exports = { list, getById, create, update, updatePartial, hardDelete };

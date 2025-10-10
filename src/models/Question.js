@@ -18,6 +18,17 @@ const QuestionSchema = new mongoose.Schema({
     required: true,
     index: true
   },
+  subjectId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Subject',
+    index: true,
+    required: false
+  },
+  subjectCode: {
+    type: String,
+    trim: true,
+    uppercase: true
+  },
   type: {
     type: String,
     enum: ['mcq', 'tf', 'short', 'essay'],
@@ -65,5 +76,6 @@ QuestionSchema.index({ orgId: 1, ownerId: 1, tags: 1 });
 QuestionSchema.index({ orgId: 1, text: 'text' });
 QuestionSchema.index({ orgId: 1, tags: 1 });
 QuestionSchema.index({ orgId: 1, type: 1, level: 1 });
+QuestionSchema.index({ orgId: 1, subjectId: 1, level: 1, type: 1 });
 
 module.exports = mongoose.model('Question', QuestionSchema);

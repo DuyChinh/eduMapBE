@@ -39,6 +39,116 @@ async function create({ orgId, teacherId, payload }) {
   return doc;
 }
 
+// LIST + FILTER
+function buildFilter({ orgId, teacherId, q }) {
+  const f = {};
+  if (orgId && mongoose.isValidObjectId(orgId)) f.orgId = new mongoose.Types.ObjectId(orgId);
+  if (teacherId && mongoose.isValidObjectId(teacherId)) f.teacherId = new mongoose.Types.ObjectId(teacherId);
+  if (q && q.trim()) f.name = { $regex: q.trim(), $options: 'i' };
+  return f;
+}
 
+async function list({ orgId, teacherId, q, page = 1, limit = 20, sort = '-createdAt' }) {
+  const filter = buildFilter({ orgId, teacherId, q });
+  const nPage = Number(page) || 1;
+  const nLimit = Number(limit) || 20;
+  const skip = (nPage - 1) * nLimit;
 
-module.exports = { create };
+  const [items, total] = await Promise.all([
+    ClassModel.find(filter).sort(sort).skip(skip).limit(nLimit),
+    ClassModel.countDocuments(filter),
+  ]);
+
+  return {
+    items,
+    total,
+    page: nPage,
+    limit: nLimit,
+    pages: Math.max(1, Math.ceil(total / nLimit)),
+  };
+}
+
+async function getById(id) {
+  return ClassModel.findById(id);
+}
+
+async function updatePartial({ id, ownerIdEnforce, payload, orgId }) {
+  // chỉ cho owner (teacher) hoặc admin (controller sẽ thêm quyền) — ở service vẫn khoá owner
+  const filter = { _id: id };
+  if (ownerIdEnforce && mongoose.isValidObjectId(ownerIdEnforce)) {
+    filter.teacherId = new mongoose.Types.ObjectId(ownerIdEnforce);
+  }
+  if (orgId && mongoose.isValidObjectId(orgId)) {
+    filter.orgId = new mongoose.Types.ObjectId(orgId);
+  }
+
+  const allowed = ['name', 'settings', 'metadata'];
+  const $set = {};
+  for (const k of allowed) if (k in payload) $set[k] = payload[k];
+
+  return ClassModel.findOneAndUpdate(filter, { $set }, { new: true });
+}
+
+async function hardDelete({ id, ownerIdEnforce, orgId }) {
+  const filter = { _id: id };
+  if (ownerIdEnforce && mongoose.isValidObjectId(ownerIdEnforce)) {
+    filter.teacherId = new mongoose.Types.ObjectId(ownerIdEnforce);
+  }
+  if (orgId && mongoose.isValidObjectId(orgId)) {
+    filter.orgId = new mongoose.Types.ObjectId(orgId);
+  }
+  return ClassModel.findOneAndDelete(filter);
+}
+
+// JOIN by code (student)
+async function findByCode({ code, orgId }) {
+  const filter = { code: String(code).toUpperCase() };
+  if (orgId && mongoose.isValidObjectId(orgId)) filter.orgId = new mongoose.Types.ObjectId(orgId);
+  return ClassModel.findOne(filter);
+}
+
+async function joinByCode({ code, userId, orgId }) {
+  const cls = await findByCode({ code, orgId });
+  if (!cls) {
+    const err = new Error('Class not found by code');
+    err.status = 404;
+    throw err;
+  }
+  // thêm student nếu chưa có
+  const uid = new mongoose.Types.ObjectId(userId);
+  const has = cls.studentIds.some(sid => String(sid) === String(uid));
+  if (!has) {
+    cls.studentIds.push(uid);
+    await cls.save();
+  }
+  return cls;
+}
+
+// REGENERATE CODE (owner/admin)
+async function regenerateCode({ id, ownerIdEnforce, orgId }) {
+  const cls = await ClassModel.findById(id);
+  if (!cls) {
+    const err = new Error('Class not found');
+    err.status = 404;
+    throw err;
+  }
+  if (ownerIdEnforce && String(cls.teacherId) !== String(ownerIdEnforce)) {
+    const err = new Error('Only owner can regenerate code');
+    err.status = 403;
+    throw err;
+  }
+  const newCode = await generateUniqueCode(orgId || cls.orgId);
+  cls.code = newCode;
+  await cls.save();
+  return cls;
+}
+
+module.exports = {
+  create,
+  list,
+  getById,
+  updatePartial,
+  hardDelete,
+  joinByCode,
+  regenerateCode,
+};
