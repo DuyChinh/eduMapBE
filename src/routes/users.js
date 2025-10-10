@@ -4,7 +4,7 @@ const userController = require('../controllers/userController');
 const authMiddleware = require('../middlewares/auth');
 
 // Apply auth middleware to all user routes
-// router.use(authMiddleware);
+router.use(authMiddleware);
 
 // Define user-related routes here
 router.get('/profile', userController.getProfile);

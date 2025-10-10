@@ -11,8 +11,6 @@ const userController = {
                 });
             }
             
-            
-            // Try to find user ID from different possible fields
             const userId = req.user.id || req.user._id || req.user.userId || req.user.sub;
             
             if (!userId) {
