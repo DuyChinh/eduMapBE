@@ -6,7 +6,7 @@ const ResetToken = require('../models/ResetToken');
 const { validatePassword } = require('../utils/passwordValidator');
 
 const authController = {
-    async register(req, res) {        
+    async register(req, res) {
         try {
             const result = await authService.register(req.body);
             res.status(201).json({
