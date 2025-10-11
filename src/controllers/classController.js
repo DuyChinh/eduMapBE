@@ -231,10 +231,43 @@ async function join(req, res, next) {
   }
 }
 
+// POST /v1/api/classes/:id/students/bulk
+async function addStudents(req, res, next) {
+  try {
+    if (!isTeacherOrAdmin(req.user)) {
+      return res.status(403).json({ ok: false, message: 'Forbidden' });
+    }
+    const id = req.params.id;
+    const { studentIds } = req.body;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ ok: false, message: 'invalid class id' });
+    }
+    if (!Array.isArray(studentIds) || studentIds.length === 0) {
+      return res.status(400).json({ ok: false, message: 'studentIds must be non-empty array' });
+    }
+
+    const orgId = getOrgIdSoft(req);
+    const ownerIdEnforce = isAdmin(req.user) ? undefined : req.user.id;
+
+    const { updatedClass, report } = await service.addStudentsToClass({
+      id,
+      studentIds,
+      ownerIdEnforce,
+      orgId
+    });
+
+    return res.json({ ok: true, data: updatedClass, report });
+  } catch (e) {
+    if (e?.status) return res.status(e.status).json({ ok: false, message: e.message });
+    next(e);
+  }
+}
+
 module.exports = {
   create,
   list,
   getOne,
+  addStudents,
   mine,
   patch,
   remove,

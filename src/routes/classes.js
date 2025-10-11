@@ -14,6 +14,10 @@ router.delete('/:id', auth, classController.remove);
 // tiện ích
 router.post('/:id/regenerate-code', auth, classController.regenerateCode);
 
+// giáo viên hoặc admin thêm nhiều học sinh vào lớp
+router.post('/:id/students/bulk', auth, classController.addStudents);
+
+
 // student join bằng code
 router.post('/join', auth, classController.join);
 

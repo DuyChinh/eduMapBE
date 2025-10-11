@@ -1,4 +1,7 @@
 const ClassModel = require('../models/Class');
+const mongoose = require('mongoose');
+const User = require('../models/User');
+
 
 /** Sinh code: A-Z + 2-9 */
 function randomCode(len = 6) {
@@ -143,6 +146,86 @@ async function regenerateCode({ id, ownerIdEnforce, orgId }) {
   return cls;
 }
 
+/**
+ * Add multiple students to a class.
+ * Returns object: { updatedClass, report: { added: [...], already: [...], invalid: [...], notStudents: [...] } }
+ */
+async function addStudentsToClass({ id, studentIds = [], ownerIdEnforce, orgId }) {
+  if (!Array.isArray(studentIds) || studentIds.length === 0) {
+    const err = new Error('studentIds must be a non-empty array');
+    err.status = 400;
+    throw err;
+  }
+
+  // Normalize & validate ids
+  const uniqueIds = Array.from(new Set(studentIds.map(s => String(s))));
+  const invalid = uniqueIds.filter(s => !mongoose.isValidObjectId(s));
+  const validIds = uniqueIds.filter(s => mongoose.isValidObjectId(s)).map(s => new mongoose.Types.ObjectId(s));
+
+  // If all invalid -> error
+  if (validIds.length === 0) {
+    const err = new Error('No valid studentIds provided');
+    err.status = 400;
+    throw err;
+  }
+
+  // Fetch users to ensure they exist + are students
+  const users = await User.find({ _id: { $in: validIds } }).select('_id role');
+  const foundIds = users.map(u => String(u._id));
+  const notFound = validIds.map(v => String(v)).filter(id => !foundIds.includes(id));
+  const notStudents = users.filter(u => u.role !== 'student').map(u => String(u._id));
+  const studentValidIds = users.filter(u => u.role === 'student').map(u => new mongoose.Types.ObjectId(String(u._id)));
+
+  if (studentValidIds.length === 0) {
+    // nothing to add
+    return {
+      updatedClass: null,
+      report: { added: [], already: [], invalid, notFound, notStudents }
+    };
+  }
+
+  // Build filter for class (owner enforcement + org)
+  const filter = { _id: id };
+  if (ownerIdEnforce && mongoose.isValidObjectId(ownerIdEnforce)) {
+    filter.teacherId = new mongoose.Types.ObjectId(ownerIdEnforce);
+  }
+  if (orgId && mongoose.isValidObjectId(orgId)) {
+    filter.orgId = new mongoose.Types.ObjectId(orgId);
+  }
+
+  // Get current class to compute 'already' vs 'toAdd'
+  const cls = await ClassModel.findOne(filter);
+  if (!cls) {
+    const err = new Error('Class not found or forbidden');
+    err.status = 403;
+    throw err;
+  }
+
+  const existing = cls.studentIds.map(s => String(s));
+  const toAdd = studentValidIds.filter(sid => !existing.includes(String(sid)));
+
+  // Update using $addToSet with $each
+  let updated = cls;
+  if (toAdd.length > 0) {
+    updated = await ClassModel.findOneAndUpdate(
+      { _id: id, ...(filter.teacherId ? { teacherId: filter.teacherId } : {}) },
+      { $addToSet: { studentIds: { $each: toAdd } } },
+      { new: true }
+    );
+  }
+
+  return {
+    updatedClass: updated,
+    report: {
+      added: toAdd.map(x => String(x)),
+      already: existing.filter(e => studentValidIds.map(s=>String(s)).includes(e)),
+      invalid,
+      notFound,
+      notStudents
+    }
+  };
+}
+
 module.exports = {
   create,
   list,
@@ -151,4 +234,5 @@ module.exports = {
   hardDelete,
   joinByCode,
   regenerateCode,
+  addStudentsToClass,
 };
