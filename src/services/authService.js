@@ -2,6 +2,7 @@ const { User } = require('../models/index');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { validatePassword } = require('../utils/passwordValidator');
+const { sanitizeUser } = require('../utils/userUtils');
 
 const authService = {
     async register(UserData) {
@@ -26,7 +27,7 @@ const authService = {
             role,
             status: 'active',
         });
-        return user;
+        return sanitizeUser(user);
     },
 
 
@@ -37,10 +38,10 @@ const authService = {
         }
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            throw new Error('Invalid password');
+            throw new Error('Email or password is incorrect');
         }
         const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_ACCESS_EXPIRES });
-        return { user, token };
+        return { user: sanitizeUser(user), token };
     }
 }
 

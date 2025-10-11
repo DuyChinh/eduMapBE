@@ -20,16 +20,21 @@ const authController = {
             if (error.message.includes('Password validation failed')) {
                 const errors = error.message.replace('Password validation failed: ', '').split(', ');
                 return res.status(400).json({
-                    success: false,
                     message: 'Password validation failed',
                     errors: errors
                 });
             }
             
+            // Handle user already exists error
+            if (error.message === 'User already exists') {
+                return res.status(409).json({
+                    message: 'User already exists'
+                });
+            }
+            
             // Other errors
             res.status(500).json({ 
-                success: false,
-                message: error.message 
+                message: 'Server error: ' + error.message 
             });
         }
     },
@@ -44,7 +49,17 @@ const authController = {
                 data: result
             });
         } catch (error) {
-            res.status(500).json({ message: error.message });
+            // Handle specific login errors
+            if (error.message === 'User not found' || error.message === 'Email or password is incorrect') {
+                return res.status(401).json({
+                    message: 'Email or password is incorrect'
+                });
+            }
+            
+            // Other errors
+            res.status(500).json({
+                message: 'Server error: ' + error.message
+            });
         }
     },
 
@@ -70,7 +85,6 @@ const authController = {
 
             if (!email) {
                 return res.status(400).json({
-                    success: false,
                     message: 'Email is required'
                 });
             }
@@ -109,7 +123,6 @@ const authController = {
         } catch (error) {
             console.error('Error in forgotPassword:', error);
             res.status(500).json({
-                success: false,
                 message: 'Server error: ' + error.message
             });
         }
@@ -121,7 +134,6 @@ const authController = {
 
             if (!token || !newPassword) {
                 return res.status(400).json({
-                    success: false,
                     message: 'Token and new password are required'
                 });
             }
@@ -130,7 +142,6 @@ const authController = {
             const passwordValidation = validatePassword(newPassword);
             if (!passwordValidation.isValid) {
                 return res.status(400).json({
-                    success: false,
                     message: 'Password validation failed',
                     errors: passwordValidation.errors
                 });
@@ -145,7 +156,6 @@ const authController = {
 
             if (!resetToken) {
                 return res.status(400).json({
-                    success: false,
                     message: 'Invalid or expired reset token'
                 });
             }
@@ -154,7 +164,6 @@ const authController = {
             const user = await User.findById(resetToken.userId);
             if (!user) {
                 return res.status(404).json({
-                    success: false,
                     message: 'User not found'
                 });
             }
@@ -176,7 +185,6 @@ const authController = {
         } catch (error) {
             console.error('Error in resetPassword:', error);
             res.status(500).json({
-                success: false,
                 message: 'Server error: ' + error.message
             });
         }
