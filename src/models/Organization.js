@@ -8,8 +8,7 @@ const OrganizationSchema = new mongoose.Schema({
   },
   domain: {
     type: String,
-    // unique: true,
-    // sparse: true,
+    unique: true,
     lowercase: true
   },
   plan: {

@@ -6,7 +6,6 @@ const authMiddleware = (req, res, next) => {
     if (!process.env.JWT_SECRET) {
       console.error('JWT_SECRET not configured in environment variables');
       return res.status(500).json({
-        success: false,
         message: 'Server configuration error'
       });
     }
@@ -16,7 +15,6 @@ const authMiddleware = (req, res, next) => {
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
-        success: false,
         message: 'Access denied. No token provided or invalid format.'
       });
     }
@@ -47,18 +45,15 @@ const authMiddleware = (req, res, next) => {
     // Provide more specific error messages
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
-        success: false,
         message: 'Invalid token format or signature'
       });
     } else if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
-        success: false,
         message: 'Token has expired'
       });
     }
     
     res.status(401).json({
-      success: false,
       message: 'Authentication failed: ' + error.message
     });
   }

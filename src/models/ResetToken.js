@@ -7,11 +7,9 @@ const ResetTokenSchema = new mongoose.Schema({
     required: true,
     index: true
   },
-  token: {
+  otp: {
     type: String,
-    required: true,
-    unique: true,
-    index: true
+    required: true
   },
   expiresAt: {
     type: Date,
@@ -26,7 +24,7 @@ const ResetTokenSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index để tìm token chưa sử dụng
-ResetTokenSchema.index({ token: 1, used: 1 });
+// Index để tìm OTP chưa sử dụng
+ResetTokenSchema.index({ otp: 1, used: 1 });
 
 module.exports = mongoose.model('ResetToken', ResetTokenSchema);

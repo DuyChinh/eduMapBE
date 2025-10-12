@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const { sanitizeUser, sanitizeUsers } = require('../utils/userUtils');
 
 const userController = {
     async getProfile(req, res){
@@ -6,7 +7,6 @@ const userController = {
             // Check if req.user exists
             if (!req.user) {
                 return res.status(401).json({
-                    success: false,
                     message: 'Authentication required - user not in request'
                 });
             }
@@ -16,7 +16,6 @@ const userController = {
             if (!userId) {
                 console.log('No user ID found in token payload. Available fields:', Object.keys(req.user));
                 return res.status(401).json({
-                    success: false,
                     message: 'Authentication required - missing user ID'
                 });
             }
@@ -28,7 +27,6 @@ const userController = {
             if (!user) {
                 console.log('User not found in database with ID:', userId);
                 return res.status(404).json({ 
-                    success: false, 
                     message: 'User not found in database' 
                 });
             }
@@ -36,12 +34,11 @@ const userController = {
             // Return formatted response according to API docs
             res.json({
                 success: true,
-                data: user,
+                data: sanitizeUser(user),
             });
         } catch (error) {
             console.error('Error in getProfile:', error);
             res.status(500).json({ 
-                success: false, 
                 message: 'Server error: ' + error.message
             });
         }
@@ -50,40 +47,71 @@ const userController = {
     async getAllUsers(req, res) {
         try {
             const users = await User.find();
-            res.json(users);
+            res.json({
+                success: true,
+                data: sanitizeUsers(users)
+            });
         } catch (error) {
-            res.status(500).json({ message: 'Server error' });
+            res.status(500).json({ 
+                message: 'Server error: ' + error.message 
+            });
         }           
     },
 
     async getUserById(req, res) {
         try {
             const user = await User.findById(req.params.id);
-            if (!user) return res.status(404).json({ message: 'User not found' });
-            res.json(user);
+            if (!user) {
+                return res.status(404).json({ 
+                    message: 'User not found' 
+                });
+            }
+            res.json({
+                success: true,
+                data: sanitizeUser(user)
+            });
         } catch (error) {
-            res.status(500).json({ message: 'Server error' });
+            res.status(500).json({ 
+                message: 'Server error: ' + error.message 
+            });
         }
     },
 
     // Update user profile
     async updateProfile(req, res){
         try {
-            const user = await User.findByIdAndUpdate(req.user.id, req.body, { new: true });
-            if (!user) return res.status(404).json({ message: 'User not found' });
-            res.json(user);
+            const userId = req.user.userId || req.user.id || req.user._id || req.user.sub;
+            const user = await User.findByIdAndUpdate(userId, req.body, { new: true });
+            if (!user) {
+                return res.status(404).json({ 
+                    message: 'User not found' 
+                });
+            }
+            res.json({
+                success: true,
+                message: 'Profile updated successfully',
+                data: sanitizeUser(user)
+            });
         } catch (error) {
-            res.status(500).json({ message: 'Server error' });
+            res.status(500).json({ 
+                message: 'Server error: ' + error.message 
+            });
         }
     },
 
         // Delete user account
     async deleteAccount(req, res) {
         try {
-            await User.findByIdAndDelete(req.user.id);
-            res.json({ message: 'User account deleted' });
+            const userId = req.user.userId || req.user.id || req.user._id || req.user.sub;
+            await User.findByIdAndDelete(userId);
+            res.json({ 
+                success: true,
+                message: 'User account deleted successfully' 
+            });
         } catch (error) {
-            res.status(500).json({ message: 'Server error' });
+            res.status(500).json({ 
+                message: 'Server error: ' + error.message 
+            });
         }
     },
 
@@ -97,7 +125,6 @@ const userController = {
             const validRoles = ['teacher', 'student'];
             if (!role || !validRoles.includes(role)) {
                 return res.status(400).json({
-                    success: false,
                     message: 'Invalid role. Must be one of: teacher, student'
                 });
             }
@@ -111,7 +138,6 @@ const userController = {
 
             if (!user) {
                 return res.status(404).json({
-                    success: false,
                     message: 'User not found'
                 });
             }
@@ -129,7 +155,6 @@ const userController = {
         } catch (error) {
             console.error('Error updating user role:', error);
             res.status(500).json({
-                success: false,
                 message: 'Server error: ' + error.message
             });
         }

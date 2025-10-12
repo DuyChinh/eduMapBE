@@ -9,7 +9,7 @@ const ClassSchema = new mongoose.Schema({
   },
   name: {
     type: String,
-    required: true,
+    required: true,  
     trim: true
   },
   code: {
@@ -17,7 +17,7 @@ const ClassSchema = new mongoose.Schema({
     required: true,
     uppercase: true
   },
-  teacherId: {
+  'teacherId': {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
