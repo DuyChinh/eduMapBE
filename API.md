@@ -134,13 +134,15 @@ const getPasswordStrength = (password) => {
 }
 
 ## api/forgot-password
-###🔄 Luồng hoạt động:
+###🔄 Luồng hoạt động mới (OTP):
 ```
-User nhập email → API tạo token → Gửi email
-User click link trong email → Frontend nhận token
-User nhập password mới → API verify token → Cập nhật password
-Token được đánh dấu đã sử dụng
+1. User nhập email → API tạo OTP 6 chữ số → Gửi email chứa OTP
+2. User nhập OTP từ email → API verify OTP → Đánh dấu OTP đã sử dụng
+3. User nhập password mới → API kiểm tra OTP đã verify → Cập nhật password
+4. Xóa tất cả OTP của user
 ```
+
+### Bước 1: Gửi OTP
 ### call: https://edu-map-be.vercel.app/v1/api/auth/forgot-password
 #### method: POST
 -- body --
@@ -151,16 +153,50 @@ Token được đánh dấu đã sử dụng
 ```
 {
   "success": true,
-  "message": "If the email exists, a reset link has been sent"
+  "message": "If the email exists, an OTP has been sent"
 }
 ```
 
-## api/reset-password
+### Bước 2: Xác thực OTP
+### call: https://edu-map-be.vercel.app/v1/api/auth/verify-otp
+#### method: POST
+-- body --
+{
+  "email": "nguyenvana@example.com",
+  "otp": "123456"
+}
+#### response:
+```
+{
+  "success": true,
+  "message": "OTP verified successfully",
+  "data": {
+    "userId": "user_id_here",
+    "email": "nguyenvana@example.com"
+  }
+}
+```
+#### error responses:
+```
+// Invalid OTP
+{
+  "success": false,
+  "message": "Invalid or expired OTP"
+}
+
+// Wrong email
+{
+  "success": false,
+  "message": "Invalid OTP for this email"
+}
+```
+
+### Bước 3: Reset Password
 ### call: https://edu-map-be.vercel.app/v1/api/auth/reset-password
 #### method: POST
 -- body --
 {
-  "token": "reset_token_from_email",
+  "email": "nguyenvana@example.com",
   "newPassword": "MyNewPass123!"
 }
 #### response:
@@ -175,13 +211,19 @@ Token được đánh dấu đã sử dụng
 // Missing fields
 {
   "success": false,
-  "message": "Token and new password are required"
+  "message": "Email and new password are required"
 }
 
-// Invalid token
+// OTP not verified
 {
   "success": false,
-  "message": "Invalid or expired reset token"
+  "message": "Please verify OTP first"
+}
+
+// User not found
+{
+  "success": false,
+  "message": "User not found"
 }
 
 // Password validation failed
@@ -196,6 +238,66 @@ Token được đánh dấu đã sử dụng
 }
 ```
 
+### 📱 Hướng dẫn triển khai Frontend:
+
+#### Flow UI/UX đề xuất:
+```
+1. Trang "Forgot Password" 
+   ├── Input email → Gọi API forgot-password
+   ├── Hiển thị: "OTP đã được gửi đến email của bạn"
+   └── Redirect đến trang nhập OTP
+
+2. Trang "Enter OTP"
+   ├── Input OTP 6 chữ số
+   ├── Timer countdown 15 phút
+   ├── Button "Verify OTP" → Gọi API verify-otp
+   └── Redirect đến trang đặt password mới
+
+3. Trang "Reset Password"
+   ├── Input password mới (2 lần)
+   ├── Button "Reset Password" → Gọi API reset-password
+   └── Redirect đến trang login với thông báo thành công
+```
+
+#### Lưu ý quan trọng:
+- **OTP hết hạn**: 15 phút
+- **OTP chỉ dùng 1 lần**: Sau khi verify thành công, không thể dùng lại
+- **Session**: Frontend cần lưu email trong session/localStorage để dùng ở bước 3
+- **Validation**: Kiểm tra OTP format (6 chữ số) trước khi gọi API
+- **Error handling**: Xử lý các trường hợp OTP sai, hết hạn, email không tồn tại
+
+#### Code example (React):
+```javascript
+// Step 1: Send OTP
+const sendOTP = async (email) => {
+  const response = await fetch('/v1/api/auth/forgot-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email })
+  });
+  return response.json();
+};
+
+// Step 2: Verify OTP
+const verifyOTP = async (email, otp) => {
+  const response = await fetch('/v1/api/auth/verify-otp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, otp })
+  });
+  return response.json();
+};
+
+// Step 3: Reset Password
+const resetPassword = async (email, newPassword) => {
+  const response = await fetch('/v1/api/auth/reset-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, newPassword })
+  });
+  return response.json();
+};
+```
 
 ## SSO Google (OAuth 2.0)
 
