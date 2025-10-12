@@ -9,8 +9,7 @@ const ResetTokenSchema = new mongoose.Schema({
   },
   otp: {
     type: String,
-    required: true,
-    index: true
+    required: true
   },
   expiresAt: {
     type: Date,

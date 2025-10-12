@@ -33,8 +33,7 @@ const QuestionSchema = new mongoose.Schema({
     required: true
   },
   tags: [{
-    type: String,
-    index: true
+    type: String
   }],
   level: {
     type: Number,
