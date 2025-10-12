@@ -9,7 +9,7 @@ const QuestionSchema = new mongoose.Schema({
   orgId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Organization',
-    required: true,
+    //required: true,
     index: true
   },
   ownerId: {
@@ -17,6 +17,17 @@ const QuestionSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
     index: true
+  },
+  subjectId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Subject',
+    index: true,
+    required: false
+  },
+  subjectCode: {
+    type: String,
+    trim: true,
+    uppercase: true
   },
   type: {
     type: String,
@@ -64,5 +75,6 @@ QuestionSchema.index({ orgId: 1, ownerId: 1, tags: 1 });
 QuestionSchema.index({ orgId: 1, text: 'text' });
 QuestionSchema.index({ orgId: 1, tags: 1 });
 QuestionSchema.index({ orgId: 1, type: 1, level: 1 });
+QuestionSchema.index({ orgId: 1, subjectId: 1, level: 1, type: 1 });
 
 module.exports = mongoose.model('Question', QuestionSchema);
