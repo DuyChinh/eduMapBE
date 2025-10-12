@@ -30,6 +30,10 @@ async function generateUniqueCode(orgId, tries = 10, len = 6) {
 
 async function create({ orgId, teacherId, payload }) {
   const code = await generateUniqueCode(orgId);
+
+  // Chỉ chèn metadata nếu có (ví dụ academicYear)
+  const metadata = (payload && payload.metadata) ? payload.metadata : {};
+
   const doc = await ClassModel.create({
     ...(orgId ? { orgId } : {}),
     teacherId,
@@ -37,10 +41,11 @@ async function create({ orgId, teacherId, payload }) {
     code, // auto-generated
     studentIds: payload.studentIds || [],
     settings: payload.settings || {},
-    metadata: payload.metadata || {}
+    metadata
   });
   return doc;
 }
+
 
 // LIST + FILTER
 function buildFilter({ orgId, teacherId, q }) {
@@ -51,7 +56,28 @@ function buildFilter({ orgId, teacherId, q }) {
   return f;
 }
 
-async function list({ orgId, teacherId, q, page = 1, limit = 20, sort = '-createdAt' }) {
+async function list({ orgId, teacherId, teacherEmail, q, page = 1, limit = 20, sort = '-createdAt' }) {
+  // If teacherEmail provided, try to find the teacher user and use its id.
+  if (teacherEmail && typeof teacherEmail === 'string') {
+    const email = teacherEmail.trim().toLowerCase();
+    if (email) {
+      const teacherUser = await User.findOne({ email }).select('_id role');
+      if (!teacherUser) {
+        // No such teacher — return empty pagination result
+        return {
+          items: [],
+          total: 0,
+          page: Number(page) || 1,
+          limit: Number(limit) || 20,
+          pages: 1,
+        };
+      }
+      // optionally ensure role is teacher (if you want strictness)
+      // if (teacherUser.role !== 'teacher') { ...handle as not found... }
+      teacherId = String(teacherUser._id);
+    }
+  }
+
   const filter = buildFilter({ orgId, teacherId, q });
   const nPage = Number(page) || 1;
   const nLimit = Number(limit) || 20;
@@ -70,6 +96,7 @@ async function list({ orgId, teacherId, q, page = 1, limit = 20, sort = '-create
     pages: Math.max(1, Math.ceil(total / nLimit)),
   };
 }
+
 
 async function getById(id) {
   return ClassModel.findById(id);
@@ -148,79 +175,152 @@ async function regenerateCode({ id, ownerIdEnforce, orgId }) {
 
 /**
  * Add multiple students to a class.
- * Returns object: { updatedClass, report: { added: [...], already: [...], invalid: [...], notStudents: [...] } }
+ * Accepts either studentIds: [] (strings) or studentEmails: [] (strings of email)
+ * Returns object: { updatedClass, report: { added, already, invalidIds, invalidEmails, notFoundIds, notFoundEmails, notStudents } }
  */
-async function addStudentsToClass({ id, studentIds = [], ownerIdEnforce, orgId }) {
-  if (!Array.isArray(studentIds) || studentIds.length === 0) {
-    const err = new Error('studentIds must be a non-empty array');
+async function addStudentsToClass({ id, studentIds = [], studentEmails = [], ownerIdEnforce, orgId }) {
+  // Normalize provided inputs
+  const idsInput = Array.isArray(studentIds) ? Array.from(new Set(studentIds.map(s => String(s)))) : [];
+  const emailsInput = Array.isArray(studentEmails) ? Array.from(new Set(studentEmails.map(e => String(e).toLowerCase().trim()))) : [];
+
+  if (idsInput.length === 0 && emailsInput.length === 0) {
+    const err = new Error('studentIds or studentEmails must be provided');
     err.status = 400;
     throw err;
   }
 
-  // Normalize & validate ids
-  const uniqueIds = Array.from(new Set(studentIds.map(s => String(s))));
-  const invalid = uniqueIds.filter(s => !mongoose.isValidObjectId(s));
-  const validIds = uniqueIds.filter(s => mongoose.isValidObjectId(s)).map(s => new mongoose.Types.ObjectId(s));
+  // Validate ids
+  const invalidIds = idsInput.filter(s => !mongoose.isValidObjectId(s));
+  const validIdObjs = idsInput.filter(s => mongoose.isValidObjectId(s)).map(s => new mongoose.Types.ObjectId(s));
 
-  // If all invalid -> error
-  if (validIds.length === 0) {
-    const err = new Error('No valid studentIds provided');
-    err.status = 400;
-    throw err;
+  // Resolve emails -> users
+  const resolvedFromEmails = [];
+  const notFoundEmails = [];
+  const invalidEmails = []; // (optional: e.g. empty / malformed) we already trimmed and lowercased; treat empty as invalid
+  for (const em of emailsInput) {
+    if (!em) { invalidEmails.push(em); continue; }
+    // We'll batch-query below; keep list
   }
 
-  // Fetch users to ensure they exist + are students
-  const users = await User.find({ _id: { $in: validIds } }).select('_id role');
-  const foundIds = users.map(u => String(u._id));
-  const notFound = validIds.map(v => String(v)).filter(id => !foundIds.includes(id));
-  const notStudents = users.filter(u => u.role !== 'student').map(u => String(u._id));
-  const studentValidIds = users.filter(u => u.role === 'student').map(u => new mongoose.Types.ObjectId(String(u._id)));
+  // Batch query users for both id list and email list
+  const queryUsers = [];
+  if (validIdObjs.length > 0) queryUsers.push({ _id: { $in: validIdObjs } });
+  if (emailsInput.length > 0) queryUsers.push({ email: { $in: emailsInput } });
 
-  if (studentValidIds.length === 0) {
-    // nothing to add
+  // Build final user list query
+  const userQuery = queryUsers.length > 0 ? { $or: queryUsers } : null;
+  let users = [];
+  if (userQuery) {
+    users = await User.find(userQuery).select('_id email role orgId').lean();
+  }
+
+  // Map users
+  const foundById = new Set(users.map(u => String(u._id)));
+  const foundByEmailMap = new Map(users.map(u => [String(u.email).toLowerCase(), u]));
+
+  // Determine notFoundIds (those valid ids not in DB)
+  const notFoundIds = validIdObjs.map(s => String(s)).filter(s => !foundById.has(s));
+
+  // For emails, determine which were found
+  const foundEmailIds = [];
+  for (const em of emailsInput) {
+    const u = foundByEmailMap.get(String(em));
+    if (!u) {
+      notFoundEmails.push(em);
+    } else {
+      foundEmailIds.push(String(u._id));
+      resolvedFromEmails.push(u);
+    }
+  }
+
+  // Merge all candidate student ids (from validIdObjs and resolvedFromEmails)
+  const candidateIds = Array.from(new Set([
+    ...validIdObjs.map(x => String(x)),
+    ...foundEmailIds
+  ])).map(s => new mongoose.Types.ObjectId(s));
+
+  // If no candidate student ids to process, return report early
+  if (candidateIds.length === 0) {
     return {
       updatedClass: null,
-      report: { added: [], already: [], invalid, notFound, notStudents }
+      report: {
+        added: [],
+        already: [],
+        invalidIds,
+        notFoundIds,
+        invalidEmails,
+        notFoundEmails,
+        notStudents: []
+      }
     };
   }
 
-  // Build filter for class (owner enforcement + org)
-  const filter = { _id: id };
-  if (ownerIdEnforce && mongoose.isValidObjectId(ownerIdEnforce)) {
-    filter.teacherId = new mongoose.Types.ObjectId(ownerIdEnforce);
-  }
+  // Verify roles (must be students) and org (optional)
+  const usersForIds = await User.find({ _id: { $in: candidateIds } }).select('_id role orgId email').lean();
+  const notStudents = usersForIds.filter(u => u.role !== 'student').map(u => String(u._id));
+  // If using org check: ensure user's orgId === class orgId (if orgId provided)
   if (orgId && mongoose.isValidObjectId(orgId)) {
-    filter.orgId = new mongoose.Types.ObjectId(orgId);
+    const cls = await ClassModel.findById(id).select('orgId studentIds').lean();
+    if (!cls) {
+      const err = new Error('Class not found or forbidden');
+      err.status = 403;
+      throw err;
+    }
+    const clsOrgId = cls.orgId ? String(cls.orgId) : null;
+    // Filter usersForIds by org match
+    const wrongOrg = usersForIds.filter(u => String(u.orgId || '') !== String(clsOrgId)).map(u => String(u._id));
+    if (wrongOrg.length > 0) {
+      notStudents.push(...wrongOrg);
+    }
+    // existing student ids from class for computing "already"
+    var existingStudentIds = (cls.studentIds || []).map(s => String(s));
+  } else {
+    // fetch class to know existing studentIds
+    const cls = await ClassModel.findById(id).select('studentIds').lean();
+    if (!cls) {
+      const err = new Error('Class not found or forbidden');
+      err.status = 403;
+      throw err;
+    }
+    var existingStudentIds = (cls.studentIds || []).map(s => String(s));
   }
 
-  // Get current class to compute 'already' vs 'toAdd'
-  const cls = await ClassModel.findOne(filter);
-  if (!cls) {
-    const err = new Error('Class not found or forbidden');
-    err.status = 403;
-    throw err;
-  }
+  // Now compute toAdd vs already
+  const validStudentIds = usersForIds.filter(u => u.role === 'student' && !notStudents.includes(String(u._id))).map(u => String(u._id));
+  const already = existingStudentIds.filter(e => validStudentIds.includes(e));
+  const toAdd = validStudentIds.filter(idStr => !existingStudentIds.includes(idStr)).map(s => new mongoose.Types.ObjectId(s));
 
-  const existing = cls.studentIds.map(s => String(s));
-  const toAdd = studentValidIds.filter(sid => !existing.includes(String(sid)));
-
-  // Update using $addToSet with $each
-  let updated = cls;
+  // Perform DB update with $addToSet $each
+  let updated = null;
   if (toAdd.length > 0) {
+    const filter = { _id: id };
+    if (ownerIdEnforce && mongoose.isValidObjectId(ownerIdEnforce)) filter.teacherId = new mongoose.Types.ObjectId(ownerIdEnforce);
+    if (orgId && mongoose.isValidObjectId(orgId)) filter.orgId = new mongoose.Types.ObjectId(orgId);
+
     updated = await ClassModel.findOneAndUpdate(
-      { _id: id, ...(filter.teacherId ? { teacherId: filter.teacherId } : {}) },
+      filter,
       { $addToSet: { studentIds: { $each: toAdd } } },
       { new: true }
     );
+    if (!updated) {
+      const err = new Error('Class not found or forbidden');
+      err.status = 403;
+      throw err;
+    }
+  } else {
+    // no change, read current class doc
+    updated = await ClassModel.findById(id);
   }
 
   return {
     updatedClass: updated,
     report: {
       added: toAdd.map(x => String(x)),
-      already: existing.filter(e => studentValidIds.map(s=>String(s)).includes(e)),
-      invalid,
-      notFound,
+      already,
+      invalidIds,
+      notFoundIds,
+      invalidEmails,
+      notFoundEmails,
       notStudents
     }
   };

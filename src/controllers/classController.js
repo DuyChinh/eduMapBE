@@ -16,40 +16,38 @@ function assertTeacherOrAdmin(user) {
   return user && (user.role === 'teacher' || user.role === 'admin');
 }
 
-/**
- * POST /v1/api/classes
- * Body: { name, settings?, metadata?, studentIds? }
- * - Teacher tạo lớp cho chính mình
- * - Admin có thể tạo thay: truyền teacherId trong body (optional)
- */
+// POST /v1/api/classes
+// Body: { name, academicYear? }
+// Teacher tạo cho mình; Admin có thể truyền teacherId để tạo thay
 async function create(req, res, next) {
   try {
     if (!assertTeacherOrAdmin(req.user)) {
       return res.status(403).json({ ok: false, message: 'Forbidden' });
     }
 
-    // const orgId = getOrgIdSoft(req);
-    // if (!orgId || !mongoose.isValidObjectId(orgId)) {
-    //   return res.status(400).json({ ok: false, message: 'orgId missing/invalid' });
-    // }
-
     let orgId = getOrgIdSoft(req);
     if (orgId && !mongoose.isValidObjectId(orgId)) {
-        return res.status(400).json({ ok: false, message: 'orgId invalid' });
+      return res.status(400).json({ ok: false, message: 'orgId invalid' });
     }
 
-    const { name, settings, metadata, studentIds, teacherId: teacherIdRaw } = req.body;
+    const { name, academicYear, teacherId: teacherIdRaw } = req.body;
     if (!name || typeof name !== 'string') {
       return res.status(400).json({ ok: false, message: 'name is required' });
     }
 
-    // Admin có thể tạo thay; teacher tự tạo thì dùng user.id
+    // Giáo viên tạo cho chính mình; admin có thể tạo cho teacher khác
     const teacherId = (req.user.role === 'admin' && teacherIdRaw) ? teacherIdRaw : req.user.id;
+
+    // Chỉ lưu metadata.academicYear (nếu có). Giữ settings và studentIds mặc định rỗng.
+    const payload = {
+      name,
+      metadata: (academicYear && typeof academicYear === 'string') ? { academicYear } : {}
+    };
 
     const doc = await service.create({
       orgId,
       teacherId,
-      payload: { name, settings, metadata, studentIds }
+      payload
     });
 
     return res.status(201).json({ ok: true, data: doc });
@@ -69,15 +67,16 @@ async function create(req, res, next) {
 async function list(req, res, next) {
   try {
     const orgId = getOrgIdSoft(req);
-    const { q, page, limit, sort, teacherId } = req.query;
+    const { q, page, limit, sort, teacherId, teacherEmail } = req.query;
 
     // Admin: xem tất cả; Teacher: mặc định xem lớp của mình nếu không truyền teacherId;
     // Student: nên dùng "mine" (dưới) để xem lớp đã tham gia.
-    const teacherFilter = isTeacher(req.user) && !teacherId ? req.user.id : teacherId;
+    const teacherFilter = isTeacher(req.user) && !teacherId && !teacherEmail ? req.user.id : teacherId;
 
     const data = await service.list({
       orgId,
       teacherId: teacherFilter,
+      teacherEmail,
       q,
       page,
       limit,
@@ -238,20 +237,25 @@ async function addStudents(req, res, next) {
       return res.status(403).json({ ok: false, message: 'Forbidden' });
     }
     const id = req.params.id;
-    const { studentIds } = req.body;
+    const { studentIds, studentEmails  } = req.body;
     if (!mongoose.isValidObjectId(id)) {
       return res.status(400).json({ ok: false, message: 'invalid class id' });
     }
-    if (!Array.isArray(studentIds) || studentIds.length === 0) {
-      return res.status(400).json({ ok: false, message: 'studentIds must be non-empty array' });
+    if ((!Array.isArray(studentIds) || studentIds.length === 0) &&
+        (!Array.isArray(studentEmails) || studentEmails.length === 0)) {
+      return res.status(400).json({ ok: false, message: 'studentIds or studentEmails must be provided' });
     }
 
     const orgId = getOrgIdSoft(req);
     const ownerIdEnforce = isAdmin(req.user) ? undefined : req.user.id;
 
+    const ids = Array.isArray(studentIds) ? studentIds.map(String) : [];
+    const emails = Array.isArray(studentEmails) ? studentEmails.map(e => (e || '').trim().toLowerCase()).filter(Boolean) : [];
+
     const { updatedClass, report } = await service.addStudentsToClass({
       id,
-      studentIds,
+      studentIds: ids,
+      studentEmails: emails,
       ownerIdEnforce,
       orgId
     });
