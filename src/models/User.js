@@ -53,3 +53,5 @@ UserSchema.index({ orgId: 1, email: 1 }, { unique: true });
 UserSchema.index({ orgId: 1, role: 1 });
 
 module.exports = mongoose.model('User', UserSchema);
+
+

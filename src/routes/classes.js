@@ -6,6 +6,7 @@ const auth = require('../middlewares/auth');
 router.post('/', auth, classController.create);
 
 router.get('/', auth, classController.list);
+router.get('/search', auth, classController.search);
 router.get('/mine', auth, classController.mine);
 router.get('/:id', auth, classController.getOne);
 router.patch('/:id', auth, classController.patch);

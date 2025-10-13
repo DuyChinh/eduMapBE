@@ -7,6 +7,7 @@ const Assignment = require('./Assignment');
 const Submission = require('./Submission');
 const ProctorLog = require('./ProctorLog');
 const Mindmap = require('./Mindmap');
+const ResetToken = require('./ResetToken');
 const mongoose = require('mongoose');
 
 mongoose.connect(process.env.DATABASE_MG_URL);
@@ -20,5 +21,6 @@ module.exports = {
   Assignment,
   Submission,
   ProctorLog,
-  Mindmap
+  Mindmap,
+  ResetToken
 };

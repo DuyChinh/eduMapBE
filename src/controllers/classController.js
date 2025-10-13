@@ -267,6 +267,33 @@ async function addStudents(req, res, next) {
   }
 }
 
+// ============== SEARCH CLASSES =================
+async function search(req, res, next) {
+  try {
+    const orgId = getOrgIdSoft(req);
+    const { q, page = 1, limit = 20, sort = '-createdAt' } = req.query;
+
+    if (!q || q.trim().length < 2) {
+      return res.status(400).json({ 
+        ok: false, 
+        message: 'Search query must be at least 2 characters' 
+      });
+    }
+
+    const data = await service.search({
+      orgId,
+      query: q.trim(),
+      page: Number(page),
+      limit: Number(limit),
+      sort
+    });
+
+    res.json({ ok: true, ...data });
+  } catch (e) { 
+    next(e); 
+  }
+}
+
 module.exports = {
   create,
   list,
@@ -277,4 +304,5 @@ module.exports = {
   remove,
   regenerateCode,
   join,
+  search,
 };

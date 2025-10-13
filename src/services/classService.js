@@ -56,7 +56,7 @@ function buildFilter({ orgId, teacherId, q }) {
   return f;
 }
 
-async function list({ orgId, teacherId, teacherEmail, q, page = 1, limit = 20, sort = '-createdAt' }) {
+async function list({ orgId, teacherId, teacherEmail, q, page = 1, limit = 10, sort = '-createdAt' }) {
   // If teacherEmail provided, try to find the teacher user and use its id.
   if (teacherEmail && typeof teacherEmail === 'string') {
     const email = teacherEmail.trim().toLowerCase();
@@ -68,7 +68,7 @@ async function list({ orgId, teacherId, teacherEmail, q, page = 1, limit = 20, s
           items: [],
           total: 0,
           page: Number(page) || 1,
-          limit: Number(limit) || 20,
+          limit: Number(limit) || 10,
           pages: 1,
         };
       }
@@ -326,6 +326,41 @@ async function addStudentsToClass({ id, studentIds = [], studentEmails = [], own
   };
 }
 
+// SEARCH CLASSES
+async function search({ orgId, query, page = 1, limit = 20, sort = '-createdAt' }) {
+  const filter = {};
+  
+  // Organization filter
+  if (orgId && mongoose.isValidObjectId(orgId)) {
+    filter.orgId = new mongoose.Types.ObjectId(orgId);
+  }
+  
+  // Search by name (case-insensitive)
+  filter.name = { $regex: query, $options: 'i' };
+  
+  const nPage = Number(page) || 1;
+  const nLimit = Number(limit) || 20;
+  const skip = (nPage - 1) * nLimit;
+
+  const [items, total] = await Promise.all([
+    ClassModel.find(filter)
+      .populate('teacherId', 'name email')
+      .sort(sort)
+      .skip(skip)
+      .limit(nLimit),
+    ClassModel.countDocuments(filter),
+  ]);
+
+  return {
+    items,
+    total,
+    page: nPage,
+    limit: nLimit,
+    pages: Math.max(1, Math.ceil(total / nLimit)),
+    query // Trả về query để frontend biết đang search gì
+  };
+}
+
 module.exports = {
   create,
   list,
@@ -335,4 +370,5 @@ module.exports = {
   joinByCode,
   regenerateCode,
   addStudentsToClass,
+  search,
 };

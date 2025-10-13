@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../models/User');
 const ResetToken = require('../models/ResetToken');
+const emailService = require('../services/emailService');
 const { validatePassword } = require('../utils/passwordValidator');
 
 const authController = {
