@@ -17,8 +17,6 @@ function assertTeacherOrAdmin(user) {
 }
 
 // POST /v1/api/classes
-// Body: { name, academicYear? }
-// Teacher tạo cho mình; Admin có thể truyền teacherId để tạo thay
 async function create(req, res, next) {
   try {
     if (!assertTeacherOrAdmin(req.user)) {
@@ -230,6 +228,29 @@ async function join(req, res, next) {
   }
 }
 
+// ============== JOIN CLASS BY TEACHER EMAIL (STUDENT) =================
+async function joinClassByTeacher(req, res, next) {
+  try {
+    if (!isStudent(req.user)) {
+      return res.status(403).json({ ok: false, message: 'Only student can join class by teacher email' });
+    }
+    const { teacherEmail, classId } = req.body;
+    if (!teacherEmail || typeof teacherEmail !== 'string') {
+      return res.status(400).json({ ok: false, message: 'teacherEmail is required' });
+    }
+    if (!classId || !mongoose.isValidObjectId(classId)) {
+      return res.status(400).json({ ok: false, message: 'classId is required and must be valid' });
+    }
+    const orgId = getOrgIdSoft(req);
+
+    const cls = await service.joinClassByTeacher({ teacherEmail, classId, userId: req.user.id, orgId });
+    res.json({ ok: true, data: cls });
+  } catch (e) {
+    if (e?.status) return res.status(e.status).json({ ok: false, message: e.message });
+    next(e);
+  }
+}
+
 // POST /v1/api/classes/:id/students/bulk
 async function addStudents(req, res, next) {
   try {
@@ -271,21 +292,40 @@ async function addStudents(req, res, next) {
 async function search(req, res, next) {
   try {
     const orgId = getOrgIdSoft(req);
-    const { q, page = 1, limit = 20, sort = '-createdAt' } = req.query;
+    const { q, teacherEmail, page = 1, limit = 20, sort = '-createdAt' } = req.query;
 
-    if (!q || q.trim().length < 2) {
+    // Must have either q or teacherEmail
+    const hasValidQuery = q && q.trim().length >= 2;
+    const hasValidTeacherEmail = teacherEmail && teacherEmail.trim().length >= 2;
+    
+    if (!hasValidQuery && !hasValidTeacherEmail) {
       return res.status(400).json({ 
         ok: false, 
-        message: 'Search query must be at least 2 characters' 
+        message: 'TESTING: Please provide either q or teacherEmail parameter' 
       });
+    }
+
+    // If teacherEmail is provided, check permissions for teachers
+    if (teacherEmail && req.user?.role === 'teacher') {
+      const userEmail = req.user?.email?.toLowerCase();
+      const searchEmail = teacherEmail.trim().toLowerCase();
+      
+      if (userEmail !== searchEmail) {
+        return res.status(403).json({ 
+          ok: false, 
+          message: 'Teachers can only search their own classes' 
+        });
+      }
     }
 
     const data = await service.search({
       orgId,
-      query: q.trim(),
+      query: q?.trim(),
+      teacherEmail: teacherEmail?.trim().toLowerCase(),
       page: Number(page),
       limit: Number(limit),
-      sort
+      sort,
+      userRole: req.user?.role
     });
 
     res.json({ ok: true, ...data });
@@ -293,6 +333,7 @@ async function search(req, res, next) {
     next(e); 
   }
 }
+
 
 module.exports = {
   create,
@@ -304,5 +345,6 @@ module.exports = {
   remove,
   regenerateCode,
   join,
+  joinClassByTeacher,
   search,
 };

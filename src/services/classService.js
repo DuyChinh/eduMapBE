@@ -154,6 +154,49 @@ async function joinByCode({ code, userId, orgId }) {
   return cls;
 }
 
+async function joinClassByTeacher({ teacherEmail, classId, userId, orgId }) {
+  // Tìm teacher theo email
+  const User = require('../models/User');
+  const teacher = await User.findOne({ 
+    email: teacherEmail.toLowerCase().trim(),
+    role: 'teacher',
+    ...(orgId ? { orgId: new mongoose.Types.ObjectId(orgId) } : {})
+  });
+  
+  if (!teacher) {
+    const err = new Error('Teacher not found with this email');
+    err.status = 404;
+    throw err;
+  }
+  
+  // Tìm class cụ thể
+  const ClassModel = require('../models/Class');
+  const filter = { 
+    _id: new mongoose.Types.ObjectId(classId),
+    teacherId: teacher._id 
+  };
+  if (orgId && mongoose.isValidObjectId(orgId)) {
+    filter.orgId = new mongoose.Types.ObjectId(orgId);
+  }
+  
+  const cls = await ClassModel.findOne(filter).populate('teacherId', 'name email');
+  if (!cls) {
+    const err = new Error('Class not found or does not belong to this teacher');
+    err.status = 404;
+    throw err;
+  }
+  
+  // Thêm student vào class
+  const uid = new mongoose.Types.ObjectId(userId);
+  const has = cls.studentIds.some(sid => String(sid) === String(uid));
+  if (!has) {
+    cls.studentIds.push(uid);
+    await cls.save();
+  }
+  
+  return cls;
+}
+
 // REGENERATE CODE (owner/admin)
 async function regenerateCode({ id, ownerIdEnforce, orgId }) {
   const cls = await ClassModel.findById(id);
@@ -327,7 +370,7 @@ async function addStudentsToClass({ id, studentIds = [], studentEmails = [], own
 }
 
 // SEARCH CLASSES
-async function search({ orgId, query, page = 1, limit = 20, sort = '-createdAt' }) {
+async function search({ orgId, query, teacherEmail, page = 1, limit = 20, sort = '-createdAt', userRole }) {
   const filter = {};
   
   // Organization filter
@@ -335,8 +378,33 @@ async function search({ orgId, query, page = 1, limit = 20, sort = '-createdAt' 
     filter.orgId = new mongoose.Types.ObjectId(orgId);
   }
   
-  // Search by name (case-insensitive)
-  filter.name = { $regex: query, $options: 'i' };
+  // Search by teacher email
+  if (teacherEmail) {
+    const User = require('../models/User');
+    const teacher = await User.findOne({ 
+      email: teacherEmail,
+      role: 'teacher',
+      ...(orgId ? { orgId: toOID(orgId) } : {})
+    });
+    
+    if (teacher) {
+      filter.teacherId = teacher._id;
+    } else {
+      // Teacher not found, return empty result
+      return {
+        items: [],
+        total: 0,
+        page: Number(page) || 1,
+        limit: Number(limit) || 20,
+        pages: 0
+      };
+    }
+  }
+  
+  // Search by class name (if query provided)
+  if (query) {
+    filter.name = { $regex: query, $options: 'i' };
+  }
   
   const nPage = Number(page) || 1;
   const nLimit = Number(limit) || 20;
@@ -345,7 +413,7 @@ async function search({ orgId, query, page = 1, limit = 20, sort = '-createdAt' 
   const [items, total] = await Promise.all([
     ClassModel.find(filter)
       .populate('teacherId', 'name email')
-      .sort(sort)
+      .sort('-createdAt') // Sort by newest first
       .skip(skip)
       .limit(nLimit),
     ClassModel.countDocuments(filter),
@@ -356,8 +424,7 @@ async function search({ orgId, query, page = 1, limit = 20, sort = '-createdAt' 
     total,
     page: nPage,
     limit: nLimit,
-    pages: Math.max(1, Math.ceil(total / nLimit)),
-    query // Trả về query để frontend biết đang search gì
+    pages: Math.max(1, Math.ceil(total / nLimit))
   };
 }
 
@@ -368,6 +435,7 @@ module.exports = {
   updatePartial,
   hardDelete,
   joinByCode,
+  joinClassByTeacher,
   regenerateCode,
   addStudentsToClass,
   search,
