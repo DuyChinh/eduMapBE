@@ -18,13 +18,6 @@ function buildFilter({ orgId, q, name, tags, type, level, isPublic, ownerId, pub
   // --- filter theo môn ---
   if (subjectId && mongoose.isValidObjectId(subjectId)) {
     filter.subjectId = new mongoose.Types.ObjectId(subjectId);
-  } else if (subjectCode) {
-    filter.subjectCode = String(subjectCode).toUpperCase();
-  }
-
-  // filter theo subject
-  if (subjectId && mongoose.isValidObjectId(subjectId)) {
-    filter.subjectId = new mongoose.Types.ObjectId(subjectId);
   }
   if (subjectCode) {
     filter.subjectCode = String(subjectCode).toUpperCase();
@@ -131,7 +124,7 @@ async function create({ payload, user }) {
   let subjectId = payload.subjectId;
   if (!subjectId && payload.subjectCode) {
     const s = await Subject.findOne({
-    ...(user?.orgId ? { orgId: user.orgId } : {}),
+      ...(user?.orgId ? { orgId: user.orgId } : {}),
       code: String(payload.subjectCode).toUpperCase()
     }).select('_id code');
     if (!s) {

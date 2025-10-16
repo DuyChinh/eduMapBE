@@ -18,6 +18,8 @@ Authorization: Bearer {token}
 - `level`: Độ khó (1-5)
 - `isPublic`: Lọc theo trạng thái công khai (true/false)
 - `ownerId`: Lọc theo người tạo
+- `subjectId`: Lọc theo môn học (ObjectId)
+- `subjectCode`: Lọc theo mã môn học ('MATH', 'LIT', 'PHYS', etc.)
 
 #### Ví dụ tìm kiếm:
 ```
@@ -25,6 +27,8 @@ Authorization: Bearer {token}
 /questions?name=phương trình  // chỉ tìm trong text
 /questions?tags=toán,đại số   // phải có cả 2 tag
 /questions?type=mcq&level=2   // lọc theo type và level
+/questions?subjectCode=MATH   // lọc theo môn Toán
+/questions?subjectId=64a1b2c3d4e5f6789012345  // lọc theo ID môn học
 ```
 
 #### Phản hồi:
@@ -126,7 +130,9 @@ Content-Type: application/json
   "answer": "b",
   "tags": ["toán", "cộng"],
   "level": 1,
-  "isPublic": true
+  "isPublic": true,
+  "subjectId": "64a1b2c3d4e5f6789012345",  // hoặc
+  "subjectCode": "MATH"  // hoặc cả hai
 }
 ```
 #### Phản hồi:
@@ -211,6 +217,29 @@ Authorization: Bearer {token}
 - Admin có thể quản lý tất cả câu hỏi 
 - Học sinh chỉ có thể xem câu hỏi công khai
 - Tìm kiếm (`q`) sẽ tìm trong text, choices.text và tags
+- `subjectId` hoặc `subjectCode` là bắt buộc khi tạo câu hỏi
+- Nếu chỉ có `subjectCode`, hệ thống sẽ tự động tìm `subjectId` tương ứng
+
+## Các môn học có sẵn:
+- `MATH`: Toán học
+- `LIT`: Ngữ văn
+- `PHYS`: Vật lý
+- `CHEM`: Hóa học
+- `BIO`: Sinh học
+- `ENG`: Tiếng Anh
+- `HIST`: Lịch sử
+- `GEO`: Địa lý
+- `CIVIC`: Giáo dục công dân
+- `TECH`: Công nghệ
+- `ART`: Mỹ thuật
+- `MUSIC`: Âm nhạc
+- `PE`: Thể dục
+- `INFO`: Tin học
+- `FRENCH`: Tiếng Pháp
+- `CHINESE`: Tiếng Trung
+- `JAPANESE`: Tiếng Nhật
+- `KOREAN`: Tiếng Hàn
+- `OTHER`: Khác/Chưa phân loại
 - Lọc theo nội dung (`name`) chỉ tìm trong trường text
 - Lọc theo tags yêu cầu câu hỏi phải có tất cả các tag được chỉ định
 - Các loại câu hỏi hỗ trợ: trắc nghiệm (mcq), đúng/sai (tf), trả lời ngắn (short), tự luận (essay)

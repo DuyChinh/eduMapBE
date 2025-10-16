@@ -27,16 +27,39 @@ function validateByType(body) {
     }
     const keys = new Set((body.choices || []).map((c) => c?.key));
     if (body.answer == null) errors.push('answer is required');
-    const ansArr = Array.isArray(body.answer) ? body.answer : [body.answer];
+    
+    // Handle different answer formats
+    let ansArr = [];
+    if (body.answer && typeof body.answer === 'object' && body.answer.keys) {
+      // Format: {"keys": ["A", "B"]}
+      ansArr = body.answer.keys;
+    } else if (Array.isArray(body.answer)) {
+      // Format: ["A", "B"]
+      ansArr = body.answer;
+    } else {
+      // Format: "A" or ["A"]
+      ansArr = [body.answer];
+    }
+    
+    console.log('Debug MCQ validation:', { answer: body.answer, ansArr, keys: Array.from(keys) });
+    
     if (ansArr.some((k) => !keys.has(k))) errors.push('answer must be one of choices.key');
   }
 
   if (type === 'tf') {
-    // answer là boolean hoặc 'true'/'false'
+    // answer là boolean hoặc 'true'/'false' hoặc object với value
     const a = body.answer;
-    const isBool =
-      typeof a === 'boolean' ||
-      (typeof a === 'string' && ['true', 'false'].includes(a.toLowerCase()));
+    let isBool = false;
+    
+    if (typeof a === 'boolean') {
+      isBool = true;
+    } else if (typeof a === 'string' && ['true', 'false'].includes(a.toLowerCase())) {
+      isBool = true;
+    } else if (a && typeof a === 'object' && typeof a.value === 'boolean') {
+      // Format: {"value": true}
+      isBool = true;
+    }
+    
     if (!isBool) errors.push('answer must be boolean for tf');
   }
 

@@ -9,6 +9,16 @@ const DEFAULT_SUBJECTS = [
   { code: 'ENG',  name: 'Tiếng Anh' },
   { code: 'HIST', name: 'Lịch sử' },
   { code: 'GEO',  name: 'Địa lý' },
+  { code: 'CIVIC', name: 'Giáo dục công dân' },
+  { code: 'TECH', name: 'Công nghệ' },
+  { code: 'ART', name: 'Mỹ thuật' },
+  { code: 'MUSIC', name: 'Âm nhạc' },
+  { code: 'PE', name: 'Thể dục' },
+  { code: 'INFO', name: 'Tin học' },
+  { code: 'FRENCH', name: 'Tiếng Pháp' },
+  { code: 'CHINESE', name: 'Tiếng Trung' },
+  { code: 'JAPANESE', name: 'Tiếng Nhật' },
+  { code: 'KOREAN', name: 'Tiếng Hàn' },
   { code: 'OTHER',name: 'Khác/Chưa phân loại' },
 ];
 
@@ -28,6 +38,16 @@ function inferSubjectCodeFromQuestion(q) {
   if (tags.includes('eng')  || /tiếng anh|english/.test(text)) return 'ENG';
   if (tags.includes('hist') || /lịch sử|history/.test(text)) return 'HIST';
   if (tags.includes('geo')  || /địa lý|geography/.test(text)) return 'GEO';
+  if (tags.includes('civic') || /giáo dục công dân|gdcd/.test(text)) return 'CIVIC';
+  if (tags.includes('tech') || /công nghệ|technology/.test(text)) return 'TECH';
+  if (tags.includes('art') || /mỹ thuật|art/.test(text)) return 'ART';
+  if (tags.includes('music') || /âm nhạc|music/.test(text)) return 'MUSIC';
+  if (tags.includes('pe') || /thể dục|physical/.test(text)) return 'PE';
+  if (tags.includes('info') || /tin học|informatics/.test(text)) return 'INFO';
+  if (tags.includes('french') || /tiếng pháp|français/.test(text)) return 'FRENCH';
+  if (tags.includes('chinese') || /tiếng trung|中文/.test(text)) return 'CHINESE';
+  if (tags.includes('japanese') || /tiếng nhật|日本語/.test(text)) return 'JAPANESE';
+  if (tags.includes('korean') || /tiếng hàn|한국어/.test(text)) return 'KOREAN';
   return 'OTHER';
 }
 
@@ -127,7 +147,7 @@ async function up(db, client) {
 }
 
 async function down(db, client) {
-  console.log('[002][down] Removing subject references from questions and dropping subjects (global only)...');
+  console.log('[004][down] Removing subject references from questions and dropping subjects (global only)...');
 
   // Gỡ subjectId/subjectCode khỏi questions (không phục hồi được gốc)
   await db.collection('questions').updateMany(

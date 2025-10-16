@@ -5,12 +5,13 @@ const User = require('../models/User');
 const Class = require('../models/Class');
 const Question = require('../models/Question');
 const Exam = require('../models/Exam');
+const Subject = require('../models/Subject');
 
 class Seeder {
   async connect() {
     try {
-      await mongoose.connect(process.env.DB_URI || 'mongodb://localhost:27017/edumap');
-      ('Connected to MongoDB for seeding');
+      await mongoose.connect(process.env.DB_URI || 'mongodb://127.0.0.1:27017/edumap');
+      console.log('Connected to MongoDB for seeding');
     } catch (error) {
       console.error('MongoDB connection error:', error);
       process.exit(1);
@@ -29,6 +30,7 @@ class Seeder {
     await Class.deleteMany({});
     await Question.deleteMany({});
     await Exam.deleteMany({});
+    await Subject.deleteMany({});
     console.log('Database cleared');
   }
 
@@ -40,6 +42,9 @@ class Seeder {
       // Seed organizations
       const organizations = await this.seedOrganizations();
       
+      // Seed subjects
+      const subjects = await this.seedSubjects(organizations);
+      
       // Seed users
       const users = await this.seedUsers(organizations);
       
@@ -47,13 +52,13 @@ class Seeder {
       const classes = await this.seedClasses(organizations, users);
       
       // Seed questions
-      const questions = await this.seedQuestions(organizations, users);
+      const questions = await this.seedQuestions(organizations, users, subjects);
       
       // Seed exams
       const exams = await this.seedExams(organizations, users, questions);
       
       console.log('✅ Seeding completed successfully!');
-      console.log(`📊 Created: ${organizations.length} organizations, ${users.length} users, ${classes.length} classes, ${questions.length} questions, ${exams.length} exams`);
+      console.log(`📊 Created: ${organizations.length} organizations, ${subjects.length} subjects, ${users.length} users, ${classes.length} classes, ${questions.length} questions, ${exams.length} exams`);
       
     } catch (error) {
       console.error('❌ Seeding failed:', error);
@@ -96,6 +101,52 @@ class Seeder {
     return createdOrgs;
   }
 
+  async seedSubjects(organizations) {
+    console.log('Seeding subjects...');
+    
+    const DEFAULT_SUBJECTS = [
+      { code: 'MATH', name: 'Toán học' },
+      { code: 'LIT',  name: 'Ngữ văn' },
+      { code: 'PHYS', name: 'Vật lý' },
+      { code: 'CHEM', name: 'Hóa học' },
+      { code: 'BIO',  name: 'Sinh học' },
+      { code: 'ENG',  name: 'Tiếng Anh' },
+      { code: 'HIST', name: 'Lịch sử' },
+      { code: 'GEO',  name: 'Địa lý' },
+      { code: 'CIVIC', name: 'Giáo dục công dân' },
+      { code: 'TECH', name: 'Công nghệ' },
+      { code: 'ART', name: 'Mỹ thuật' },
+      { code: 'MUSIC', name: 'Âm nhạc' },
+      { code: 'PE', name: 'Thể dục' },
+      { code: 'INFO', name: 'Tin học' },
+      { code: 'FRENCH', name: 'Tiếng Pháp' },
+      { code: 'CHINESE', name: 'Tiếng Trung' },
+      { code: 'JAPANESE', name: 'Tiếng Nhật' },
+      { code: 'KOREAN', name: 'Tiếng Hàn' },
+      { code: 'OTHER',name: 'Khác/Chưa phân loại' },
+    ];
+
+    const subjects = [];
+
+    // Tạo global subjects (không có orgId)
+    for (const subjectData of DEFAULT_SUBJECTS) {
+      const subject = new Subject({
+        ...subjectData,
+        isActive: true
+      });
+      await subject.save();
+      subjects.push(subject);
+    }
+
+    // Tạo subjects riêng cho từng organization (optional)
+    for (const org of organizations) {
+      // Có thể tạo subjects riêng cho từng org nếu cần
+      // Hiện tại skip để dùng global subjects
+    }
+
+    return subjects;
+  }
+
   async seedUsers(organizations) {
     console.log('Seeding users...');
     
@@ -107,7 +158,7 @@ class Seeder {
         orgId: org._id,
         name: `Admin ${org.name}`,
         email: `admin@${org.domain}`,
-        passwordHash: await bcrypt.hash('admin123', 12),
+        password: await bcrypt.hash('admin123', 12),
         role: 'admin',
         status: 'active',
         isOrgOwner: true
@@ -131,7 +182,7 @@ class Seeder {
     for (const teacher of teacherData) {
       const user = new User({
         ...teacher,
-        passwordHash: await bcrypt.hash('teacher123', 12),
+        password: await bcrypt.hash('teacher123', 12),
         role: 'teacher',
         status: 'active'
       });
@@ -151,7 +202,7 @@ class Seeder {
     for (const student of studentData) {
       const user = new User({
         ...student,
-        passwordHash: await bcrypt.hash('student123', 12),
+        password: await bcrypt.hash('student123', 12),
         role: 'student',
         status: 'active'
       });
@@ -202,17 +253,20 @@ class Seeder {
     return classes;
   }
 
-  async seedQuestions(organizations, users) {
+  async seedQuestions(organizations, users, subjects) {
     console.log('Seeding questions...');
     
     const questions = [];
     const teachers = users.filter(u => u.role === 'teacher');
+    const mathSubject = subjects.find(s => s.code === 'MATH');
 
     for (const teacher of teachers) {
       const questionData = [
         {
           orgId: teacher.orgId,
           ownerId: teacher._id,
+          subjectId: mathSubject?._id,
+          subjectCode: 'MATH',
           type: 'mcq',
           text: 'Phương trình bậc hai ax² + bx + c = 0 có nghiệm khi nào?',
           choices: [
@@ -233,6 +287,8 @@ class Seeder {
         {
           orgId: teacher.orgId,
           ownerId: teacher._id,
+          subjectId: mathSubject?._id,
+          subjectCode: 'MATH',
           type: 'tf',
           text: 'Hàm số y = x² là hàm số chẵn.',
           answer: { value: true },
@@ -247,6 +303,8 @@ class Seeder {
         {
           orgId: teacher.orgId,
           ownerId: teacher._id,
+          subjectId: mathSubject?._id,
+          subjectCode: 'MATH',
           type: 'short',
           text: 'Tính đạo hàm của hàm số y = x³ + 2x² - 5x + 1',
           answer: { text: 'y\' = 3x² + 4x - 5' },
