@@ -286,6 +286,116 @@ Authorization: Bearer {token}
 
 ---
 
+## Học sinh tham gia lớp học bằng mã lớp
+### URL: `/v1/api/classes/join`
+#### Phương thức: POST
+#### Headers:
+```
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+#### Body:
+```json
+{
+  "code": "ABC123"
+}
+```
+#### Phản hồi:
+```json
+{
+  "ok": true,
+  "data": {
+    "_id": "class_id",
+    "name": "Toán 12A1",
+    "code": "ABC123",
+    "teacherId": "teacher_id",
+    "studentIds": ["student_id"],
+    "createdAt": "2023-10-15T10:30:00Z"
+  }
+}
+```
+
+---
+
+## Học sinh tham gia lớp học bằng email giáo viên
+### URL: `/v1/api/classes/join-by-teacher`
+#### Phương thức: POST
+#### Headers:
+```
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+#### Body:
+```json
+{
+  "teacherEmail": "teacher@school.edu.vn"
+}
+```
+#### Phản hồi:
+```json
+{
+  "ok": true,
+  "data": {
+    "_id": "class_id",
+    "name": "Toán 12A1",
+    "code": "ABC123",
+    "teacherId": "teacher_id",
+    "studentIds": ["student_id"],
+    "createdAt": "2023-10-15T10:30:00Z"
+  }
+}
+```
+#### Lưu ý:
+- Nếu teacher có nhiều lớp, student sẽ được thêm vào lớp đầu tiên
+- Chỉ student mới có thể sử dụng API này
+- Teacher email phải tồn tại và có role 'teacher'
+
+---
+
+## Tìm kiếm lớp học
+### URL: `/v1/api/classes/search`
+#### Phương thức: GET
+#### Query Parameters:
+- `q` (required): Từ khóa tìm kiếm (ít nhất 2 ký tự)
+- `page`, `limit`: Phân trang
+- `sort`: Sắp xếp (mặc định: `-createdAt`)
+
+#### Headers:
+```
+Authorization: Bearer {token}
+```
+
+#### Ví dụ:
+```
+GET /v1/api/classes/search?q=toán&page=1&limit=10
+```
+
+#### Phản hồi:
+```json
+{
+  "ok": true,
+  "items": [
+    {
+      "_id": "class_id",
+      "name": "Toán 12A1",
+      "code": "ABC123",
+      "teacherId": "teacher_id",
+      "createdAt": "2023-10-15T10:30:00Z"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "limit": 10,
+  "pages": 1
+}
+```
+
+#### Lưu ý:
+- Query phải có ít nhất 2 ký tự
+- Tìm kiếm theo tên lớp và mô tả
+
+---
+
 ## Thêm nhiều học sinh vào lớp
 ### URL: `/v1/api/classes/:id/students/bulk`
 #### Phương thức: POST
