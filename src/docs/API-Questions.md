@@ -1,7 +1,7 @@
 # API Câu hỏi
 
 ## Lấy danh sách câu hỏi
-### URL: https://edu-map-be.vercel.app/v1/api/questions
+### URL: http://localhost:3000/v1/api/questions
 #### Phương thức: GET
 #### Headers:
 ```
@@ -52,7 +52,7 @@ Authorization: Bearer {token}
           "text": "Lựa chọn B"
         }
       ],
-      "answer": "a",
+      "answer": ["a"],
       "tags": ["toán", "đại số"],
       "level": 1,
       "isPublic": true,
@@ -68,7 +68,7 @@ Authorization: Bearer {token}
 ```
 
 ## Lấy thông tin một câu hỏi
-### URL: https://edu-map-be.vercel.app/v1/api/questions/{id}
+### URL: http://localhost:3000/v1/api/questions/{id}
 #### Phương thức: GET 
 #### Headers:
 ```
@@ -94,7 +94,7 @@ Authorization: Bearer {token}
         "text": "Lựa chọn B"
       }
     ],
-    "answer": "a",
+    "answer": ["a"],
     "tags": ["toán", "đại số"],
     "level": 1,
     "isPublic": true,
@@ -105,7 +105,7 @@ Authorization: Bearer {token}
 ```
 
 ## Tạo câu hỏi mới
-### URL: https://edu-map-be.vercel.app/v1/api/questions  
+### URL: http://localhost:3000/v1/api/questions  
 #### Phương thức: POST
 #### Headers:
 ```
@@ -127,7 +127,7 @@ Content-Type: application/json
       "text": "4"
     }
   ],
-  "answer": "b",
+  "answer": ["b"],
   "tags": ["toán", "cộng"],
   "level": 1,
   "isPublic": true,
@@ -153,7 +153,7 @@ Content-Type: application/json
         "text": "4"  
       }
     ],
-    "answer": "b",
+    "answer": ["b"],
     "tags": ["toán", "cộng"],
     "level": 1,
     "isPublic": true,
@@ -164,7 +164,7 @@ Content-Type: application/json
 ```
 
 ## Cập nhật câu hỏi
-### URL: https://edu-map-be.vercel.app/v1/api/questions/{id}
+### URL: http://localhost:3000/v1/api/questions/{id}
 #### Phương thức: PUT
 #### Headers:
 ```
@@ -194,7 +194,7 @@ Content-Type: application/json
 ```
 
 ## Xóa câu hỏi
-### URL: https://edu-map-be.vercel.app/v1/api/questions/{id}
+### URL: http://localhost:3000/v1/api/questions/{id}
 #### Phương thức: DELETE
 #### Headers:
 ```

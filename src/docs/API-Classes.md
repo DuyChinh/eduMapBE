@@ -1,7 +1,7 @@
 # API Lớp học
 
 ## Tạo lớp học mới
-### URL: https://edu-map-be.vercel.app/v1/api/classes
+### URL: http://localhost:3000/v1/api/classes
 #### Phương thức: POST
 #### Headers:
 ```
@@ -318,7 +318,7 @@ Content-Type: application/json
 ---
 
 ## Học sinh tham gia lớp học bằng email giáo viên
-### URL: `/v1/api/classes/join-by-teacher`
+### URL: `/v1/api/classes/join-class-by-teacher`
 #### Phương thức: POST
 #### Headers:
 ```
