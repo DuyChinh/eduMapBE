@@ -11,6 +11,14 @@ const SubjectSchema = new mongoose.Schema({
         required: true,
         trim: true
     },
+    name_en: {
+        type: String,
+        trim: true
+    },
+    name_jp: {
+        type: String,
+        trim: true
+    },
     code: {
         type: String,
         required: true,
@@ -21,7 +29,7 @@ const SubjectSchema = new mongoose.Schema({
         type: String,
         trim: true
     },
-    // tiện tìm kiếm/hiển thị
+    // For search and display convenience
     slug: {
         type: String,
         trim: true
@@ -34,7 +42,7 @@ const SubjectSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// unique trong 1 org (hoặc toàn hệ thống nếu bạn không dùng orgId)
+// Unique within an organization (or system-wide if orgId is not used)
 SubjectSchema.index({
     orgId: 1,
     code: 1

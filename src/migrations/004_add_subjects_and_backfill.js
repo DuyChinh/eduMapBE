@@ -1,15 +1,15 @@
 const { ObjectId } = require('mongodb');
 
 const DEFAULT_SUBJECTS = [
-  { code: 'MATH', name: 'Toán học' },
-  { code: 'LIT',  name: 'Ngữ văn' },
-  { code: 'PHYS', name: 'Vật lý' },
-  { code: 'CHEM', name: 'Hóa học' },
-  { code: 'BIO',  name: 'Sinh học' },
-  { code: 'ENG',  name: 'Tiếng Anh' },
-  { code: 'HIST', name: 'Lịch sử' },
-  { code: 'GEO',  name: 'Địa lý' },
-  { code: 'OTHER',name: 'Khác/Chưa phân loại' },
+  { code: 'MATH', name: 'Toán học', name_en: 'Mathematics', name_jp: '数学' },
+  { code: 'LIT',  name: 'Ngữ văn', name_en: 'Literature', name_jp: '文学' },
+  { code: 'PHYS', name: 'Vật lý', name_en: 'Physics', name_jp: '物理学' },
+  { code: 'CHEM', name: 'Hóa học', name_en: 'Chemistry', name_jp: '化学' },
+  { code: 'BIO',  name: 'Sinh học', name_en: 'Biology', name_jp: '生物学' },
+  { code: 'ENG',  name: 'Tiếng Anh', name_en: 'English', name_jp: '英語' },
+  { code: 'HIST', name: 'Lịch sử', name_en: 'History', name_jp: '歴史' },
+  { code: 'GEO',  name: 'Địa lý', name_en: 'Geography', name_jp: '地理' },
+  { code: 'OTHER',name: 'Khác/Chưa phân loại', name_en: 'Other/Unclassified', name_jp: 'その他/未分類' },
 ];
 
 function normalizeCode(s) {
@@ -41,15 +41,15 @@ async function up(db, client) {
   }
 
   // Indexes for subjects:
-  // Unique theo (orgId, code). Vì có thể có records không có orgId, dùng partial để tránh xung đột.
+  // Unique by (orgId, code). Since there might be records without orgId, use partial to avoid conflicts.
   await db.collection('subjects').createIndex(
     { orgId: 1, code: 1 },
     { unique: true, partialFilterExpression: { code: { $exists: true } } }
   );
   await db.collection('subjects').createIndex({ orgId: 1, name: 1 });
 
-  // 2) Seed default subjects (không chỉ định orgId -> dùng chung;
-  //    có thể seed riêng per org ở các bước sau hoặc sửa đoạn dưới.)
+  // 2) Seed default subjects (no orgId specified -> shared;
+  //    can seed separately per org in later steps or modify the section below.)
   console.log('[002] Seeding default subjects...');
   for (const s of DEFAULT_SUBJECTS) {
     await db.collection('subjects').updateOne(
@@ -58,6 +58,8 @@ async function up(db, client) {
         $setOnInsert: {
           code: s.code,
           name: s.name,
+          name_en: s.name_en,
+          name_jp: s.name_jp,
           isActive: true,
           createdAt: new Date(),
           updatedAt: new Date()
@@ -70,7 +72,7 @@ async function up(db, client) {
   // 3) Backfill questions.subjectId / subjectCode
   console.log('[002] Backfilling questions.subjectId / subjectCode...');
 
-  // Tạo map nhanh: (orgId? + code) -> _id
+  // Create quick map: (orgId? + code) -> _id
   const subjectsGlobal = await db.collection('subjects').find({ orgId: { $exists: false } }).toArray();
   const byCodeGlobal = new Map(subjectsGlobal.map(s => [normalizeCode(s.code), s._id]));
 
@@ -81,23 +83,23 @@ async function up(db, client) {
     const q = await cursor.next();
     processed++;
 
-    // Bỏ qua nếu đã có subjectId & subjectCode
+    // Skip if already has subjectId & subjectCode
     if (q.subjectId && q.subjectCode) continue;
 
     let code = normalizeCode(q.subjectCode);
     if (!code) code = inferSubjectCodeFromQuestion(q);
 
     // Map code -> subjectId
-    // có subjects theo orgId, ưu tiên tìm theo orgId, fallback sang global
+    // has subjects by orgId, prioritize search by orgId, fallback to global
     let subjId = byCodeGlobal.get(code);
     if (!subjId) {
-      // Nếu chưa có subject tương ứng code này ở global, tạo mới nhanh:
+      // If no subject with this code exists globally, create new quickly:
       const ins = await db.collection('subjects').findOneAndUpdate(
         { code, orgId: { $exists: false } },
         {
           $setOnInsert: {
             code,
-            name: code, // tạm lấy code làm name, có thể sửa tay sau
+            name: code, // temporarily use code as name, can be manually edited later
             isActive: true,
             createdAt: new Date(),
             updatedAt: new Date()
@@ -129,17 +131,17 @@ async function up(db, client) {
 async function down(db, client) {
   console.log('[002][down] Removing subject references from questions and dropping subjects (global only)...');
 
-  // Gỡ subjectId/subjectCode khỏi questions (không phục hồi được gốc)
+  // Remove subjectId/subjectCode from questions (cannot restore original)
   await db.collection('questions').updateMany(
     {},
     { $unset: { subjectId: "", subjectCode: "" } }
   );
 
-  // Xoá subjects global (orgId not exists). 
+  // Delete global subjects (orgId not exists). 
   await db.collection('subjects').deleteMany({ orgId: { $exists: false } });
 
-  // (Không drop collection subjects để tránh mất dữ liệu nếu có subject theo orgId khác)
-  // Nếu cần triệt để:
+  // (Don't drop subjects collection to avoid data loss if there are subjects by other orgId)
+  // If complete removal needed:
   // await db.collection('subjects').drop();
 }
 
