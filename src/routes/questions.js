@@ -5,8 +5,8 @@ const auth = require('../middlewares/auth');
 
 
 
-router.get('/', auth, questionController.list);
-router.get('/:id', auth, questionController.getOne);
+router.get('/', auth, questionController.getAllQuestions);
+router.get('/:id', auth, questionController.getQuestionById);
 router.post('/', auth, questionController.create);
 router.put('/:id', auth, questionController.update);
 router.patch('/:id', auth, questionController.patch);
