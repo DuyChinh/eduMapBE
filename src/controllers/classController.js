@@ -38,9 +38,30 @@ async function create(req, res, next) {
     // Giáo viên tạo cho chính mình; admin có thể tạo cho teacher khác
     const teacherId = (req.user.role === 'admin' && teacherIdRaw) ? teacherIdRaw : req.user.id;
 
+    // Kiểm tra tên class trùng lặp của giáo viên này
+    const existingClass = await service.findByNameAndTeacher({
+      name: name.trim(),
+      teacherId,
+      orgId
+    });
+
+    if (existingClass) {
+      return res.status(409).json({ 
+        ok: false, 
+        message: 'Class name already exists for this teacher',
+        data: {
+          existingClass: {
+            _id: existingClass._id,
+            name: existingClass.name,
+            createdAt: existingClass.createdAt
+          }
+        }
+      });
+    }
+
     // Chỉ lưu metadata.academicYear (nếu có). Giữ settings và studentIds mặc định rỗng.
     const payload = {
-      name,
+      name: name.trim(),
       metadata: (academicYear && typeof academicYear === 'string') ? { academicYear } : {}
     };
 
@@ -54,7 +75,7 @@ async function create(req, res, next) {
   } catch (e) {
     // Duplicate key (orgId+code unique)
     if (e?.code === 11000) {
-      return res.status(409).json({ ok: false, message: 'class code already exists' });
+      return res.status(409).json({ ok: false, message: 'class name already exists' });
     }
     if (e?.status) {
       return res.status(e.status).json({ ok: false, message: e.message });

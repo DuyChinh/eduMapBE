@@ -11,11 +11,11 @@ const ClassSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
-    unique: true
   },
   code: {
     type: String,
     required: true,
+    unique: true,
     uppercase: true
   },
   'teacherId': {

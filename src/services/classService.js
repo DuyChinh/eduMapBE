@@ -102,6 +102,21 @@ async function getById(id) {
   return ClassModel.findById(id);
 }
 
+// Kiểm tra tên class trùng lặp của giáo viên
+async function findByNameAndTeacher({ name, teacherId, orgId }) {
+  const filter = {
+    name: name.trim(),
+    teacherId: new mongoose.Types.ObjectId(teacherId)
+  };
+  
+  // Nếu có orgId thì filter theo orgId
+  if (orgId && mongoose.isValidObjectId(orgId)) {
+    filter.orgId = new mongoose.Types.ObjectId(orgId);
+  }
+  
+  return ClassModel.findOne(filter);
+}
+
 async function updatePartial({ id, ownerIdEnforce, payload, orgId }) {
   // chỉ cho owner (teacher) hoặc admin (controller sẽ thêm quyền) — ở service vẫn khoá owner
   const filter = { _id: id };
@@ -365,6 +380,7 @@ module.exports = {
   create,
   list,
   getById,
+  findByNameAndTeacher,
   updatePartial,
   hardDelete,
   joinByCode,
