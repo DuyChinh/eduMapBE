@@ -21,7 +21,7 @@ const QuestionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Subject',
     index: true,
-    required: false
+    required: true
   },
   subjectCode: {
     type: String,

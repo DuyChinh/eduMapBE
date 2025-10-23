@@ -107,9 +107,15 @@ async function patch(req, res, next) {
       return res.status(403).json({ ok: false, message: 'Only owner can modify this question' });
 
     // chỉ cho phép set các field whitelisted
-    const allowed = ['text', 'type', 'choices', 'answer', 'tags', 'level', 'isPublic', 'metadata'];
+    const allowed = ['text', 'type', 'choices', 'answer', 'tags', 'level', 'isPublic', 'metadata', 'subjectId', 'subject'];
     const payload = {};
     for (const k of allowed) if (k in req.body) payload[k] = req.body[k];
+
+    // Xử lý subject field
+    if (payload.subject && !payload.subjectId) {
+      payload.subjectId = payload.subject;
+      delete payload.subject;
+    }
 
     // validate theo type sau khi merge
     const merged = { ...existing.toObject(), ...payload };
@@ -204,7 +210,7 @@ async function getAllQuestions(req, res, next) {
     // Query database
     const [items, total] = await Promise.all([
       Question.find(filter)
-        .populate('subjectId', 'name code')
+        .populate('subjectId', 'name name_en name_jp')
         .populate('ownerId', 'name email')
         .sort(sort)
         .skip(skip)
@@ -212,32 +218,9 @@ async function getAllQuestions(req, res, next) {
         .lean(),
       Question.countDocuments(filter)
     ]);
-
-    // Transform data để trả về đúng format
-    const transformedItems = items.map(item => ({
-      _id: item._id,
-      name: item.name || '',
-      text: item.text,
-      type: item.type,
-      choices: item.choices,
-      answer: item.answer,
-      explanation: item.explanation || '',
-      level: item.level,
-      isPublic: item.isPublic,
-      usageCount: item.usageCount || 0,
-      subjectId: item.subjectId?._id,
-      subjectName: item.subjectId?.name,
-      subjectCode: item.subjectId?.code,
-      ownerId: item.ownerId?._id,
-      ownerName: item.ownerId?.name,
-      createdAt: item.createdAt,
-      updatedAt: item.updatedAt,
-      metadata: item.metadata || {}
-    }));
-
     res.json({
       ok: true,
-      items: transformedItems,
+      items,
       total,
       page: nPage,
       limit: nLimit,
@@ -253,48 +236,12 @@ async function getQuestionById(req, res, next) {
     const id = req.params.id;
     if (!mongoose.isValidObjectId(id))
       return res.status(400).json({ ok: false, message: 'invalid id' });
+
+    const question = await Question.findById(id)
+      .populate('ownerId', 'name email') 
+      .populate('subjectId', 'name name_en name_jp'); 
     
-    const doc = await Question.findById(id)
-      .populate('subjectId', 'name code')
-      .populate('ownerId', 'name email')
-      .lean();
-
-    if (!doc) return res.status(404).json({ ok: false, message: 'Question not found' });
-
-    if (req.user?.role === 'student' && !doc.isPublic)
-      return res.status(403).json({ ok: false, message: 'Forbidden' });
-
-    if (req.user?.role === 'teacher' && !doc.isPublic) {
-      const isOwnerView = String(doc.ownerId) === String(req.user.id);
-      if (!isOwnerView) return res.status(403).json({ ok: false, message: 'Forbidden' });
-    }
-
-    const orgId = getOrgIdSoft(req);
-    if (orgId && doc.orgId && String(doc.orgId) !== String(orgId) && req.user?.role !== 'admin')
-      return res.status(403).json({ ok: false, message: 'Forbidden' });
-
-    const transformedData = {
-      _id: doc._id,
-      name: doc.name || '',
-      text: doc.text,
-      type: doc.type,
-      choices: doc.choices,
-      answer: doc.answer,
-      explanation: doc.explanation || '',
-      level: doc.level,
-      isPublic: doc.isPublic,
-      usageCount: doc.usageCount || 0,
-      subjectId: doc.subjectId?._id,
-      subjectName: doc.subjectId?.name,
-      subjectCode: doc.subjectId?.code,
-      ownerId: doc.ownerId?._id,
-      ownerName: doc.ownerId?.name,
-      createdAt: doc.createdAt,
-      updatedAt: doc.updatedAt,
-      metadata: doc.metadata || {}
-    };
-
-    res.json({ ok: true, data: transformedData });
+    res.json({ ok: true, data: question });
   } catch (e) { next(e); }
 }
 
@@ -305,9 +252,37 @@ async function create(req, res, next) {
       return res.status(403).json({ ok: false, message: 'Forbidden' });
     }
 
-    const { subject: subjectId } = req.body;
+    const { subjectId, name } = req.body;
     if (!subjectId) {
       return res.status(400).json({ ok: false, message: 'subjectId or subjectCode is required' });
+    }
+
+    if (!name || typeof name !== 'string') {
+      return res.status(400).json({ ok: false, message: 'name is required' });
+    }
+
+    const orgId = getOrgIdSoft(req);
+
+    // Kiểm tra tên question trùng lặp của giáo viên này
+    const existingQuestion = await service.findByNameAndOwner({
+      name: name.trim(),
+      ownerId: req.user.id,
+      orgId
+    });
+
+    if (existingQuestion) {
+      return res.status(409).json({ 
+        ok: false, 
+        message: 'Question name already exists for this teacher',
+        data: {
+          existingQuestion: {
+            _id: existingQuestion._id,
+            name: existingQuestion.name,
+            text: existingQuestion.text,
+            createdAt: existingQuestion.createdAt
+          }
+        }
+      });
     }
 
     const errors = validateByType(req.body);
@@ -333,11 +308,18 @@ async function update(req, res, next) {
     if (!isOwner(req.user, existing))
       return res.status(403).json({ ok: false, message: 'Only owner can modify this question' });
 
-    const merged = { ...existing.toObject(), ...req.body };
+    // Xử lý subject field giống như trong create
+    const payload = { ...req.body };
+    if (payload.subject && !payload.subjectId) {
+      payload.subjectId = payload.subject;
+      delete payload.subject;
+    }
+
+    const merged = { ...existing.toObject(), ...payload };
     const errors = validateByType(merged);
     if (errors.length) return res.status(400).json({ ok: false, errors });
 
-    const updated = await service.update({ id, payload: req.body, ownerIdEnforce: req.user.id });
+    const updated = await service.update({ id, payload, ownerIdEnforce: req.user.id });
     res.json({ ok: true, data: updated });
   } catch (e) { next(e); }
 }
