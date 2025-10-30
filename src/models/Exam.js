@@ -19,15 +19,7 @@ const ExamQuestionSchema = new mongoose.Schema({
   isRequired: { 
     type: Boolean, 
     default: true 
-  },
-  // Exam-specific overrides (optional)
-  customText: String,
-  customChoices: [{
-    key: { type: String, required: true },
-    text: { type: String, required: true }
-  }],
-  customAnswer: mongoose.Schema.Types.Mixed,
-  customExplanation: String
+  }
 }, { _id: false });
 
 const ExamSchema = new mongoose.Schema({
@@ -52,6 +44,158 @@ const ExamSchema = new mongoose.Schema({
   },
   questions: [ExamQuestionSchema],
   
+  // Scheduling
+  startTime: {
+    type: Date,
+    required: false,
+    default: Date.now
+  },
+  endTime: {
+    type: Date,
+    required: false,
+    default: function() {
+      const now = new Date();
+      now.setDate(now.getDate() + 3); // +3 days
+      return now;
+    }
+  },
+  timezone: {
+    type: String,
+    default: 'Asia/Ho_Chi_Minh'
+  },
+  
+  // Subject
+  subjectId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Subject',
+    required: false,
+    index: true
+  },
+  subjectCode: {
+    type: String,
+    trim: true,
+    uppercase: true,
+    required: false
+  },
+  
+  // Grade
+  gradeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Grade',
+    required: false,
+    index: true
+  },
+  
+  // Exam Purpose
+  examPurpose: {
+    type: String,
+    enum: ['exam', 'practice', 'quiz', 'assignment'],
+    default: 'exam',
+    required: false
+  },
+  
+  // Access Control
+  isAllowUser: {
+    type: String,
+    enum: ['everyone', 'class', 'student'],
+    required: true,
+    default: 'everyone'
+  },
+  
+  // Availability Window
+  availableFrom: {
+    type: Date,
+    required: false,
+    default: null
+  },
+  availableUntil: {
+    type: Date,
+    required: false,
+    default: null
+  },
+  
+  // Fee
+  fee: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  
+  // Exam Password
+  examPassword: {
+    type: String,
+    trim: true,
+    required: true,
+    default: ''
+  },
+  
+  // Max Attempts
+  maxAttempts: {
+    type: Number,
+    required: true,
+    min: 1,
+    default: 1
+  },
+  
+  // View Mark (when to show score)
+  viewMark: {
+    type: Number,
+    enum: [0, 1, 2],
+    required: true,
+    default: 1
+  },
+  
+  // View Exam and Answer (when to show exam and answers)
+  viewExamAndAnswer: {
+    type: Number,
+    enum: [0, 1, 2],
+    required: true,
+    default: 1
+  },
+  
+  // Security & Monitoring
+  autoMonitoring: {
+    type: String,
+    enum: ['off', 'screenExit', 'fullMonitoring'],
+    default: 'off'
+  },
+  studentVerification: {
+    type: Boolean,
+    default: false
+  },
+  eduMapOnly: {
+    type: Boolean,
+    default: false
+  },
+  
+  // Display Settings
+  hideGroupTitles: {
+    type: Boolean,
+    default: false
+  },
+  sectionsStartFromQ1: {
+    type: Boolean,
+    default: false
+  },
+  // Note: showScore and showExamAndAnswers replaced by viewMark and viewExamAndAnswer
+  hideLeaderboard: {
+    type: Boolean,
+    default: false
+  },
+  addTitleInfo: {
+    type: Boolean,
+    default: false
+  },
+  preExamNotification: {
+    type: Boolean,
+    default: false
+  },
+  preExamNotificationText: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  
   // Ownership
   ownerId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -65,10 +209,11 @@ const ExamSchema = new mongoose.Schema({
     // Basic settings
     allowReview: { type: Boolean, default: true },
     showCorrectAnswer: { type: Boolean, default: false },
+    timeLimit: { type: Boolean, default: true },
+    
+    // Shuffle settings (moved to main level for easier access)
     shuffleQuestions: { type: Boolean, default: false },
     shuffleChoices: { type: Boolean, default: false },
-    timeLimit: { type: Boolean, default: true },
-    maxAttempts: { type: Number, default: 1 },
 
     // Teacher controls
     teacherCanStart: { type: Boolean, default: true },
@@ -153,10 +298,50 @@ ExamSchema.index({ ownerId: 1 });
 ExamSchema.index({ status: 1 });
 ExamSchema.index({ isActive: 1 });
 ExamSchema.index({ 'questions.questionId': 1 });
+ExamSchema.index({ name: 1, ownerId: 1 }, { unique: true }); // Unique name per owner
+ExamSchema.index({ startTime: 1 });
+ExamSchema.index({ endTime: 1 });
+ExamSchema.index({ isAllowUser: 1 }); // New field
+ExamSchema.index({ examPurpose: 1 });
+ExamSchema.index({ availableFrom: 1 });
+ExamSchema.index({ availableUntil: 1 });
+ExamSchema.index({ viewMark: 1 });
+ExamSchema.index({ viewExamAndAnswer: 1 });
+ExamSchema.index({ maxAttempts: 1 });
 
 // Virtual for question count
 ExamSchema.virtual('questionCount').get(function() {
   return this.questions.length;
+});
+
+// Pre-save validation
+ExamSchema.pre('save', function(next) {
+  // Validate scheduling
+  if (this.startTime && this.endTime) {
+    if (this.startTime >= this.endTime) {
+      return next(new Error('Start time must be before end time'));
+    }
+    
+    // Check if duration matches the time range
+    const timeDiffMinutes = (this.endTime - this.startTime) / (1000 * 60);
+    if (timeDiffMinutes < this.duration) {
+      return next(new Error('Exam duration cannot exceed the time range'));
+    }
+  }
+  
+  // Validate availability window
+  if (this.availableFrom && this.availableUntil) {
+    if (this.availableFrom >= this.availableUntil) {
+      return next(new Error('Available from time must be before available until time'));
+    }
+  }
+  
+  // Validate name is not empty after trim
+  if (!this.name || this.name.trim().length === 0) {
+    return next(new Error('Exam name cannot be empty'));
+  }
+  
+  next();
 });
 
 // Instance methods

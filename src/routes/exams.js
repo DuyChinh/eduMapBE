@@ -11,7 +11,7 @@ router.patch('/:id', auth, examController.updateExam);
 router.delete('/:id', auth, examController.deleteExam);
 
 // Question management in exams
-router.post('/:id/questions', auth, examController.addQuestions);
-router.delete('/:id/questions/:questionId', auth, examController.removeQuestion);
+router.post('/:id/questions', auth, examController.addQuestionsToExam);
+router.delete('/:id/questions/:questionId', auth, examController.removeQuestionFromExam);
 
 module.exports = router;

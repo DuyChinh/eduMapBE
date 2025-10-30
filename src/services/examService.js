@@ -2,10 +2,22 @@ const mongoose = require('mongoose');
 const Exam = require('../models/Exam');
 const Question = require('../models/Question');
 
+/**
+ * Converts string value to MongoDB ObjectId if valid
+ * @param {string} value - String value to convert
+ * @returns {ObjectId|undefined} - ObjectId if valid, undefined otherwise
+ */
 const convertToObjectId = (value) =>
   (value && mongoose.isValidObjectId(value)) ? new mongoose.Types.ObjectId(value) : undefined;
 
-// Build filter for exam queries
+/**
+ * Builds filter object for exam queries
+ * @param {Object} params - Query parameters
+ * @param {string} params.ownerId - Owner ID filter
+ * @param {string} params.status - Status filter
+ * @param {string} params.q - Search query
+ * @returns {Object} - MongoDB filter object
+ */
 function buildExamFilter({ ownerId, status, q }) {
   const filter = {};
 
@@ -25,7 +37,17 @@ function buildExamFilter({ ownerId, status, q }) {
   return filter;
 }
 
-// Get all exams with pagination
+/**
+ * Retrieves all exams with pagination and filtering
+ * @param {Object} params - Query parameters
+ * @param {string} params.ownerId - Owner ID filter
+ * @param {number} params.page - Page number
+ * @param {number} params.limit - Items per page
+ * @param {string} params.sort - Sort field
+ * @param {string} params.status - Status filter
+ * @param {string} params.q - Search query
+ * @returns {Object} - Paginated exam data
+ */
 async function getAllExams(params) {
   const {
     ownerId,
@@ -60,7 +82,12 @@ async function getAllExams(params) {
   };
 }
 
-// Get exam by ID
+/**
+ * Retrieves a specific exam by ID
+ * @param {Object} params - Query parameters
+ * @param {string} params.id - Exam ID
+ * @returns {Object|null} - Exam data or null if not found
+ */
 async function getExamById({ id }) {
   const examFilter = { _id: id };
 
@@ -69,9 +96,54 @@ async function getExamById({ id }) {
     .exec();
 }
 
-// Create new exam
+/**
+ * Creates a new exam
+ * @param {Object} params - Creation parameters
+ * @param {Object} params.payload - Exam data
+ * @param {Object} params.user - User creating the exam
+ * @returns {Object} - Created exam data
+ */
 async function createExam({ payload, user }) {
   const examOwnerId = user?.id || user?._id;
+
+  // Validate user ID
+  if (!mongoose.isValidObjectId(examOwnerId)) {
+    const error = new Error('Invalid user ID');
+    error.status = 400;
+    throw error;
+  }
+
+  // Validate questions belong to the same subject (required)
+  if (!payload.questions || payload.questions.length === 0) {
+    const error = new Error('questions array is required and cannot be empty');
+    error.status = 400;
+    throw error;
+  }
+  
+  if (!payload.subjectId) {
+    const error = new Error('subjectId is required when creating exam with questions');
+    error.status = 400;
+    throw error;
+  }
+  
+  const questionIds = payload.questions.map(q => q.questionId);
+  
+  // Check if all questions exist and belong to the same subject
+  const questions = await Question.find({
+    _id: { $in: questionIds },
+    subjectId: payload.subjectId
+  });
+  
+  if (questions.length !== questionIds.length) {
+    const error = new Error('All questions must belong to the same subject');
+    error.status = 400;
+    throw error;
+  }
+  
+  // Auto-fill subjectCode from first question
+  if (questions.length > 0) {
+    payload.subjectCode = questions[0].subjectCode;
+  }
 
   const exam = await Exam.create({
     ...payload,
@@ -81,7 +153,14 @@ async function createExam({ payload, user }) {
   return exam;
 }
 
-// Update exam partially
+/**
+ * Updates an existing exam partially
+ * @param {Object} params - Update parameters
+ * @param {string} params.id - Exam ID
+ * @param {Object} params.payload - Update data
+ * @param {string} params.ownerIdEnforce - Owner ID to enforce
+ * @returns {Object|null} - Updated exam data or null if not found
+ */
 async function updateExamPartial({ id, payload, ownerIdEnforce }) {
   const examFilter = { _id: id };
   if (ownerIdEnforce && mongoose.isValidObjectId(ownerIdEnforce)) {
@@ -92,20 +171,36 @@ async function updateExamPartial({ id, payload, ownerIdEnforce }) {
     examFilter,
     { $set: payload },
     { new: true, runValidators: true }
-  );
+  )
+  .exec();
 }
 
-// Delete exam
+/**
+ * Deletes an existing exam
+ * @param {Object} params - Delete parameters
+ * @param {string} params.id - Exam ID
+ * @param {string} params.ownerIdEnforce - Owner ID to enforce
+ * @returns {Object|null} - Deleted exam data or null if not found
+ */
 async function deleteExam({ id, ownerIdEnforce }) {
   const examFilter = { _id: id };
   if (ownerIdEnforce && mongoose.isValidObjectId(ownerIdEnforce)) {
     examFilter.ownerId = new mongoose.Types.ObjectId(ownerIdEnforce);
   }
 
-  return Exam.findOneAndDelete(examFilter);
+  return Exam.findOneAndDelete(examFilter)
+    .exec();
 }
 
-// Add questions to exam
+/**
+ * Adds questions to an existing exam
+ * @param {Object} params - Add questions parameters
+ * @param {string} params.examId - Exam ID
+ * @param {Array} params.questionIds - Array of question IDs
+ * @param {string} params.ownerIdEnforce - Owner ID to enforce
+ * @param {string} params.subjectId - Subject ID for validation
+ * @returns {Object} - Updated exam data
+ */
 async function addQuestionsToExam({ examId, questionIds, ownerIdEnforce, subjectId }) {
   // Validate question IDs
   const validQuestionIds = questionIds.filter(id => mongoose.isValidObjectId(id));
@@ -185,7 +280,14 @@ async function addQuestionsToExam({ examId, questionIds, ownerIdEnforce, subject
   return exam;
 }
 
-// Remove question from exam
+/**
+ * Removes a question from an existing exam
+ * @param {Object} params - Remove question parameters
+ * @param {string} params.examId - Exam ID
+ * @param {string} params.questionId - Question ID to remove
+ * @param {string} params.ownerIdEnforce - Owner ID to enforce
+ * @returns {Object} - Updated exam data
+ */
 async function removeQuestionFromExam({ examId, questionId, ownerIdEnforce }) {
   const examFilter = { _id: examId };
   if (ownerIdEnforce && mongoose.isValidObjectId(ownerIdEnforce)) {

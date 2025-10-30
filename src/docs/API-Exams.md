@@ -39,6 +39,52 @@ Content-Type: application/json
   "description": "Final exam for Grade 10 Math",
   "duration": 120,
   "totalMarks": 100,
+  "subjectId": "68f254ffef3cded20b0e2110",
+  "gradeId": "68f254ffef3cded20b0e2111",
+  "examPurpose": "exam",
+  "isAllowUser": "everyone",
+  "examPassword": "exam123",
+  "maxAttempts": 3,
+  "viewMark": 1,
+  "viewExamAndAnswer": 1,
+  "availableFrom": "2024-01-15T08:00:00Z",
+  "availableUntil": "2024-01-15T18:00:00Z",
+  "fee": 0,
+  "questions": [
+    {
+      "questionId": "68e783537ceeea23e3d0e061",
+      "order": 1,
+      "marks": 20,
+      "isRequired": true
+    },
+    {
+      "questionId": "68e750fa7d0ffb21a570524e",
+      "order": 2,
+      "marks": 30,
+      "isRequired": true
+    }
+  ],
+  "startTime": "2024-12-01T08:00:00.000Z",
+  "endTime": "2024-12-01T10:30:00.000Z",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "examPassword": "exam123",
+  "autoMonitoring": "off",
+  "studentVerification": false,
+  "eduMapOnly": false,
+  "hideGroupTitles": false,
+  "sectionsStartFromQ1": false,
+  "examPurpose": "exam",
+  "isAllowUser": "everyone",
+  "availableFrom": "2024-01-15T08:00:00Z",
+  "availableUntil": "2024-01-15T18:00:00Z",
+  "examPassword": "exam123",
+  "maxAttempts": 3,
+  "viewMark": 1,
+  "viewExamAndAnswer": 1,
+  "hideLeaderboard": false,
+  "addTitleInfo": false,
+  "preExamNotification": false,
+  "preExamNotificationText": "Chúc bạn làm bài tốt!",
   "settings": {
     "allowReview": true,
     "showCorrectAnswer": false,
@@ -100,7 +146,44 @@ Content-Type: application/json
     "description": "Final exam for Grade 10 Math",
     "duration": 120,
     "totalMarks": 100,
-    "questions": [],
+    "questions": [
+      {
+        "questionId": "68e783537ceeea23e3d0e061",
+        "order": 1,
+        "marks": 20,
+        "isRequired": true
+      },
+      {
+        "questionId": "68e750fa7d0ffb21a570524e",
+        "order": 2,
+        "marks": 30,
+        "isRequired": true
+      }
+    ],
+    "startTime": "2024-12-01T08:00:00.000Z",
+    "endTime": "2024-12-01T10:30:00.000Z",
+    "timezone": "Asia/Ho_Chi_Minh",
+    "subjectId": "68f254ffef3cded20b0e2110",
+    "subjectCode": "MATH",
+    "gradeId": "68f254ffef3cded20b0e2111",
+    "examPurpose": "exam",
+    "isAllowUser": "everyone",
+    "availableFrom": "2024-01-15T08:00:00Z",
+    "availableUntil": "2024-01-15T18:00:00Z",
+    "fee": 0,
+    "examPassword": "exam123",
+    "maxAttempts": 3,
+    "viewMark": 1,
+    "viewExamAndAnswer": 1,
+    "autoMonitoring": "off",
+    "studentVerification": false,
+    "eduMapOnly": false,
+    "hideGroupTitles": false,
+    "sectionsStartFromQ1": false,
+    "hideLeaderboard": false,
+    "addTitleInfo": false,
+    "preExamNotification": false,
+    "preExamNotificationText": "Good luck!",
     "ownerId": "68e3ce12bb8ee016c4d4107f",
     "settings": {
       "allowReview": true,
@@ -512,7 +595,49 @@ Removes a specific question from an exam.
 ```json
 {
   "ok": false,
+  "message": "name is required and cannot be empty"
+}
+```
+
+```json
+{
+  "ok": false,
+  "message": "duration must be a positive integer (minutes)"
+}
+```
+
+```json
+{
+  "ok": false,
+  "message": "startTime must be before endTime"
+}
+```
+
+```json
+{
+  "ok": false,
+  "message": "Exam duration cannot exceed the time range"
+}
+```
+
+```json
+{
+  "ok": false,
+  "message": "An exam with this name already exists for this teacher"
+}
+```
+
+```json
+{
+  "ok": false,
   "message": "All questions must belong to the same subject"
+}
+```
+
+```json
+{
+  "ok": false,
+  "message": "Total question marks (70) cannot exceed exam total marks (50)"
 }
 ```
 
@@ -554,11 +679,27 @@ Removes a specific question from an exam.
 ```javascript
 {
   _id: ObjectId,
-  name: String (required),
+  name: String (required, unique per owner),
   description: String,
   duration: Number (required, min: 1), // minutes
   totalMarks: Number (required, min: 0),
   questions: [ExamQuestionSchema],
+  
+  // Scheduling
+  startTime: Date (optional, default: current time),
+  endTime: Date (optional, default: current time + 3 days),
+  timezone: String (default: 'Asia/Ho_Chi_Minh'),
+  
+  // Subject
+  subjectId: ObjectId (required when adding questions),
+  subjectCode: String (auto-filled from questions),
+  
+  // Grade
+  gradeId: ObjectId (optional, ref: 'Grade'),
+  
+  // Fee
+  fee: Number (default: 0, min: 0),
+  
   ownerId: ObjectId (required, ref: 'User'),
   settings: {
     // Basic settings
@@ -643,15 +784,7 @@ Removes a specific question from an exam.
   questionId: ObjectId (required, ref: 'Question'),
   order: Number (required, min: 1),
   marks: Number (default: 1, min: 0),
-  isRequired: Boolean (default: true),
-  // Exam-specific overrides (optional)
-  customText: String,
-  customChoices: [{
-    key: String (required),
-    text: String (required)
-  }],
-  customAnswer: Mixed,
-  customExplanation: String
+  isRequired: Boolean (default: true)
 }
 ```
 
@@ -668,6 +801,7 @@ Removes a specific question from an exam.
 - Questions can be added/removed from exams dynamically
 - Question order can be customized per exam
 - Marks can be customized per exam
+- **Simple Design**: No custom overrides - questions maintain their original content
 - **Subject Validation**: When `subjectId` is provided, all questions must belong to the same subject
 - **Mixed Subjects**: When no `subjectId` is provided, questions from different subjects are allowed
 
@@ -684,17 +818,70 @@ Removes a specific question from an exam.
 ## Validation Rules
 
 ### Required Fields
-- `name`: Must be provided and trimmed
-- `duration`: Must be a positive number (minutes)
-- `totalMarks`: Must be a non-negative number
+- `name`: Must be provided, trimmed, and unique per owner
+- `duration`: Must be a positive integer (minutes)
+- `totalMarks`: Must be a non-negative number (>= 0)
+- `questions`: Must be provided and cannot be empty array
+- `subjectId`: Must be provided when creating exam with questions
 - `ownerId`: Must be a valid ObjectId
 
+### Optional Fields
+- `description`: Can be empty
+- `settings`: All have default values
+- `startTime`: Start time of exam (ISO string)
+- `endTime`: End time of exam (ISO string)
+- `timezone`: Timezone (default: Asia/Ho_Chi_Minh)
+- `gradeId`: Grade ID (optional, ref: 'Grade')
+- `fee`: Exam fee (default: 0, min: 0)
+
+### Scheduling Validation
+- `startTime` and `endTime` are optional with smart defaults
+- If not provided: `startTime` = current time, `endTime` = current time + 3 days
+- If provided: `startTime` must be before `endTime`
+- `duration` cannot exceed the time range from `startTime` to `endTime`
+- All time fields must be valid ISO date strings
+
+### Unique Constraints
+- Exam name must be unique per teacher (ownerId)
+- Different teachers can use the same exam name
+- Database enforces unique constraint on `name + ownerId`
+
 ### Subject Validation
-When adding questions to an exam with `subjectId`:
-1. All questions must exist in the database
-2. All questions must belong to the same subject
-3. The subject must match the specified `subjectId`
-4. If validation fails, returns 400 Bad Request with appropriate error message
+When creating an exam:
+1. `questions` array is required and cannot be empty
+2. `subjectId` must be provided
+3. All questions must exist in the database
+4. All questions must belong to the same subject (same subjectId)
+5. `subjectCode` will be auto-filled from questions
+6. If validation fails, returns 400 Bad Request with appropriate error message
+
+**Note**: You cannot create an exam without questions. All questions must be added during exam creation.
+
+### Grade Validation
+- `gradeId` is optional when creating an exam
+- `examPurpose`: Purpose of exam (exam, practice, quiz, assignment)
+- `accessType`: Access control (public, class, student)
+- `allowGuest`: Allow non-logged in users (default: true)
+- `availableFrom`: Exam availability start time
+- `availableUntil`: Exam availability end time
+- `examPassword`: Password protection for exam access
+- `preExamNotificationText`: Text shown before exam starts
+- `shuffleQuestions`: Shuffle question order
+- `shuffleChoices`: Shuffle answer choices
+- If provided, must be a valid ObjectId
+- References the Grade collection for grade information
+- Used for filtering and organizing exams by grade level
+
+### Fee Validation
+- `fee` must be a non-negative number (>= 0)
+- Default value is 0 (free exam)
+- Used for paid exam functionality
+- Fee is charged per exam attempt
+
+### Marks Validation
+- Total marks of all questions cannot exceed exam's `totalMarks`
+- Each question's marks must be non-negative
+- If total question marks > exam total marks, returns 400 Bad Request
 
 ### Settings Validation
 - All settings fields have default values
@@ -714,18 +901,134 @@ When adding questions to an exam with `subjectId`:
 - Error handling for all scenarios
 
 ### Sample Test Data
+
+#### Test Case 1: Minimal Required Fields Only
 ```json
 {
-  "name": "Test Math Exam",
-  "description": "Sample exam for testing",
-  "duration": 60,
+  "name": "Basic Math Test",
+  "description": "Simple math test with required fields only",
+  "duration": 30,
   "totalMarks": 50,
+  "examPurpose": "exam",
+  "isAllowUser": "everyone",
+  "examPassword": "test123",
+  "maxAttempts": 1,
+  "viewMark": 1,
+  "viewExamAndAnswer": 1,
+  "questions": [
+    {
+      "questionId": "68e783537ceeea23e3d0e061",
+      "order": 1,
+      "marks": 25,
+      "isRequired": true
+    },
+    {
+      "questionId": "68e750fa7d0ffb21a570524e",
+      "order": 2,
+      "marks": 25,
+      "isRequired": true
+    }
+  ],
+  "subjectId": "68f254ffef3cded20b0e2110"
+}
+```
+
+#### Test Case 2: Full Features with Custom Settings
+```json
+{
+  "name": "Advanced Physics Exam",
+  "description": "Comprehensive physics exam with advanced features",
+  "duration": 90,
+  "totalMarks": 100,
+  "examPurpose": "exam",
+  "isAllowUser": "class",
+  "availableFrom": "2024-12-01T08:00:00Z",
+  "availableUntil": "2024-12-01T18:00:00Z",
+  "examPassword": "physics2024",
+  "maxAttempts": 2,
+  "viewMark": 2,
+  "viewExamAndAnswer": 2,
+  "autoMonitoring": "screenExit",
+  "studentVerification": true,
+  "eduMapOnly": false,
+  "hideGroupTitles": false,
+  "sectionsStartFromQ1": true,
+  "hideLeaderboard": true,
+  "addTitleInfo": true,
+  "preExamNotification": true,
+  "preExamNotificationText": "Please ensure you have a stable internet connection before starting the exam.",
+  "questions": [
+    {
+      "questionId": "68e783537ceeea23e3d0e061",
+      "order": 1,
+      "marks": 20,
+      "isRequired": true
+    },
+    {
+      "questionId": "68e750fa7d0ffb21a570524e",
+      "order": 2,
+      "marks": 30,
+      "isRequired": true
+    },
+    {
+      "questionId": "68e735aadc42dc7019584a7a",
+      "order": 3,
+      "marks": 50,
+      "isRequired": true
+    }
+  ],
+  "subjectId": "68f254ffef3cded20b0e2110",
+  "gradeId": "68f254ffef3cded20b0e2111",
+  "fee": 0,
+  "startTime": "2024-12-01T08:00:00.000Z",
+  "endTime": "2024-12-01T10:30:00.000Z",
+  "timezone": "Asia/Ho_Chi_Minh",
   "settings": {
+    "theme": "light",
     "allowReview": true,
     "showCorrectAnswer": false,
-    "shuffleQuestions": false,
     "timeLimit": true,
-    "maxAttempts": 1
+    "shuffleQuestions": true,
+    "shuffleChoices": false,
+    "teacherCanStart": true,
+    "teacherCanPause": true,
+    "teacherCanStop": true,
+    "showProgress": true,
+    "showTimer": true,
+    "allowSkip": false,
+    "allowBack": true,
+    "autoSubmit": false,
+    "confirmSubmit": true,
+    "allowLateSubmission": false,
+    "preventCopy": true,
+    "preventRightClick": true,
+    "fullscreenMode": true,
+    "notifyOnStart": true,
+    "notifyOnSubmit": true,
+    "notifyOnTimeWarning": true,
+    "questionPerPage": 1,
+    "saveProgress": true,
+    "allowReviewAfterSubmit": false,
+    "showQuestionNumbers": true,
+    "allowMarkForReview": true,
+    "showAnswerExplanation": false,
+    "allowQuestionFeedback": false,
+    "randomizeQuestionOrder": false,
+    "randomizeChoiceOrder": false,
+    "allowPartialCredit": false,
+    "showScoreImmediately": false,
+    "allowRetake": false,
+    "maxRetakeAttempts": 0,
+    "retakeDelay": 0,
+    "timeWarningThreshold": 5,
+    "gracePeriod": 0,
+    "lateSubmissionPenalty": 0,
+    "fontSize": "medium",
+    "showNavigation": true,
+    "showQuestionList": true,
+    "allowFullscreen": true,
+    "showInstructions": true,
+    "instructions": "Read each question carefully before answering. You have 90 minutes to complete this exam."
   }
 }
 ```
@@ -737,3 +1040,7 @@ When adding questions to an exam with `subjectId`:
 - Search is case-insensitive and searches both name and description
 - Question population includes full question details when fetching exam by ID
 - Subject validation ensures exam integrity and proper question organization
+- **Scheduling**: Exams can be scheduled with specific start/end times and dates
+- **Unique Names**: Exam names must be unique per teacher (ownerId)
+- **Timezone Support**: All scheduling times respect the specified timezone
+- **Validation**: Comprehensive validation ensures data integrity and business rules
