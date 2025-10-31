@@ -67,20 +67,11 @@ Content-Type: application/json
   "startTime": "2024-12-01T08:00:00.000Z",
   "endTime": "2024-12-01T10:30:00.000Z",
   "timezone": "Asia/Ho_Chi_Minh",
-  "examPassword": "exam123",
   "autoMonitoring": "off",
   "studentVerification": false,
   "eduMapOnly": false,
   "hideGroupTitles": false,
   "sectionsStartFromQ1": false,
-  "examPurpose": "exam",
-  "isAllowUser": "everyone",
-  "availableFrom": "2024-01-15T08:00:00Z",
-  "availableUntil": "2024-01-15T18:00:00Z",
-  "examPassword": "exam123",
-  "maxAttempts": 3,
-  "viewMark": 1,
-  "viewExamAndAnswer": 1,
   "hideLeaderboard": false,
   "addTitleInfo": false,
   "preExamNotification": false,
@@ -91,7 +82,7 @@ Content-Type: application/json
     "shuffleQuestions": false,
     "shuffleChoices": false,
     "timeLimit": true,
-    "maxAttempts": 1,
+    
     "teacherCanStart": true,
     "teacherCanPause": true,
     "teacherCanStop": true,
@@ -191,7 +182,7 @@ Content-Type: application/json
       "shuffleQuestions": false,
       "shuffleChoices": false,
       "timeLimit": true,
-      "maxAttempts": 1,
+      
       "teacherCanStart": true,
       "teacherCanPause": true,
       "teacherCanStop": true,
@@ -272,14 +263,37 @@ Retrieves a list of exams with pagination and filtering.
       "duration": 120,
       "totalMarks": 100,
       "questions": [],
+      "startTime": "2024-12-01T08:00:00.000Z",
+      "endTime": "2024-12-01T10:30:00.000Z",
+      "timezone": "Asia/Ho_Chi_Minh",
       "ownerId": "68e3ce12bb8ee016c4d4107f",
+      "subjectId": "68f254ffef3cded20b0e2110",
+      "gradeId": "68f254ffef3cded20b0e2111",
+      "examPurpose": "exam",
+      "isAllowUser": "everyone",
+      "availableFrom": "2024-01-15T08:00:00Z",
+      "availableUntil": "2024-01-15T18:00:00Z",
+      "fee": 0,
+      "examPassword": "exam123",
+      "maxAttempts": 3,
+      "viewMark": 1,
+      "viewExamAndAnswer": 1,
+      "autoMonitoring": "off",
+      "studentVerification": false,
+      "eduMapOnly": false,
+      "hideGroupTitles": false,
+      "sectionsStartFromQ1": false,
+      "hideLeaderboard": false,
+      "addTitleInfo": false,
+      "preExamNotification": false,
+      "preExamNotificationText": "Good luck!",
       "settings": {
         "allowReview": true,
         "showCorrectAnswer": false,
         "shuffleQuestions": false,
         "shuffleChoices": false,
         "timeLimit": true,
-        "maxAttempts": 1,
+        
         "teacherCanStart": true,
         "showProgress": true,
         "showTimer": true
@@ -339,14 +353,38 @@ Retrieves a specific exam with full details including populated questions.
         "isRequired": true
       }
     ],
+    "startTime": "2024-12-01T08:00:00.000Z",
+    "endTime": "2024-12-01T10:30:00.000Z",
+    "timezone": "Asia/Ho_Chi_Minh",
     "ownerId": "68e3ce12bb8ee016c4d4107f",
+    "subjectId": "68f254ffef3cded20b0e2110",
+    "subjectCode": "MATH",
+    "gradeId": "68f254ffef3cded20b0e2111",
+    "examPurpose": "exam",
+    "isAllowUser": "everyone",
+    "availableFrom": "2024-01-15T08:00:00Z",
+    "availableUntil": "2024-01-15T18:00:00Z",
+    "fee": 0,
+    "examPassword": "exam123",
+    "maxAttempts": 3,
+    "viewMark": 1,
+    "viewExamAndAnswer": 1,
+    "autoMonitoring": "off",
+    "studentVerification": false,
+    "eduMapOnly": false,
+    "hideGroupTitles": false,
+    "sectionsStartFromQ1": false,
+    "hideLeaderboard": false,
+    "addTitleInfo": false,
+    "preExamNotification": false,
+    "preExamNotificationText": "Good luck!",
     "settings": {
       "allowReview": true,
       "showCorrectAnswer": false,
       "shuffleQuestions": false,
       "shuffleChoices": false,
       "timeLimit": true,
-      "maxAttempts": 1,
+      
       "teacherCanStart": true,
       "showProgress": true,
       "showTimer": true
@@ -409,7 +447,7 @@ Content-Type: application/json
       "shuffleQuestions": true,
       "shuffleChoices": false,
       "timeLimit": true,
-      "maxAttempts": 1,
+      
       "teacherCanStart": true,
       "showProgress": true,
       "showTimer": true
@@ -437,7 +475,7 @@ Deletes an exam permanently.
 ```json
 {
   "ok": true,
-  "message": "Exam deleted",
+  "message": "Exam deleted successfully",
   "data": {
     "_id": "68f6f6c620ab14a45e11315b",
     "name": "Math Final Exam",
@@ -515,7 +553,7 @@ Content-Type: application/json
       "shuffleQuestions": false,
       "shuffleChoices": false,
       "timeLimit": true,
-      "maxAttempts": 1,
+      
       "teacherCanStart": true,
       "showProgress": true,
       "showTimer": true
@@ -570,7 +608,7 @@ Removes a specific question from an exam.
       "shuffleQuestions": false,
       "shuffleChoices": false,
       "timeLimit": true,
-      "maxAttempts": 1,
+      
       "teacherCanStart": true,
       "showProgress": true,
       "showTimer": true
@@ -684,58 +722,84 @@ Removes a specific question from an exam.
   duration: Number (required, min: 1), // minutes
   totalMarks: Number (required, min: 0),
   questions: [ExamQuestionSchema],
-  
+
   // Scheduling
   startTime: Date (optional, default: current time),
   endTime: Date (optional, default: current time + 3 days),
   timezone: String (default: 'Asia/Ho_Chi_Minh'),
-  
+
   // Subject
-  subjectId: ObjectId (required when adding questions),
+  subjectId: ObjectId (required when creating exam with questions),
   subjectCode: String (auto-filled from questions),
-  
+
   // Grade
   gradeId: ObjectId (optional, ref: 'Grade'),
-  
+
+  // Purpose & Access
+  examPurpose: String (enum: ['exam','practice','quiz','assignment'], default: 'exam'),
+  isAllowUser: String (enum: ['everyone','class','student'], default: 'everyone'),
+
+  // Availability Window
+  availableFrom: Date (optional),
+  availableUntil: Date (optional),
+
   // Fee
   fee: Number (default: 0, min: 0),
-  
+
+  // Security & Attempts & Views
+  examPassword: String (required),
+  maxAttempts: Number (required, min: 1, default: 1),
+  viewMark: Number (enum: [0,1,2], default: 1),
+  viewExamAndAnswer: Number (enum: [0,1,2], default: 1),
+  autoMonitoring: String (enum: ['off','screenExit','fullMonitoring'], default: 'off'),
+  studentVerification: Boolean (default: false),
+  eduMapOnly: Boolean (default: false),
+
+  // Display flags
+  hideGroupTitles: Boolean (default: false),
+  sectionsStartFromQ1: Boolean (default: false),
+  hideLeaderboard: Boolean (default: false),
+  addTitleInfo: Boolean (default: false),
+  preExamNotification: Boolean (default: false),
+  preExamNotificationText: String (default: ''),
+
+  // Ownership
   ownerId: ObjectId (required, ref: 'User'),
+
+  // Settings
   settings: {
-    // Basic settings
     allowReview: Boolean (default: true),
     showCorrectAnswer: Boolean (default: false),
+    timeLimit: Boolean (default: true),
     shuffleQuestions: Boolean (default: false),
     shuffleChoices: Boolean (default: false),
-    timeLimit: Boolean (default: true),
-    maxAttempts: Number (default: 1),
-    
+
     // Teacher controls
     teacherCanStart: Boolean (default: true),
     teacherCanPause: Boolean (default: true),
     teacherCanStop: Boolean (default: true),
-    
+
     // Student experience
     showProgress: Boolean (default: true),
     showTimer: Boolean (default: true),
     allowSkip: Boolean (default: false),
     allowBack: Boolean (default: true),
-    
+
     // Submission settings
     autoSubmit: Boolean (default: false),
     confirmSubmit: Boolean (default: true),
     allowLateSubmission: Boolean (default: false),
-    
+
     // Security settings
     preventCopy: Boolean (default: false),
     preventRightClick: Boolean (default: false),
     fullscreenMode: Boolean (default: false),
-    
+
     // Notification settings
     notifyOnStart: Boolean (default: true),
     notifyOnSubmit: Boolean (default: true),
     notifyOnTimeWarning: Boolean (default: true),
-    
+
     // Advanced settings
     questionPerPage: Number (default: 1),
     saveProgress: Boolean (default: true),
@@ -751,22 +815,24 @@ Removes a specific question from an exam.
     allowRetake: Boolean (default: false),
     maxRetakeAttempts: Number (default: 0),
     retakeDelay: Number (default: 0),
-    
+
     // Time settings
     timeWarningThreshold: Number (default: 5),
     gracePeriod: Number (default: 0),
     lateSubmissionPenalty: Number (default: 0),
-    
+
     // Display settings
-    theme: String (default: 'default', enum: ['default', 'dark', 'light']),
-    fontSize: String (default: 'medium', enum: ['small', 'medium', 'large']),
+    theme: String (default: 'default', enum: ['default','dark','light']),
+    fontSize: String (default: 'medium', enum: ['small','medium','large']),
     showNavigation: Boolean (default: true),
     showQuestionList: Boolean (default: true),
     allowFullscreen: Boolean (default: true),
     showInstructions: Boolean (default: true),
     instructions: String (default: '')
   },
-  status: String (enum: ['draft', 'published', 'archived'], default: 'draft'),
+
+  // Status & metadata
+  status: String (enum: ['draft','published','archived'], default: 'draft'),
   isActive: Boolean (default: true),
   stats: {
     totalAttempts: Number (default: 0),
@@ -802,8 +868,7 @@ Removes a specific question from an exam.
 - Question order can be customized per exam
 - Marks can be customized per exam
 - **Simple Design**: No custom overrides - questions maintain their original content
-- **Subject Validation**: When `subjectId` is provided, all questions must belong to the same subject
-- **Mixed Subjects**: When no `subjectId` is provided, questions from different subjects are allowed
+- **Subject Validation**: All questions must belong to the same subject when creating an exam
 
 ### Access Control
 - Teachers can only manage their own exams
@@ -824,6 +889,12 @@ Removes a specific question from an exam.
 - `questions`: Must be provided and cannot be empty array
 - `subjectId`: Must be provided when creating exam with questions
 - `ownerId`: Must be a valid ObjectId
+- `examPurpose`: Must be one of `exam`, `practice`, `quiz`, `assignment`
+- `isAllowUser`: Must be one of `everyone`, `class`, `student`
+- `examPassword`: Must be a non-empty string
+- `maxAttempts`: Must be a positive integer (>= 1)
+- `viewMark`: Must be one of `0` (never), `1` (afterCompletion), `2` (afterAllFinish)
+- `viewExamAndAnswer`: Must be one of `0` (never), `1` (afterCompletion), `2` (afterAllFinish)
 
 ### Optional Fields
 - `description`: Can be empty
@@ -833,12 +904,21 @@ Removes a specific question from an exam.
 - `timezone`: Timezone (default: Asia/Ho_Chi_Minh)
 - `gradeId`: Grade ID (optional, ref: 'Grade')
 - `fee`: Exam fee (default: 0, min: 0)
+- `availableFrom`: Exam availability start time (ISO string)
+- `availableUntil`: Exam availability end time (ISO string)
+- `preExamNotification`: Boolean flag to enable pre-exam notification
+- `preExamNotificationText`: Optional unless `preExamNotification` is true
 
 ### Scheduling Validation
 - `startTime` and `endTime` are optional with smart defaults
 - If not provided: `startTime` = current time, `endTime` = current time + 3 days
 - If provided: `startTime` must be before `endTime`
 - `duration` cannot exceed the time range from `startTime` to `endTime`
+- All time fields must be valid ISO date strings
+
+### Availability Window Validation
+- `availableFrom` and `availableUntil` are optional
+- If both provided: `availableFrom` must be before `availableUntil`
 - All time fields must be valid ISO date strings
 
 ### Unique Constraints
@@ -859,17 +939,8 @@ When creating an exam:
 
 ### Grade Validation
 - `gradeId` is optional when creating an exam
-- `examPurpose`: Purpose of exam (exam, practice, quiz, assignment)
-- `accessType`: Access control (public, class, student)
-- `allowGuest`: Allow non-logged in users (default: true)
-- `availableFrom`: Exam availability start time
-- `availableUntil`: Exam availability end time
-- `examPassword`: Password protection for exam access
-- `preExamNotificationText`: Text shown before exam starts
-- `shuffleQuestions`: Shuffle question order
-- `shuffleChoices`: Shuffle answer choices
 - If provided, must be a valid ObjectId
-- References the Grade collection for grade information
+- References the `Grade` collection for grade information
 - Used for filtering and organizing exams by grade level
 
 ### Fee Validation
@@ -912,7 +983,7 @@ When creating an exam:
   "examPurpose": "exam",
   "isAllowUser": "everyone",
   "examPassword": "test123",
-  "maxAttempts": 1,
+  
   "viewMark": 1,
   "viewExamAndAnswer": 1,
   "questions": [
