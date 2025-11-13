@@ -19,7 +19,7 @@ const SubmissionSchema = new mongoose.Schema({
   orgId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Organization',
-    required: true,
+    required: false,
     index: true
   },
   examId: {

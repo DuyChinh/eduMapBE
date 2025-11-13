@@ -97,6 +97,36 @@ async function getExamById({ id }) {
 }
 
 /**
+ * Retrieves an exam by share code (for public access)
+ * @param {Object} params - Query parameters
+ * @param {string} params.shareCode - Share code
+ * @returns {Object|null} - Exam data or null if not found
+ */
+async function getExamByShareCode({ shareCode }) {
+  const exam = await Exam.findOne({ 
+    shareCode: shareCode.toUpperCase(),
+    status: 'published'
+  })
+    .populate('questions.questionId')
+    .lean();
+
+  if (!exam) {
+    return null;
+  }
+
+  // Check availability window
+  const now = new Date();
+  if (exam.availableFrom && now < exam.availableFrom) {
+    return null; // Not available yet
+  }
+  if (exam.availableUntil && now > exam.availableUntil) {
+    return null; // No longer available
+  }
+
+  return exam;
+}
+
+/**
  * Creates a new exam
  * @param {Object} params - Creation parameters
  * @param {Object} params.payload - Exam data
@@ -145,12 +175,50 @@ async function createExam({ payload, user }) {
     payload.subjectCode = questions[0].subjectCode;
   }
 
+  // Generate shareCode if status is published
+  if (payload.status === 'published') {
+    payload.shareCode = await generateUniqueShareCode();
+  }
+
   const exam = await Exam.create({
     ...payload,
     ownerId: examOwnerId
   });
 
   return exam;
+}
+
+/**
+ * Generates a unique share code for exams
+ * @returns {Promise<string>} - Unique 8-character alphanumeric code
+ */
+async function generateUniqueShareCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let shareCode;
+  let isUnique = false;
+  let attempts = 0;
+  
+  while (!isUnique && attempts < 20) {
+    // Generate 8-character code
+    shareCode = '';
+    for (let i = 0; i < 8; i++) {
+      shareCode += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    
+    // Check if code already exists
+    const existing = await Exam.findOne({ shareCode });
+    if (!existing) {
+      isUnique = true;
+    }
+    attempts++;
+  }
+  
+  if (!isUnique) {
+    // Fallback: use timestamp-based code
+    shareCode = Date.now().toString(36).toUpperCase().slice(-8);
+  }
+  
+  return shareCode;
 }
 
 /**
@@ -163,6 +231,22 @@ async function createExam({ payload, user }) {
  */
 async function updateExamPartial({ id, payload, ownerIdEnforce }) {
   const examFilter = { _id: id };
+  
+  // If updating status to published and no shareCode exists, generate one
+  if (payload.status === 'published') {
+    const existingExam = await Exam.findById(id);
+    if (existingExam && !existingExam.shareCode) {
+      payload.shareCode = await generateUniqueShareCode();
+    }
+  }
+  
+  // If updating status from published to draft, remove shareCode
+  if (payload.status === 'draft') {
+    const existingExam = await Exam.findById(id);
+    if (existingExam && existingExam.status === 'published') {
+      payload.shareCode = null;
+    }
+  }
   if (ownerIdEnforce && mongoose.isValidObjectId(ownerIdEnforce)) {
     examFilter.ownerId = new mongoose.Types.ObjectId(ownerIdEnforce);
   }
@@ -318,6 +402,7 @@ async function removeQuestionFromExam({ examId, questionId, ownerIdEnforce }) {
 module.exports = {
   getAllExams,
   getExamById,
+  getExamByShareCode,
   createExam,
   updateExamPartial,
   deleteExam,

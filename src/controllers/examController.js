@@ -36,7 +36,8 @@ async function createExam(req, res, next) {
       hideGroupTitles, sectionsStartFromQ1, hideLeaderboard, addTitleInfo, 
       preExamNotification, preExamNotificationText, examPurpose, 
       isAllowUser, availableFrom, availableUntil, shuffleQuestions, 
-      shuffleChoices, maxAttempts, viewMark, viewExamAndAnswer 
+      shuffleChoices, maxAttempts, viewMark, viewExamAndAnswer,
+      status // 'draft' or 'published'
     } = req.body;
     
     // Input validation
@@ -170,6 +171,11 @@ async function createExam(req, res, next) {
       }
     }
 
+    // Validate status if provided
+    if (status && !['draft', 'published'].includes(status)) {
+      return res.status(400).json({ ok: false, message: 'status must be either draft or published' });
+    }
+
     const payload = {
       name: name.trim(),
       description: description?.trim() || '',
@@ -201,7 +207,8 @@ async function createExam(req, res, next) {
       preExamNotificationText: preExamNotificationText?.trim() || '',
       shuffleQuestions: shuffleQuestions || false,
       shuffleChoices: shuffleChoices || false,
-      maxAttempts: maxAttempts || 1
+      maxAttempts: maxAttempts || 1,
+      status: status || 'draft' // Default to draft
     };
 
     const createdExam = await examService.createExam({ payload, user: req.user });
@@ -281,6 +288,53 @@ async function getExamById(req, res, next) {
     }
 
     res.json({ ok: true, data: examData });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Retrieves an exam by share code (public access)
+ * GET /v1/api/exams/share/:shareCode
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ */
+async function getExamByShareCode(req, res, next) {
+  try {
+    const { shareCode } = req.params;
+    
+    if (!shareCode || shareCode.length !== 8) {
+      return res.status(400).json({ ok: false, message: 'Invalid share code format' });
+    }
+
+    const examData = await examService.getExamByShareCode({ shareCode });
+    
+    if (!examData) {
+      return res.status(404).json({ ok: false, message: 'Exam not found or not available' });
+    }
+
+    // Don't return sensitive information for public access
+    // But include examPassword flag (true/false) to indicate if password is required
+    const publicExamData = {
+      _id: examData._id,
+      name: examData.name,
+      description: examData.description,
+      duration: examData.duration,
+      totalMarks: examData.totalMarks,
+      shareCode: examData.shareCode,
+      examPurpose: examData.examPurpose,
+      startTime: examData.startTime,
+      endTime: examData.endTime,
+      availableFrom: examData.availableFrom,
+      availableUntil: examData.availableUntil,
+      maxAttempts: examData.maxAttempts,
+      // Include examPassword flag (not the actual password) to indicate if password is required
+      examPassword: examData.examPassword ? true : false,
+      // Don't include questions, answers, or settings
+    };
+
+    res.json({ ok: true, data: publicExamData });
   } catch (error) {
     next(error);
   }
@@ -443,6 +497,7 @@ module.exports = {
   createExam,
   getAllExams,
   getExamById,
+  getExamByShareCode,
   updateExam,
   deleteExam,
   addQuestionsToExam,

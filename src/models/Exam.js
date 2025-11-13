@@ -283,6 +283,16 @@ const ExamSchema = new mongoose.Schema({
     default: true
   },
   
+  // Share code for published exams
+  shareCode: {
+    type: String,
+    trim: true,
+    uppercase: true,
+    unique: true,
+    sparse: true, // Allow multiple null values
+    index: true
+  },
+  
   // Statistics
   stats: {
     totalAttempts: { type: Number, default: 0 },
