@@ -1,21 +1,27 @@
-const mongoose = require('mongoose');
-require('dotenv').config();
-
 /**
  * Migration: Add shareCode field to Exam model
  * This allows generating shareable links for published exams
  */
-async function up() {
-  const db = mongoose.connection.db;
+async function up(db) {
   const examsCollection = db.collection('exams');
 
-  // Add shareCode field to all existing exams
-  await examsCollection.updateMany(
-    { shareCode: { $exists: false } },
-    { $set: { shareCode: null } }
-  );
+  // First, drop the old index if it exists (might not be sparse)
+  try {
+    await examsCollection.dropIndex('shareCode_1');
+    console.log('Dropped old shareCode index');
+  } catch (error) {
+    // Index might not exist, that's okay
+    console.log('No existing shareCode index to drop');
+  }
 
-  // Generate shareCode for published exams
+  // Create sparse unique index for shareCode
+  await examsCollection.createIndex(
+    { shareCode: 1 },
+    { unique: true, sparse: true, name: 'shareCode_1' }
+  );
+  console.log('Created sparse unique index for shareCode');
+
+  // Generate shareCode for published exams (don't set null for others)
   const publishedExams = await examsCollection.find({ status: 'published' }).toArray();
   
   for (const exam of publishedExams) {
@@ -46,8 +52,7 @@ async function up() {
   console.log('✅ Migration 020: Added shareCode field to Exam model');
 }
 
-async function down() {
-  const db = mongoose.connection.db;
+async function down(db) {
   const examsCollection = db.collection('exams');
 
   // Remove shareCode field
