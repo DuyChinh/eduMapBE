@@ -6,6 +6,9 @@ const auth = require('../middlewares/auth');
 // Start exam submission
 router.post('/start', auth, submissionController.startSubmission);
 
+// Get current user's submissions (must be before /:id route)
+router.get('/me', auth, submissionController.getMySubmissions);
+
 // Get submission by ID
 router.get('/:id', auth, submissionController.getSubmissionById);
 

@@ -184,12 +184,41 @@ async function getExamLeaderboard(req, res, next) {
   }
 }
 
+/**
+ * Gets current user's submissions
+ * GET /v1/api/submissions/me
+ */
+async function getMySubmissions(req, res, next) {
+  try {
+    const user = req.user;
+    const { subject, status, startDate, endDate } = req.query;
+
+    const submissions = await submissionService.getMySubmissions({
+      userId: user.id,
+      filters: {
+        subject,
+        status,
+        startDate,
+        endDate
+      }
+    });
+
+    res.json({ ok: true, data: submissions });
+  } catch (error) {
+    if (error?.status) {
+      return res.status(error.status).json({ ok: false, message: error.message });
+    }
+    next(error);
+  }
+}
+
 module.exports = {
   startSubmission,
   updateAnswers,
   submitExam,
   getSubmissionById,
   getExamSubmissions,
-  getExamLeaderboard
+  getExamLeaderboard,
+  getMySubmissions
 };
 

@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Submission = require('../models/Submission');
 const Exam = require('../models/Exam');
 const ActivityLog = require('../models/ActivityLog');
+const ProctorLog = require('../models/ProctorLog');
 const User = require('../models/User');
 
 // Helper functions
@@ -344,24 +345,57 @@ async function getSubmissionActivityLog(req, res, next) {
       return res.status(403).json({ ok: false, message: 'Forbidden' });
     }
 
-    // Get the submission
+    // Get the submission (can be in_progress, submitted, or graded)
+    // Get the most recent submission for this exam and student
     const submission = await Submission.findOne({
       examId,
       userId: studentId
-    });
+    })
+      .sort({ createdAt: -1 })
+      .limit(1);
 
     if (!submission) {
       return res.status(404).json({ ok: false, message: 'Submission not found' });
     }
 
-    // Get activity logs
-    const activityLogs = await ActivityLog.find({
+    // Get activity logs from proctorlogs collection
+    // ProctorLog model maps to 'proctorlogs' collection
+    const activityLogs = await ProctorLog.find({
       submissionId: submission._id
-    }).sort({ timestamp: 1 });
+    })
+      .sort({ ts: 1 }) // Sort by ts (timestamp) field
+      .lean(); // Use lean() for better performance
+
+    // Format activity logs for response (ProctorLog uses event, meta, ts instead of type, details, timestamp)
+    const formattedLogs = activityLogs.map(log => ({
+      _id: log._id,
+      submissionId: log.submissionId,
+      examId: examId, // Add examId from params
+      userId: log.userId,
+      event: log.event, // ProctorLog uses 'event' field
+      type: log.event, // Map event to type for compatibility
+      action: log.event, // Use event as action
+      severity: log.severity,
+      isSuspicious: log.severity === 'high' || log.severity === 'critical', // Determine suspicious based on severity
+      meta: {
+        ...log.meta,
+        visible: log.meta?.visible,
+        reason: log.meta?.reason,
+        userAgent: log.meta?.userAgent,
+        url: log.meta?.url,
+        ip: log.meta?.ip,
+        coordinates: log.meta?.coordinates,
+        ts: log.ts
+      },
+      timestamp: log.ts, // Map ts to timestamp
+      createdAt: log.createdAt,
+      updatedAt: log.updatedAt
+    }));
 
     res.json({
       ok: true,
-      data: activityLogs
+      data: formattedLogs,
+      count: formattedLogs.length
     });
   } catch (error) {
     console.error('Error getting activity log:', error);

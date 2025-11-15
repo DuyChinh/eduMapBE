@@ -378,6 +378,121 @@ async function getExamLeaderboard({ examId, user }) {
 }
 
 /**
+ * Gets current user's submissions with filters
+ * @param {Object} params - Parameters
+ * @param {string} params.userId - User ID
+ * @param {Object} params.filters - Filter options (subject, status, startDate, endDate)
+ * @returns {Array} - List of user's submissions
+ */
+async function getMySubmissions({ userId, filters = {} }) {
+  const query = {
+    userId,
+    status: { $in: ['submitted', 'graded', 'late'] } // Only get completed submissions
+  };
+
+  // Apply filters
+  if (filters.status) {
+    query.status = filters.status;
+  }
+
+  if (filters.startDate || filters.endDate) {
+    query.submittedAt = {};
+    if (filters.startDate) {
+      query.submittedAt.$gte = new Date(filters.startDate);
+    }
+    if (filters.endDate) {
+      query.submittedAt.$lte = new Date(filters.endDate);
+    }
+  }
+
+  // Get submissions with exam info
+  let submissions = await Submission.find(query)
+    .populate({
+      path: 'examId',
+      select: 'name subjectId subjectCode description totalMarks ownerId',
+      populate: [
+        {
+          path: 'ownerId',
+          select: 'name email'
+        },
+        {
+          path: 'subjectId',
+          select: 'name name_en name_jp code'
+        }
+      ]
+    })
+    .populate('userId', 'name email')
+    .sort({ submittedAt: -1 })
+    .lean();
+
+  // Filter by subject if provided
+  if (filters.subject) {
+    submissions = submissions.filter(submission => {
+      const exam = submission.examId;
+      if (!exam) return false;
+      
+      // Check subject name from populated subjectId
+      const subject = exam.subjectId;
+      if (subject) {
+        const subjectName = subject.name || subject.name_en || subject.name_jp || subject.code || '';
+        if (subjectName.toLowerCase().includes(filters.subject.toLowerCase())) {
+          return true;
+        }
+      }
+      
+      // Check subjectCode
+      if (exam.subjectCode) {
+        if (exam.subjectCode.toLowerCase().includes(filters.subject.toLowerCase())) {
+          return true;
+        }
+      }
+      
+      return false;
+    });
+  }
+
+  // Format response
+  const formattedSubmissions = submissions.map(submission => {
+    const exam = submission.examId || {};
+    const subject = exam.subjectId || {};
+    
+    // Get subject name (prefer current language, fallback to name)
+    const getSubjectName = () => {
+      if (subject.name) return subject.name;
+      if (subject.name_en) return subject.name_en;
+      if (subject.name_jp) return subject.name_jp;
+      if (subject.code) return subject.code;
+      if (exam.subjectCode) return exam.subjectCode;
+      return '';
+    };
+    
+    return {
+      _id: submission._id,
+      examId: exam._id,
+      exam: {
+        _id: exam._id,
+        name: exam.name,
+        subject: getSubjectName(),
+        subjectId: exam.subjectId?._id || exam.subjectId,
+        description: exam.description,
+        totalMarks: exam.totalMarks
+      },
+      score: submission.score || 0,
+      totalMarks: submission.maxScore || exam.totalMarks || 0,
+      percentage: submission.percentage || 0,
+      timeSpent: submission.timeSpent || 0,
+      startedAt: submission.startedAt,
+      submittedAt: submission.submittedAt,
+      status: submission.status,
+      attemptNumber: submission.attemptNumber || 1,
+      answers: submission.answers || []
+    };
+  });
+
+  return formattedSubmissions;
+}
+
+/**
  * Shuffles an array using Fisher-Yates algorithm
  * @param {Array} array - Array to shuffle
  * @returns {Array} - Shuffled array
@@ -396,6 +511,8 @@ module.exports = {
   updateSubmissionAnswers,
   submitExam,
   getSubmissionById,
-  getExamSubmissions
+  getExamSubmissions,
+  getExamLeaderboard,
+  getMySubmissions
 };
 
