@@ -214,7 +214,29 @@ async function mine(req, res, next) {
         ClassModel.find(filter).sort('-createdAt').skip(skip).limit(limit),
         ClassModel.countDocuments(filter),
       ]);
-      return res.json({ ok: true, items, total, page, limit, pages: Math.max(1, Math.ceil(total / limit)) });
+      
+      // Add joinedAt for current student from studentJoins array
+      const userIdStr = String(req.user.id);
+      const itemsWithJoinedAt = items.map(item => {
+        const classData = item.toObject ? item.toObject() : item;
+        // Find joinedAt from studentJoins array
+        if (classData.studentJoins && Array.isArray(classData.studentJoins)) {
+          const joinInfo = classData.studentJoins.find(join => {
+            const studentId = join.studentId;
+            if (!studentId) return false;
+            const joinStudentId = typeof studentId === 'object' 
+              ? String(studentId._id || studentId.id || studentId)
+              : String(studentId);
+            return joinStudentId === userIdStr;
+          });
+          if (joinInfo && joinInfo.joinedAt) {
+            classData.joinedAt = joinInfo.joinedAt;
+          }
+        }
+        return classData;
+      });
+      
+      return res.json({ ok: true, items: itemsWithJoinedAt, total, page, limit, pages: Math.max(1, Math.ceil(total / limit)) });
     }
     // Admin: xem tất cả
     const data = await service.list({ orgId, page: req.query.page, limit: req.query.limit });
