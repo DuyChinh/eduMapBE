@@ -64,9 +64,9 @@ async function createExam(req, res, next) {
     }
 
     // Validate examPassword (required)
-    if (!examPassword || typeof examPassword !== 'string') {
-      return res.status(400).json({ ok: false, message: 'examPassword is required and must be a string' });
-    }
+    // if (!examPassword || typeof examPassword !== 'string') {
+    //   return res.status(400).json({ ok: false, message: 'examPassword is required and must be a string' });
+    // }
 
     // Validate examPurpose (required)
     if (!examPurpose || !['exam', 'practice', 'quiz', 'assignment'].includes(examPurpose)) {
@@ -193,7 +193,7 @@ async function createExam(req, res, next) {
       availableFrom: availableFrom ? new Date(availableFrom) : undefined,
       availableUntil: availableUntil ? new Date(availableUntil) : undefined,
       fee: fee !== undefined ? fee : 0,
-      examPassword: examPassword.trim(),
+      examPassword: examPassword ? examPassword.trim() : '',
       autoMonitoring: autoMonitoring || 'off',
       studentVerification: studentVerification || false,
       eduMapOnly: eduMapOnly || false,

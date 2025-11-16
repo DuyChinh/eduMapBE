@@ -125,7 +125,7 @@ const ExamSchema = new mongoose.Schema({
   examPassword: {
     type: String,
     trim: true,
-    required: true,
+    required: false,
     default: ''
   },
   
