@@ -125,7 +125,67 @@ async function getOne(req, res, next) {
       return res.status(403).json({ ok: false, message: 'Forbidden' });
     }
 
-    res.json({ ok: true, data: doc });
+    // Format response với joinedAt cho mỗi student
+    const classData = doc.toObject ? doc.toObject() : doc;
+    
+    // Tạo map từ studentJoins để dễ lookup
+    const joinMap = new Map();
+    if (classData.studentJoins && Array.isArray(classData.studentJoins)) {
+      classData.studentJoins.forEach(join => {
+        let studentId = null;
+        if (join.studentId) {
+          if (typeof join.studentId === 'object' && join.studentId._id) {
+            studentId = String(join.studentId._id);
+          } else if (typeof join.studentId === 'object' && join.studentId.id) {
+            studentId = String(join.studentId.id);
+          } else if (typeof join.studentId === 'object') {
+            studentId = String(join.studentId);
+          } else {
+            studentId = String(join.studentId);
+          }
+        }
+        if (studentId && studentId !== 'undefined' && studentId !== 'null') {
+          joinMap.set(studentId, join.joinedAt);
+        }
+      });
+    }
+
+    // Format students từ studentIds với joinedAt
+    const students = [];
+    if (classData.studentIds && Array.isArray(classData.studentIds)) {
+      classData.studentIds.forEach(student => {
+        let studentId = null;
+        let studentData = null;
+        
+        if (typeof student === 'object' && student._id) {
+          // Populated student object
+          studentId = String(student._id);
+          studentData = student;
+        } else if (typeof student === 'object' && student.id) {
+          studentId = String(student.id);
+          studentData = student;
+        } else if (typeof student === 'object') {
+          studentId = String(student);
+          studentData = null;
+        } else {
+          // Just ObjectId string
+          studentId = String(student);
+          studentData = null;
+        }
+        
+        if (studentData) {
+          students.push({
+            ...studentData,
+            joinedAt: joinMap.get(studentId) || null
+          });
+        }
+      });
+    }
+    
+    // Thêm students vào response
+    classData.students = students;
+
+    res.json({ ok: true, data: classData });
   } catch (e) { next(e); }
 }
 
@@ -288,6 +348,43 @@ async function addStudents(req, res, next) {
   }
 }
 
+// DELETE /v1/api/classes/:id/students
+async function removeStudents(req, res, next) {
+  try {
+    if (!isTeacherOrAdmin(req.user)) {
+      return res.status(403).json({ ok: false, message: 'Forbidden' });
+    }
+    const id = req.params.id;
+    const { studentIds, studentEmails } = req.body;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ ok: false, message: 'invalid class id' });
+    }
+    if ((!Array.isArray(studentIds) || studentIds.length === 0) &&
+        (!Array.isArray(studentEmails) || studentEmails.length === 0)) {
+      return res.status(400).json({ ok: false, message: 'studentIds or studentEmails must be provided' });
+    }
+
+    const orgId = getOrgIdSoft(req);
+    const ownerIdEnforce = isAdmin(req.user) ? undefined : req.user.id;
+
+    const ids = Array.isArray(studentIds) ? studentIds.map(String) : [];
+    const emails = Array.isArray(studentEmails) ? studentEmails.map(e => (e || '').trim().toLowerCase()).filter(Boolean) : [];
+
+    const { updatedClass, report } = await service.removeStudentsFromClass({
+      id,
+      studentIds: ids,
+      studentEmails: emails,
+      ownerIdEnforce,
+      orgId
+    });
+
+    return res.json({ ok: true, data: updatedClass, report });
+  } catch (e) {
+    if (e?.status) return res.status(e.status).json({ ok: false, message: e.message });
+    next(e);
+  }
+}
+
 // ============== SEARCH CLASSES =================
 async function search(req, res, next) {
   try {
@@ -320,6 +417,7 @@ module.exports = {
   list,
   getOne,
   addStudents,
+  removeStudents,
   mine,
   patch,
   remove,

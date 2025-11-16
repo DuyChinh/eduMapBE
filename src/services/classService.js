@@ -99,7 +99,9 @@ async function list({ orgId, teacherId, teacherEmail, q, page = 1, limit = 10, s
 
 
 async function getById(id) {
-  return ClassModel.findById(id);
+  return ClassModel.findById(id)
+    .populate('studentIds', 'name email avatar studentCode')
+    .populate('studentJoins.studentId', 'name email avatar studentCode');
 }
 
 // Kiểm tra tên class trùng lặp của giáo viên
@@ -164,6 +166,11 @@ async function joinByCode({ code, userId, orgId }) {
   const has = cls.studentIds.some(sid => String(sid) === String(uid));
   if (!has) {
     cls.studentIds.push(uid);
+    // Thêm vào studentJoins với thời gian join
+    cls.studentJoins.push({
+      studentId: uid,
+      joinedAt: new Date()
+    });
     await cls.save();
   }
   return cls;
@@ -312,16 +319,35 @@ async function addStudentsToClass({ id, studentIds = [], studentEmails = [], own
     if (ownerIdEnforce && mongoose.isValidObjectId(ownerIdEnforce)) filter.teacherId = new mongoose.Types.ObjectId(ownerIdEnforce);
     if (orgId && mongoose.isValidObjectId(orgId)) filter.orgId = new mongoose.Types.ObjectId(orgId);
 
-    updated = await ClassModel.findOneAndUpdate(
-      filter,
-      { $addToSet: { studentIds: { $each: toAdd } } },
-      { new: true }
-    );
-    if (!updated) {
+    // Fetch class để thêm studentJoins
+    const cls = await ClassModel.findOne(filter);
+    if (!cls) {
       const err = new Error('Class not found or forbidden');
       err.status = 403;
       throw err;
     }
+
+    // Thêm studentIds
+    toAdd.forEach(studentId => {
+      if (!cls.studentIds.some(sid => String(sid) === String(studentId))) {
+        cls.studentIds.push(studentId);
+      }
+    });
+
+    // Thêm studentJoins với thời gian join
+    const joinTime = new Date();
+    toAdd.forEach(studentId => {
+      const studentIdStr = String(studentId);
+      const exists = cls.studentJoins.some(join => String(join.studentId) === studentIdStr);
+      if (!exists) {
+        cls.studentJoins.push({
+          studentId,
+          joinedAt: joinTime
+        });
+      }
+    });
+
+    updated = await cls.save();
   } else {
     // no change, read current class doc
     updated = await ClassModel.findById(id);
@@ -337,6 +363,146 @@ async function addStudentsToClass({ id, studentIds = [], studentEmails = [], own
       invalidEmails,
       notFoundEmails,
       notStudents
+    }
+  };
+}
+
+/**
+ * Remove students from a class
+ * @param {Object} params - Remove students parameters
+ * @param {string} params.id - Class ID
+ * @param {string[]} params.studentIds - Array of student IDs to remove
+ * @param {string[]} params.studentEmails - Array of student emails to remove
+ * @param {string} params.ownerIdEnforce - Teacher ID to enforce ownership (optional, for admin)
+ * @param {string} params.orgId - Organization ID (optional)
+ * @returns {Object} - Updated class and report
+ */
+async function removeStudentsFromClass({ id, studentIds = [], studentEmails = [], ownerIdEnforce, orgId }) {
+  // Normalize provided inputs
+  const idsInput = Array.isArray(studentIds) ? Array.from(new Set(studentIds.map(s => String(s)))) : [];
+  const emailsInput = Array.isArray(studentEmails) ? Array.from(new Set(studentEmails.map(e => String(e).toLowerCase().trim()))) : [];
+
+  if (idsInput.length === 0 && emailsInput.length === 0) {
+    const err = new Error('studentIds or studentEmails must be provided');
+    err.status = 400;
+    throw err;
+  }
+
+  // Validate ids
+  const invalidIds = idsInput.filter(s => !mongoose.isValidObjectId(s));
+  const validIdObjs = idsInput.filter(s => mongoose.isValidObjectId(s)).map(s => new mongoose.Types.ObjectId(s));
+
+  // Resolve emails -> users
+  const resolvedFromEmails = [];
+  const notFoundEmails = [];
+  const invalidEmails = [];
+  for (const em of emailsInput) {
+    if (!em) { invalidEmails.push(em); continue; }
+  }
+
+  // Batch query users for both id list and email list
+  const queryUsers = [];
+  if (validIdObjs.length > 0) queryUsers.push({ _id: { $in: validIdObjs } });
+  if (emailsInput.length > 0) queryUsers.push({ email: { $in: emailsInput } });
+
+  // Build final user list query
+  const userQuery = queryUsers.length > 0 ? { $or: queryUsers } : null;
+  let users = [];
+  if (userQuery) {
+    users = await User.find(userQuery).select('_id email role orgId').lean();
+  }
+
+  // Map users
+  const foundById = new Set(users.map(u => String(u._id)));
+  const foundByEmailMap = new Map(users.map(u => [String(u.email).toLowerCase(), u]));
+
+  // Determine notFoundIds (those valid ids not in DB)
+  const notFoundIds = validIdObjs.map(s => String(s)).filter(s => !foundById.has(s));
+
+  // For emails, determine which were found
+  const foundEmailIds = [];
+  for (const em of emailsInput) {
+    const u = foundByEmailMap.get(String(em));
+    if (!u) {
+      notFoundEmails.push(em);
+    } else {
+      foundEmailIds.push(String(u._id));
+      resolvedFromEmails.push(u);
+    }
+  }
+
+  // Merge all candidate student ids (from validIdObjs and resolvedFromEmails)
+  const candidateIds = Array.from(new Set([
+    ...validIdObjs.map(x => String(x)),
+    ...foundEmailIds
+  ])).map(s => new mongoose.Types.ObjectId(s));
+
+  // If no candidate student ids to process, return report early
+  if (candidateIds.length === 0) {
+    const cls = await ClassModel.findById(id);
+    return {
+      updatedClass: cls,
+      report: {
+        removed: [],
+        notInClass: [],
+        invalidIds,
+        notFoundIds,
+        invalidEmails,
+        notFoundEmails
+      }
+    };
+  }
+
+  // Check class exists and get current studentIds
+  const filter = { _id: id };
+  if (ownerIdEnforce && mongoose.isValidObjectId(ownerIdEnforce)) filter.teacherId = new mongoose.Types.ObjectId(ownerIdEnforce);
+  if (orgId && mongoose.isValidObjectId(orgId)) filter.orgId = new mongoose.Types.ObjectId(orgId);
+
+  const cls = await ClassModel.findOne(filter).select('studentIds').lean();
+  if (!cls) {
+    const err = new Error('Class not found or forbidden');
+    err.status = 403;
+    throw err;
+  }
+
+  const existingStudentIds = (cls.studentIds || []).map(s => String(s));
+  
+  // Compute which students are actually in the class and can be removed
+  const toRemove = candidateIds.filter(idStr => existingStudentIds.includes(String(idStr)));
+  const notInClass = candidateIds.filter(idStr => !existingStudentIds.includes(String(idStr))).map(s => String(s));
+
+  // Perform DB update with $pull
+  let updated = null;
+  if (toRemove.length > 0) {
+    updated = await ClassModel.findOneAndUpdate(
+      filter,
+      { 
+        $pull: { 
+          studentIds: { $in: toRemove },
+          studentJoins: { studentId: { $in: toRemove } }
+        } 
+      },
+      { new: true }
+    );
+    if (!updated) {
+      const err = new Error('Class not found or forbidden');
+      err.status = 403;
+      throw err;
+    }
+  } else {
+    // no change, read current class doc
+    updated = await ClassModel.findById(id);
+  }
+
+  return {
+    updatedClass: updated,
+    report: {
+      removed: toRemove.map(x => String(x)),
+      notInClass,
+      invalidIds,
+      notFoundIds,
+      invalidEmails,
+      notFoundEmails
     }
   };
 }
@@ -386,5 +552,6 @@ module.exports = {
   joinByCode,
   regenerateCode,
   addStudentsToClass,
+  removeStudentsFromClass,
   search,
 };

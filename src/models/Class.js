@@ -28,6 +28,17 @@ const ClassSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   }],
+  studentJoins: [{
+    studentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    joinedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
   settings: {
     allowLateSubmission: { type: Boolean, default: false },
     maxAttempts: { type: Number, default: 1 },
