@@ -183,7 +183,6 @@ async function getExamLeaderboard(req, res, next) {
     next(error);
   }
 }
-
 /**
  * Gets current user's submissions
  * GET /v1/api/submissions/me

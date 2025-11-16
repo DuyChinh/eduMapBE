@@ -94,6 +94,7 @@ async function getExamStatistics(req, res, next) {
 /**
  * Get exam leaderboard
  * GET /v1/api/exams/:examId/leaderboard
+ * Each user appears only once with their best submission
  */
 async function getExamLeaderboard(req, res, next) {
   try {
@@ -114,17 +115,65 @@ async function getExamLeaderboard(req, res, next) {
       return res.status(403).json({ ok: false, message: 'Leaderboard is hidden for this exam' });
     }
 
-    // Get submissions sorted by score and time
+    // Get all submitted and graded submissions for this exam
     const submissions = await Submission.find({
       examId,
       status: { $in: ['submitted', 'graded'] }
     })
       .populate('userId', 'name email avatar studentCode')
-      .sort({ score: -1, submittedAt: 1 })
-      .limit(parseInt(limit));
+      .sort({ submittedAt: -1 });
 
-    // Format leaderboard data with ranks
-    const leaderboard = submissions.map((submission, index) => ({
+    if (submissions.length === 0) {
+      return res.json({
+        ok: true,
+        data: []
+      });
+    }
+
+    // Group submissions by userId
+    const userSubmissionsMap = {};
+    submissions.forEach(sub => {
+      const userId = String(sub.userId._id);
+      if (!userSubmissionsMap[userId]) {
+        userSubmissionsMap[userId] = [];
+      }
+      userSubmissionsMap[userId].push(sub);
+    });
+
+    // For each user, select the best submission based on logic:
+    // - If scores are equal: choose the one with lower timeSpent (faster)
+    // - Otherwise: choose the one with higher score
+    const bestSubmissions = [];
+    
+    Object.values(userSubmissionsMap).forEach(userSubs => {
+      let bestSub;
+      if (userSubs.length === 1) {
+        bestSub = userSubs[0];
+      } else {
+        // Multiple submissions, apply selection logic
+        // Sort by score (descending), then by timeSpent (ascending)
+        userSubs.sort((a, b) => {
+          if (a.score !== b.score) {
+            return b.score - a.score; // Higher score first
+          }
+          return (a.timeSpent || 0) - (b.timeSpent || 0); // Lower timeSpent first
+        });
+        bestSub = userSubs[0];
+      }
+      bestSubmissions.push(bestSub);
+    });
+
+    // Sort all best submissions by score (descending), then by timeSpent (ascending)
+    bestSubmissions.sort((a, b) => {
+      if (a.score !== b.score) {
+        return b.score - a.score; // Higher score first
+      }
+      return (a.timeSpent || 0) - (b.timeSpent || 0); // Lower timeSpent first
+    });
+
+    // Apply limit and format leaderboard data with ranks
+    const limitedSubmissions = bestSubmissions.slice(0, parseInt(limit));
+    const leaderboard = limitedSubmissions.map((submission, index) => ({
       rank: index + 1,
       student: {
         _id: submission.userId._id,
@@ -552,6 +601,163 @@ async function getSubjectAverageScores(req, res, next) {
   }
 }
 
+/**
+ * Get score distribution for chart (by score ranges)
+ * GET /v1/api/exams/:examId/score-distribution
+ * Returns statistics grouped into 10 score ranges
+ */
+async function getScoreDistribution(req, res, next) {
+  try {
+    const { examId } = req.params;
+    const user = req.user;
+
+    if (!mongoose.isValidObjectId(examId)) {
+      return res.status(400).json({ ok: false, message: 'Invalid exam ID format' });
+    }
+
+    // Check exam exists and user has permission
+    const exam = await Exam.findById(examId);
+    if (!exam) {
+      return res.status(404).json({ ok: false, message: 'Exam not found' });
+    }
+
+    // Only teacher who owns the exam or admin can view statistics
+    const isOwner = String(exam.ownerId) === String(user.id);
+    if (!isOwner && !isAdmin(user)) {
+      return res.status(403).json({ ok: false, message: 'Forbidden' });
+    }
+
+    // Get all submitted and graded submissions for this exam
+    const submissions = await Submission.find({
+      examId,
+      status: { $in: ['submitted', 'graded'] }
+    })
+      .populate('userId', 'name email studentCode')
+      .sort({ submittedAt: -1 });
+
+    if (submissions.length === 0) {
+      // Return empty distribution with 10 ranges
+      const totalMarks = exam.totalMarks || 100;
+      const rangeSize = Math.round(totalMarks / 10);
+      const ranges = [];
+      for (let i = 0; i < 10; i++) {
+        const min = i * rangeSize;
+        const max = i === 9 ? totalMarks : (i + 1) * rangeSize;
+        let rangeLabel;
+        if (i === 0) {
+          rangeLabel = `< ${max}`;
+        } else if (i === 9) {
+          rangeLabel = `>= ${min}`;
+        } else {
+          rangeLabel = `${min} - ${max - 1}`;
+        }
+        ranges.push({
+          range: rangeLabel,
+          min,
+          max: i === 9 ? totalMarks : max,
+          count: 0
+        });
+      }
+      return res.json({
+        ok: true,
+        data: ranges
+      });
+    }
+
+    // Group submissions by userId
+    const userSubmissionsMap = {};
+    submissions.forEach(sub => {
+      const userId = String(sub.userId._id);
+      if (!userSubmissionsMap[userId]) {
+        userSubmissionsMap[userId] = [];
+      }
+      userSubmissionsMap[userId].push(sub);
+    });
+
+    // For each user, select the best submission based on logic:
+    // - If scores are equal: choose the one with lower timeSpent (faster)
+    // - Otherwise: choose the one with higher score
+    const userScores = [];
+    
+    Object.values(userSubmissionsMap).forEach(userSubs => {
+      let bestSub;
+      if (userSubs.length === 1) {
+        bestSub = userSubs[0];
+      } else {
+        // Multiple submissions, apply selection logic
+        // Sort by score (descending), then by timeSpent (ascending)
+        userSubs.sort((a, b) => {
+          if (a.score !== b.score) {
+            return b.score - a.score; // Higher score first
+          }
+          return (a.timeSpent || 0) - (b.timeSpent || 0); // Lower timeSpent first
+        });
+        bestSub = userSubs[0];
+      }
+      userScores.push(bestSub.score);
+    });
+
+    // Calculate score ranges (always 10 ranges)
+    const totalMarks = exam.totalMarks || 100;
+    const rangeSize = Math.round(totalMarks / 10);
+    
+    // Initialize 10 ranges
+    const ranges = [];
+    for (let i = 0; i < 10; i++) {
+      const min = i * rangeSize;
+      const max = i === 9 ? totalMarks : (i + 1) * rangeSize;
+      let rangeLabel;
+      if (i === 0) {
+        rangeLabel = `< ${max}`;
+      } else if (i === 9) {
+        rangeLabel = `>= ${min}`;
+      } else {
+        rangeLabel = `${min} - ${max - 1}`;
+      }
+      ranges.push({
+        range: rangeLabel,
+        min,
+        max: i === 9 ? totalMarks : max,
+        count: 0
+      });
+    }
+
+    // Count scores in each range
+    userScores.forEach(score => {
+      for (let i = 0; i < ranges.length; i++) {
+        const range = ranges[i];
+        if (i === 0) {
+          // First range: < max
+          if (score < range.max) {
+            range.count++;
+            break;
+          }
+        } else if (i === 9) {
+          // Last range: >= min
+          if (score >= range.min) {
+            range.count++;
+            break;
+          }
+        } else {
+          // Other ranges: >= min and < max
+          if (score >= range.min && score < range.max) {
+            range.count++;
+            break;
+          }
+        }
+      }
+    });
+
+    res.json({
+      ok: true,
+      data: ranges
+    });
+  } catch (error) {
+    console.error('Error getting score distribution:', error);
+    next(error);
+  }
+}
+
 module.exports = {
   getExamStatistics,
   getExamLeaderboard,
@@ -559,6 +765,7 @@ module.exports = {
   getStudentSubmissionDetail,
   getSubmissionActivityLog,
   getOverallExamResults,
-  getSubjectAverageScores
+  getSubjectAverageScores,
+  getScoreDistribution
 };
 

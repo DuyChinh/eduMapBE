@@ -18,6 +18,7 @@ router.delete('/:id/questions/:questionId', auth, examController.removeQuestionF
 
 // Exam statistics and analytics
 router.get('/:examId/statistics', auth, examStatsController.getExamStatistics);
+router.get('/:examId/score-distribution', auth, examStatsController.getScoreDistribution);
 router.get('/:examId/leaderboard', auth, examStatsController.getExamLeaderboard);
 router.get('/:examId/submissions', auth, examStatsController.getExamSubmissions);
 router.get('/:examId/submissions/:studentId', auth, examStatsController.getStudentSubmissionDetail);
