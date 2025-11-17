@@ -241,7 +241,7 @@ async function createExam(req, res, next) {
  */
 async function getAllExams(req, res, next) {
   try {
-    const { page, limit, sort, status, q, ownerId } = req.query;
+    const { page, limit, sort, status, q, ownerId, subjectId } = req.query;
 
     // Teachers can only view their own exams, admins can view all
     const filterOwnerId = isTeacher(req.user) && !ownerId ? req.user.id : ownerId;
@@ -254,7 +254,8 @@ async function getAllExams(req, res, next) {
       limit,
       sort,
       status,
-      q
+      q,
+      subjectId
     });
 
     res.json({ ok: true, ...examData });

@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Exam = require('../models/Exam');
 const Question = require('../models/Question');
+const Subject = require('../models/Subject');
 
 /**
  * Converts string value to MongoDB ObjectId if valid
@@ -18,13 +19,16 @@ const convertToObjectId = (value) =>
  * @param {string} params.q - Search query
  * @returns {Object} - MongoDB filter object
  */
-function buildExamFilter({ ownerId, status, q }) {
+function buildExamFilter({ ownerId, status, q, subjectId }) {
   const filter = {};
 
   const examOwnerId = convertToObjectId(ownerId);
   if (examOwnerId) filter.ownerId = examOwnerId;
 
   if (status) filter.status = status;
+
+  const subjectObjectId = convertToObjectId(subjectId);
+  if (subjectObjectId) filter.subjectId = subjectObjectId;
 
   if (q && typeof q === 'string' && q.trim()) {
     const searchRegex = new RegExp(q.trim(), 'i');
@@ -55,10 +59,46 @@ async function getAllExams(params) {
     limit = 20,
     sort = '-createdAt',
     status,
-    q
+    q,
+    subjectId
   } = params;
 
-  const examFilter = buildExamFilter({ ownerId, status, q });
+  let examFilter = buildExamFilter({ ownerId, status, q: null, subjectId });
+
+  // If there's a search query, also search in subject names
+  if (q && typeof q === 'string' && q.trim()) {
+    const searchRegex = new RegExp(q.trim(), 'i');
+    
+    // Find subjects matching the search query
+    const matchingSubjects = await Subject.find({
+      $or: [
+        { name: searchRegex },
+        { name_en: searchRegex },
+        { name_jp: searchRegex },
+        { code: searchRegex }
+      ]
+    }).select('_id');
+    
+    const matchingSubjectIds = matchingSubjects.map(s => s._id);
+    
+    // Build $or condition for exam search
+    const searchConditions = [
+      { name: searchRegex },
+      { description: searchRegex }
+    ];
+    
+    // If we found matching subjects, add subjectId filter
+    if (matchingSubjectIds.length > 0) {
+      searchConditions.push({ subjectId: { $in: matchingSubjectIds } });
+    }
+    
+    // If examFilter already has $or, merge it; otherwise create it
+    if (examFilter.$or) {
+      examFilter.$or = [...examFilter.$or, ...searchConditions];
+    } else {
+      examFilter.$or = searchConditions;
+    }
+  }
 
   const currentPage = Number(page) || 1;
   const pageLimit = Number(limit) || 20;
@@ -67,6 +107,7 @@ async function getAllExams(params) {
   const [exams, totalCount] = await Promise.all([
     Exam.find(examFilter)
       .populate('questions.questionId', 'name text type level')
+      .populate('subjectId', 'name name_en name_jp code')
       .sort(sort)
       .skip(skipCount)
       .limit(pageLimit),
@@ -93,6 +134,7 @@ async function getExamById({ id }) {
 
   return Exam.findOne(examFilter)
     .populate('questions.questionId')
+    .populate('subjectId', 'name name_en name_jp code')
     .exec();
 }
 
