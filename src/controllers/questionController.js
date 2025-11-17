@@ -344,4 +344,12 @@ async function remove(req, res, next) {
 
 
 
-module.exports = { getAllQuestions, getQuestionById, create, update, patch, remove };
+module.exports = { 
+  getAllQuestions, 
+  getQuestionById, 
+  create, 
+  update, 
+  patch, 
+  remove,
+  validateByType // Export for use in import controller
+};
