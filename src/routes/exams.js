@@ -23,5 +23,6 @@ router.get('/:examId/leaderboard', auth, examStatsController.getExamLeaderboard)
 router.get('/:examId/submissions', auth, examStatsController.getExamSubmissions);
 router.get('/:examId/submissions/:studentId', auth, examStatsController.getStudentSubmissionDetail);
 router.get('/:examId/submissions/:studentId/activity', auth, examStatsController.getSubmissionActivityLog);
+router.delete('/:examId/submissions/:studentId/reset', auth, examStatsController.resetStudentAttempt);
 
 module.exports = router;

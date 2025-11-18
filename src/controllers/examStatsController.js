@@ -758,6 +758,77 @@ async function getScoreDistribution(req, res, next) {
   }
 }
 
+/**
+ * Reset student attempt (allow retake)
+ * DELETE /v1/api/exams/:examId/submissions/:studentId/reset
+ */
+async function resetStudentAttempt(req, res, next) {
+  try {
+    const { examId, studentId } = req.params;
+    const user = req.user;
+
+    if (!mongoose.isValidObjectId(examId) || !mongoose.isValidObjectId(studentId)) {
+      return res.status(400).json({ ok: false, message: 'Invalid ID format' });
+    }
+
+    // Check exam exists and user has permission
+    const exam = await Exam.findById(examId);
+    if (!exam) {
+      return res.status(404).json({ ok: false, message: 'Exam not found' });
+    }
+
+    // Only teacher who owns the exam or admin can reset attempts
+    const isOwner = String(exam.ownerId) === String(user.id);
+    if (!isOwner && !isAdmin(user)) {
+      return res.status(403).json({ ok: false, message: 'Forbidden' });
+    }
+
+    // Find the latest submitted/graded submission (highest attemptNumber)
+    // This will reduce the attempt count by 1, allowing the student to retake once
+    const latestSubmission = await Submission.findOne({
+      examId,
+      userId: studentId,
+      status: { $in: ['submitted', 'graded', 'late'] }
+    })
+      .sort({ attemptNumber: -1, submittedAt: -1 })
+      .exec();
+
+    if (!latestSubmission) {
+      return res.status(404).json({ 
+        ok: false, 
+        message: 'No submitted submission found for this student. Cannot reset attempt.' 
+      });
+    }
+
+    const submissionId = latestSubmission._id.toString();
+    const attemptNumber = latestSubmission.attemptNumber;
+
+    // Delete the latest submission
+    await Submission.findByIdAndDelete(latestSubmission._id);
+
+    // Also delete related activity logs and proctor logs for this submission
+    await ActivityLog.deleteMany({
+      submissionId: submissionId
+    });
+    
+    await ProctorLog.deleteMany({
+      submissionId: submissionId
+    });
+
+    res.json({
+      ok: true,
+      message: `Student attempt #${attemptNumber} deleted successfully. Student can now retake the exam (attempt count reduced by 1).`,
+      data: {
+        deletedAttemptNumber: attemptNumber,
+        deletedSubmissionId: submissionId
+      }
+    });
+  } catch (error) {
+    console.error('Error resetting student attempt:', error);
+    next(error);
+  }
+}
+
 module.exports = {
   getExamStatistics,
   getExamLeaderboard,
@@ -766,6 +837,7 @@ module.exports = {
   getSubmissionActivityLog,
   getOverallExamResults,
   getSubjectAverageScores,
-  getScoreDistribution
+  getScoreDistribution,
+  resetStudentAttempt
 };
 
