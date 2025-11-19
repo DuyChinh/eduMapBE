@@ -116,6 +116,7 @@ const userController = {
         }
     },
 
+    //Switch user role
     async switchMyRole(req, res) {
         try {
             const { role } = req.body;
@@ -143,7 +144,7 @@ const userController = {
                     message: 'User not found',
                 });
             }
-            
+
             user.role = role;
             await user.save();
 
@@ -154,7 +155,7 @@ const userController = {
             };
 
             const token = jwt.sign(payload, process.env.JWT_SECRET, {
-                expiresIn: '7d', // tuỳ config
+                expiresIn: '7d',
             });
 
             return res.json({
