@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const { sanitizeUser, sanitizeUsers } = require('../utils/userUtils');
+const jwt = require('jsonwebtoken');
 
 const userController = {
     async getProfile(req, res){
@@ -115,6 +116,64 @@ const userController = {
         }
     },
 
+    async switchMyRole(req, res) {
+        try {
+            const { role } = req.body;
+
+            const validRoles = ['teacher', 'student'];
+            if (!role || !validRoles.includes(role)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid role. Must be one of: teacher, student',
+                });
+            }
+
+            const userId = req.user.userId || req.user.id || req.user._id || req.user.sub;
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Authentication required',
+                });
+            }
+
+            const user = await User.findById(userId);
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found',
+                });
+            }
+            
+            user.role = role;
+            await user.save();
+
+            const payload = {
+                id: user._id,
+                email: user.email,
+                role: user.role,
+            };
+
+            const token = jwt.sign(payload, process.env.JWT_SECRET, {
+                expiresIn: '7d', // tuỳ config
+            });
+
+            return res.json({
+                success: true,
+                message: 'Role switched successfully',
+                data: {
+                    user: sanitizeUser(user),
+                    token,
+                },
+            });
+        } catch (error) {
+            console.error('Error switching user role:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Server error: ' + error.message,
+            });
+        }
+    },
+
     // Update user role (admin only)
     async updateUserRole(req, res) {
         try {
@@ -162,4 +221,3 @@ const userController = {
 }
 
 module.exports = userController;
-

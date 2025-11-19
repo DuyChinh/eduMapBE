@@ -12,5 +12,6 @@ router.get('/:id', userController.getUserById);
 router.put('/:id', userController.updateProfile);
 router.patch('/:id/role', userController.updateUserRole);
 router.delete('/:id', userController.deleteAccount);
+router.post('/switch-role', userController.switchMyRole);
 
 module.exports = router;
