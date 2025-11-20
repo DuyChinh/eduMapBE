@@ -155,7 +155,7 @@ const userController = {
             };
 
             const token = jwt.sign(payload, process.env.JWT_SECRET, {
-                expiresIn: '7d',
+                expiresIn: process.env.JWT_ACCESS_EXPIRES
             });
 
             return res.json({
