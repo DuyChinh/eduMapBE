@@ -127,6 +127,28 @@ Content-Type: application/json
 }
 ```
 
+#### Required Fields
+The following fields are **required** when creating an exam:
+
+| Field | Type | Description | Validation Rules |
+|-------|------|-------------|------------------|
+| `name` | String | Exam name | Non-empty string, trimmed, unique per teacher |
+| `duration` | Number | Exam duration in minutes | Positive integer (>= 1) |
+| `totalMarks` | Number | Total marks for the exam | Non-negative number (>= 0) |
+| `examPassword` | String | Password to access the exam | Non-empty string |
+| `examPurpose` | String | Purpose of the exam | One of: `exam`, `practice`, `quiz`, `assignment` |
+| `isAllowUser` | String | Access control setting | One of: `everyone`, `class`, `student` |
+| `maxAttempts` | Number | Maximum number of attempts | Positive integer (>= 1) |
+| `viewMark` | Number | When to show marks/score | One of: `0` (never), `1` (afterCompletion), `2` (afterAllFinish) |
+| `viewExamAndAnswer` | Number | When to show exam and answers | One of: `0` (never), `1` (afterCompletion), `2` (afterAllFinish) |
+| `questions` | Array | Array of questions | Non-empty array. Each question must have:<br>- `questionId`: Valid ObjectId<br>- `order`: Positive integer (>= 1)<br>- `marks`: Optional, non-negative number (default: 1)<br>- `isRequired`: Optional, boolean (default: true) |
+| `subjectId` | String | Subject ID | Valid ObjectId format. Required when creating exam with questions |
+
+**Conditional Required:**
+- `preExamNotificationText` (String): Required if `preExamNotification` is `true`
+
+**Note:** `ownerId` is automatically set from the authenticated user's token and does not need to be provided.
+
 #### Response
 ```json
 {

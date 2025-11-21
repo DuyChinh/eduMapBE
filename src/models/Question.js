@@ -9,7 +9,6 @@ const QuestionSchema = new mongoose.Schema({
   orgId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Organization',
-    //required: true,
     index: true
   },
   ownerId: {
@@ -22,7 +21,7 @@ const QuestionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Subject',
     index: true,
-    required: false
+    required: true
   },
   subjectCode: {
     type: String,
@@ -34,6 +33,11 @@ const QuestionSchema = new mongoose.Schema({
     enum: ['mcq', 'tf', 'short', 'essay'],
     default: 'mcq'
   },
+  name: {
+    type: String,
+    trim: true,
+    required: true,
+  },
   text: {
     type: String,
     required: true
@@ -42,6 +46,10 @@ const QuestionSchema = new mongoose.Schema({
   answer: {
     type: mongoose.Schema.Types.Mixed,
     required: true
+  },
+  explanation: {
+    type: String,
+    trim: true
   },
   tags: [{
     type: String

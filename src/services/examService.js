@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Exam = require('../models/Exam');
 const Question = require('../models/Question');
+const Subject = require('../models/Subject');
 
 /**
  * Converts string value to MongoDB ObjectId if valid
@@ -18,13 +19,16 @@ const convertToObjectId = (value) =>
  * @param {string} params.q - Search query
  * @returns {Object} - MongoDB filter object
  */
-function buildExamFilter({ ownerId, status, q }) {
+function buildExamFilter({ ownerId, status, q, subjectId }) {
   const filter = {};
 
   const examOwnerId = convertToObjectId(ownerId);
   if (examOwnerId) filter.ownerId = examOwnerId;
 
   if (status) filter.status = status;
+
+  const subjectObjectId = convertToObjectId(subjectId);
+  if (subjectObjectId) filter.subjectId = subjectObjectId;
 
   if (q && typeof q === 'string' && q.trim()) {
     const searchRegex = new RegExp(q.trim(), 'i');
@@ -55,10 +59,46 @@ async function getAllExams(params) {
     limit = 20,
     sort = '-createdAt',
     status,
-    q
+    q,
+    subjectId
   } = params;
 
-  const examFilter = buildExamFilter({ ownerId, status, q });
+  let examFilter = buildExamFilter({ ownerId, status, q: null, subjectId });
+
+  // If there's a search query, also search in subject names
+  if (q && typeof q === 'string' && q.trim()) {
+    const searchRegex = new RegExp(q.trim(), 'i');
+    
+    // Find subjects matching the search query
+    const matchingSubjects = await Subject.find({
+      $or: [
+        { name: searchRegex },
+        { name_en: searchRegex },
+        { name_jp: searchRegex },
+        { code: searchRegex }
+      ]
+    }).select('_id');
+    
+    const matchingSubjectIds = matchingSubjects.map(s => s._id);
+    
+    // Build $or condition for exam search
+    const searchConditions = [
+      { name: searchRegex },
+      { description: searchRegex }
+    ];
+    
+    // If we found matching subjects, add subjectId filter
+    if (matchingSubjectIds.length > 0) {
+      searchConditions.push({ subjectId: { $in: matchingSubjectIds } });
+    }
+    
+    // If examFilter already has $or, merge it; otherwise create it
+    if (examFilter.$or) {
+      examFilter.$or = [...examFilter.$or, ...searchConditions];
+    } else {
+      examFilter.$or = searchConditions;
+    }
+  }
 
   const currentPage = Number(page) || 1;
   const pageLimit = Number(limit) || 20;
@@ -67,6 +107,7 @@ async function getAllExams(params) {
   const [exams, totalCount] = await Promise.all([
     Exam.find(examFilter)
       .populate('questions.questionId', 'name text type level')
+      .populate('subjectId', 'name name_en name_jp code')
       .sort(sort)
       .skip(skipCount)
       .limit(pageLimit),
@@ -93,7 +134,38 @@ async function getExamById({ id }) {
 
   return Exam.findOne(examFilter)
     .populate('questions.questionId')
+    .populate('subjectId', 'name name_en name_jp code')
     .exec();
+}
+
+/**
+ * Retrieves an exam by share code (for public access)
+ * @param {Object} params - Query parameters
+ * @param {string} params.shareCode - Share code
+ * @returns {Object|null} - Exam data or null if not found
+ */
+async function getExamByShareCode({ shareCode }) {
+  const exam = await Exam.findOne({ 
+    shareCode: shareCode.toUpperCase(),
+    status: 'published'
+  })
+    .populate('questions.questionId')
+    .lean();
+
+  if (!exam) {
+    return null;
+  }
+
+  // Check availability window
+  const now = new Date();
+  if (exam.availableFrom && now < exam.availableFrom) {
+    return null; // Not available yet
+  }
+  if (exam.availableUntil && now > exam.availableUntil) {
+    return null; // No longer available
+  }
+
+  return exam;
 }
 
 /**
@@ -145,12 +217,50 @@ async function createExam({ payload, user }) {
     payload.subjectCode = questions[0].subjectCode;
   }
 
+  // Generate shareCode if status is published
+  if (payload.status === 'published') {
+    payload.shareCode = await generateUniqueShareCode();
+  }
+
   const exam = await Exam.create({
     ...payload,
     ownerId: examOwnerId
   });
 
   return exam;
+}
+
+/**
+ * Generates a unique share code for exams
+ * @returns {Promise<string>} - Unique 8-character alphanumeric code
+ */
+async function generateUniqueShareCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let shareCode;
+  let isUnique = false;
+  let attempts = 0;
+  
+  while (!isUnique && attempts < 20) {
+    // Generate 8-character code
+    shareCode = '';
+    for (let i = 0; i < 8; i++) {
+      shareCode += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    
+    // Check if code already exists
+    const existing = await Exam.findOne({ shareCode });
+    if (!existing) {
+      isUnique = true;
+    }
+    attempts++;
+  }
+  
+  if (!isUnique) {
+    // Fallback: use timestamp-based code
+    shareCode = Date.now().toString(36).toUpperCase().slice(-8);
+  }
+  
+  return shareCode;
 }
 
 /**
@@ -163,6 +273,22 @@ async function createExam({ payload, user }) {
  */
 async function updateExamPartial({ id, payload, ownerIdEnforce }) {
   const examFilter = { _id: id };
+  
+  // If updating status to published and no shareCode exists, generate one
+  if (payload.status === 'published') {
+    const existingExam = await Exam.findById(id);
+    if (existingExam && !existingExam.shareCode) {
+      payload.shareCode = await generateUniqueShareCode();
+    }
+  }
+  
+  // If updating status from published to draft, remove shareCode
+  if (payload.status === 'draft') {
+    const existingExam = await Exam.findById(id);
+    if (existingExam && existingExam.status === 'published') {
+      payload.shareCode = null;
+    }
+  }
   if (ownerIdEnforce && mongoose.isValidObjectId(ownerIdEnforce)) {
     examFilter.ownerId = new mongoose.Types.ObjectId(ownerIdEnforce);
   }
@@ -318,6 +444,7 @@ async function removeQuestionFromExam({ examId, questionId, ownerIdEnforce }) {
 module.exports = {
   getAllExams,
   getExamById,
+  getExamByShareCode,
   createExam,
   updateExamPartial,
   deleteExam,

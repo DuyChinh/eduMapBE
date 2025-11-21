@@ -11,11 +11,11 @@ const ClassSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
-    unique: true
   },
   code: {
     type: String,
     required: true,
+    unique: true,
     uppercase: true
   },
   'teacherId': {
@@ -27,6 +27,17 @@ const ClassSchema = new mongoose.Schema({
   studentIds: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
+  }],
+  studentJoins: [{
+    studentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    joinedAt: {
+      type: Date,
+      default: Date.now
+    }
   }],
   settings: {
     allowLateSubmission: { type: Boolean, default: false },

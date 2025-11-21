@@ -6,23 +6,17 @@ const toOID = (v) =>
   (v && mongoose.isValidObjectId(v)) ? new mongoose.Types.ObjectId(v) : undefined;
 
 const escapeRegExp = (s = "") => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-// q: search rộng (text / choices.text / tags)
-// name: filter theo "tên question" (text contains)
 function buildFilter({ orgId, q, name, tags, type, level, isPublic, ownerId, publicOrOwnerUserId, subjectId, subjectCode }) {
   const filter = {};
 
   const org = toOID(orgId);
   if (org) filter.orgId = org;
-
-  // --- filter theo môn ---
   if (subjectId && mongoose.isValidObjectId(subjectId)) {
     filter.subjectId = new mongoose.Types.ObjectId(subjectId);
   } else if (subjectCode) {
     filter.subjectCode = String(subjectCode).toUpperCase();
   }
 
-  // filter theo subject
   if (subjectId && mongoose.isValidObjectId(subjectId)) {
     filter.subjectId = new mongoose.Types.ObjectId(subjectId);
   }
@@ -39,7 +33,6 @@ function buildFilter({ orgId, q, name, tags, type, level, isPublic, ownerId, pub
     filter.$or = [{ text: re }, { 'choices.text': re }, { tags: re }];
   }
 
-  // --- filter theo "tên question" (text contains) ---
   if (name && typeof name === 'string' && name.trim()) {
     const safe = escapeRegExp(name.trim());
     filter.text = { $regex: safe, $options: 'i' };
@@ -125,10 +118,26 @@ async function getById({ orgId, id }) {
   return Question.findById(id);
 }
 
+// Kiểm tra tên question trùng lặp của giáo viên
+async function findByNameAndOwner({ name, ownerId, orgId }) {
+  const filter = {
+    name: name.trim(),
+    ownerId: new mongoose.Types.ObjectId(ownerId)
+  };
+  
+  // Nếu có orgId thì filter theo orgId
+  if (orgId && mongoose.isValidObjectId(orgId)) {
+    filter.orgId = new mongoose.Types.ObjectId(orgId);
+  }
+  
+  return Question.findOne(filter);
+}
+
 async function create({ payload, user }) {
   const ownerId = user?.id || user?._id;
 
-  let subjectId = payload.subjectId;
+  let subjectId = payload.subjectId || payload.subject; // Hỗ trợ cả hai
+  
   if (!subjectId && payload.subjectCode) {
     const s = await Subject.findOne({
     ...(user?.orgId ? { orgId: user.orgId } : {}),
@@ -140,10 +149,31 @@ async function create({ payload, user }) {
       throw err;
     }
     subjectId = s._id;
-    payload.subjectCode = s.code; // chuẩn hoá
+    payload.subjectCode = s.code;
   }
+
+  const processedPayload = { ...payload };
+  
+  if (payload.type === 'mcq' && Array.isArray(payload.choices)) {
+    const isNewFormat = payload.choices.every(choice => typeof choice === 'string');
+    
+    if (isNewFormat) {
+      // Convert new format to old format
+      processedPayload.choices = payload.choices.map((text, index) => ({
+        key: String.fromCharCode(65 + index), // A, B, C, D...
+        text: text
+      }));
+      
+      // Convert answer from index to key
+      const answerIndex = Number(payload.answer);
+      if (!isNaN(answerIndex) && answerIndex >= 0 && answerIndex < payload.choices.length) {
+        processedPayload.answer = String.fromCharCode(65 + answerIndex);
+      }
+    }
+  }
+
   const doc = await Question.create({
-    ...payload,
+    ...processedPayload,
     subjectId,
     ...(user?.orgId ? { orgId: user.orgId } : {}),
     ownerId,
@@ -183,4 +213,4 @@ async function updatePartial({ orgId, id, payload }) {
   return Question.findByIdAndUpdate(id, { $set: payload }, { new: true });
 }
 
-module.exports = { list, getById, create, update, updatePartial, hardDelete };
+module.exports = { list, getById, findByNameAndOwner, create, update, updatePartial, hardDelete };

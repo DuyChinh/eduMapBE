@@ -18,6 +18,8 @@ router.post('/:id/regenerate-code', auth, classController.regenerateCode);
 // giáo viên hoặc admin thêm nhiều học sinh vào lớp
 router.post('/:id/students/bulk', auth, classController.addStudents);
 
+// giáo viên hoặc admin xóa học sinh khỏi lớp
+router.delete('/:id/students', auth, classController.removeStudents);
 
 // student join bằng code
 router.post('/join', auth, classController.join);

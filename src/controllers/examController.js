@@ -64,9 +64,9 @@ async function createExam(req, res, next) {
     }
 
     // Validate examPassword (required)
-    if (!examPassword || typeof examPassword !== 'string') {
-      return res.status(400).json({ ok: false, message: 'examPassword is required and must be a string' });
-    }
+    // if (!examPassword || typeof examPassword !== 'string') {
+    //   return res.status(400).json({ ok: false, message: 'examPassword is required and must be a string' });
+    // }
 
     // Validate examPurpose (required)
     if (!examPurpose || !['exam', 'practice', 'quiz', 'assignment'].includes(examPurpose)) {
@@ -171,6 +171,11 @@ async function createExam(req, res, next) {
       }
     }
 
+    // Validate status if provided
+    if (status && !['draft', 'published'].includes(status)) {
+      return res.status(400).json({ ok: false, message: 'status must be either draft or published' });
+    }
+
     const payload = {
       name: name.trim(),
       description: description?.trim() || '',
@@ -189,7 +194,7 @@ async function createExam(req, res, next) {
       availableFrom: availableFrom ? new Date(availableFrom) : undefined,
       availableUntil: availableUntil ? new Date(availableUntil) : undefined,
       fee: fee !== undefined ? fee : 0,
-      examPassword: examPassword.trim(),
+      examPassword: examPassword ? examPassword.trim() : '',
       autoMonitoring: autoMonitoring || 'off',
       studentVerification: studentVerification || false,
       eduMapOnly: eduMapOnly || false,
@@ -204,7 +209,7 @@ async function createExam(req, res, next) {
       shuffleQuestions: shuffleQuestions || false,
       shuffleChoices: shuffleChoices || false,
       maxAttempts: maxAttempts || 1,
-      status: status || 'draft'
+      status: status || 'draft' // Default to draft
     };
 
     const createdExam = await examService.createExam({ payload, user: req.user });
@@ -237,10 +242,12 @@ async function createExam(req, res, next) {
  */
 async function getAllExams(req, res, next) {
   try {
-    const { page, limit, sort, status, q, ownerId } = req.query;
+    const { page, limit, sort, status, q, ownerId, subjectId } = req.query;
 
     // Teachers can only view their own exams, admins can view all
     const filterOwnerId = isTeacher(req.user) && !ownerId ? req.user.id : ownerId;
+    console.log('filterOwnerId', filterOwnerId);
+  
 
     const examData = await examService.getAllExams({
       ownerId: filterOwnerId,
@@ -248,7 +255,8 @@ async function getAllExams(req, res, next) {
       limit,
       sort,
       status,
-      q
+      q,
+      subjectId
     });
 
     res.json({ ok: true, ...examData });
@@ -284,6 +292,53 @@ async function getExamById(req, res, next) {
     }
 
     res.json({ ok: true, data: examData });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Retrieves an exam by share code (public access)
+ * GET /v1/api/exams/share/:shareCode
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ */
+async function getExamByShareCode(req, res, next) {
+  try {
+    const { shareCode } = req.params;
+    
+    if (!shareCode || shareCode.length !== 8) {
+      return res.status(400).json({ ok: false, message: 'Invalid share code format' });
+    }
+
+    const examData = await examService.getExamByShareCode({ shareCode });
+    
+    if (!examData) {
+      return res.status(404).json({ ok: false, message: 'Exam not found or not available' });
+    }
+
+    // Don't return sensitive information for public access
+    // But include examPassword flag (true/false) to indicate if password is required
+    const publicExamData = {
+      _id: examData._id,
+      name: examData.name,
+      description: examData.description,
+      duration: examData.duration,
+      totalMarks: examData.totalMarks,
+      shareCode: examData.shareCode,
+      examPurpose: examData.examPurpose,
+      startTime: examData.startTime,
+      endTime: examData.endTime,
+      availableFrom: examData.availableFrom,
+      availableUntil: examData.availableUntil,
+      maxAttempts: examData.maxAttempts,
+      // Include examPassword flag (not the actual password) to indicate if password is required
+      examPassword: examData.examPassword ? true : false,
+      // Don't include questions, answers, or settings
+    };
+
+    res.json({ ok: true, data: publicExamData });
   } catch (error) {
     next(error);
   }
@@ -446,6 +501,7 @@ module.exports = {
   createExam,
   getAllExams,
   getExamById,
+  getExamByShareCode,
   updateExam,
   deleteExam,
   addQuestionsToExam,

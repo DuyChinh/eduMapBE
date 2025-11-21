@@ -132,7 +132,7 @@ const ExamSchema = new mongoose.Schema({
   examPassword: {
     type: String,
     trim: true,
-    required: true,
+    required: false,
     default: ''
   },
   
@@ -288,6 +288,16 @@ const ExamSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  
+  // Share code for published exams
+  shareCode: {
+    type: String,
+    trim: true,
+    uppercase: true,
+    unique: true,
+    sparse: true, // Allow multiple null values
+    index: true
   },
   
   // Statistics

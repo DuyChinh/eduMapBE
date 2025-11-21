@@ -79,39 +79,38 @@ async function getAllSubjects(req, res, next) {
       Subject.countDocuments(filter)
     ]);
     
-    // Add displayName based on language preference
-    const itemsWithDisplayName = items.map(item => {
+    // Transform name based on language preference
+    const itemsWithLocalizedName = items.map(item => {
       const itemObj = item.toObject();
-      let displayName = itemObj.name; // Default to Vietnamese
+      let localizedName = itemObj.name; // Default to Vietnamese
       
       switch (lang.toLowerCase()) {
         case 'en':
-          displayName = itemObj.name_en || itemObj.name;
+          localizedName = itemObj.name_en || itemObj.name;
           break;
         case 'jp':
         case 'ja':
-          displayName = itemObj.name_jp || itemObj.name;
+          localizedName = itemObj.name_jp || itemObj.name;
           break;
         case 'vi':
         default:
-          displayName = itemObj.name;
+          localizedName = itemObj.name;
           break;
       }
       
       return {
         ...itemObj,
-        displayName
+        name: localizedName
       };
     });
     
     res.json({ 
       ok: true, 
-      items: itemsWithDisplayName,
+      items: itemsWithLocalizedName,
       total,
       page: nPage,
       limit: nLimit,
-      pages: Math.max(1, Math.ceil(total / nLimit)),
-      lang: lang.toLowerCase()
+      pages: Math.max(1, Math.ceil(total / nLimit))
     });
   } catch (e) { 
     next(e); 
@@ -140,21 +139,21 @@ async function getSubjectById(req, res, next) {
       return res.status(404).json({ ok: false, message: 'Subject not found' });
     }
     
-    // Add displayName based on language preference
+    // Transform name based on language preference
     const subjectObj = subject.toObject();
-    let displayName = subjectObj.name; // Default to Vietnamese
+    let localizedName = subjectObj.name; // Default to Vietnamese
     
     switch (lang.toLowerCase()) {
       case 'en':
-        displayName = subjectObj.name_en || subjectObj.name;
+        localizedName = subjectObj.name_en || subjectObj.name;
         break;
       case 'jp':
       case 'ja':
-        displayName = subjectObj.name_jp || subjectObj.name;
+        localizedName = subjectObj.name_jp || subjectObj.name;
         break;
       case 'vi':
       default:
-        displayName = subjectObj.name;
+        localizedName = subjectObj.name;
         break;
     }
     
@@ -162,9 +161,8 @@ async function getSubjectById(req, res, next) {
       ok: true, 
       data: {
         ...subjectObj,
-        displayName
-      },
-      lang: lang.toLowerCase()
+        name: localizedName
+      }
     });
   } catch (e) { 
     next(e); 
