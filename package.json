@@ -15,6 +15,7 @@
     "db:reset": "npm run migrate:down && npm run migrate:up && npm run seed"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
