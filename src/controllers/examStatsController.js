@@ -840,4 +840,3 @@ module.exports = {
   getScoreDistribution,
   resetStudentAttempt
 };
-

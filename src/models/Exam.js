@@ -102,6 +102,13 @@ const ExamSchema = new mongoose.Schema({
     default: 'everyone'
   },
   
+  // Allowed Class IDs (when isAllowUser is 'class')
+  allowedClassIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Class',
+    required: false
+  }],
+  
   // Availability Window
   availableFrom: {
     type: Date,

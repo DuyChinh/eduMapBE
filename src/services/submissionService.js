@@ -32,6 +32,26 @@ async function startSubmission({ examId, user, orgId }) {
     throw { status: 403, message: 'Exam is no longer available' };
   }
 
+  // Check if user has access based on isAllowUser setting
+  if (exam.isAllowUser === 'class') {
+    if (!exam.allowedClassIds || exam.allowedClassIds.length === 0) {
+      throw { status: 403, message: 'This exam is restricted to specific classes. No classes have been assigned.' };
+    }
+    
+    // Check if student is in any of the allowed classes
+    const Class = require('../models/Class');
+    const userId = new mongoose.Types.ObjectId(user.id);
+    
+    const allowedClasses = await Class.find({
+      _id: { $in: exam.allowedClassIds },
+      studentIds: userId
+    });
+    
+    if (!allowedClasses || allowedClasses.length === 0) {
+      throw { status: 403, message: 'You are not enrolled in any of the classes allowed for this exam.' };
+    }
+  }
+
   // Check max attempts
   const existingSubmissions = await Submission.countDocuments({
     examId,
