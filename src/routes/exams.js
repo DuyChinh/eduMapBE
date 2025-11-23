@@ -21,6 +21,7 @@ router.get('/:examId/statistics', auth, examStatsController.getExamStatistics);
 router.get('/:examId/score-distribution', auth, examStatsController.getScoreDistribution);
 router.get('/:examId/leaderboard', auth, examStatsController.getExamLeaderboard);
 router.get('/:examId/submissions', auth, examStatsController.getExamSubmissions);
+router.get('/:examId/submissions/detail/:submissionId', auth, examStatsController.getSubmissionDetailById);
 router.get('/:examId/submissions/:studentId', auth, examStatsController.getStudentSubmissionDetail);
 router.get('/:examId/submissions/:studentId/activity', auth, examStatsController.getSubmissionActivityLog);
 router.delete('/:examId/submissions/:studentId/reset', auth, examStatsController.resetStudentAttempt);

@@ -285,13 +285,15 @@ async function getStudentSubmissionDetail(req, res, next) {
     }
 
     // Get the submission (include 'late' status)
-    // Get the most recent submission (sort by submittedAt descending)
+    // Get the most recent COMPLETED submission (only submitted/graded/late, not in_progress)
+    // Sort by submittedAt descending to get the latest submitted one
     const submission = await Submission.findOne({
       examId,
       userId: studentId,
-      status: { $in: ['submitted', 'graded', 'late'] }
+      status: { $in: ['submitted', 'graded', 'late'] },
+      submittedAt: { $exists: true, $ne: null } // Ensure it has been submitted
     })
-      .sort({ submittedAt: -1 }) // Get the most recent submission
+      .sort({ submittedAt: -1 }) // Get the most recent submitted submission
       .populate('userId', 'name email avatar studentCode')
       .populate('answers.questionId');
 
@@ -366,6 +368,114 @@ async function getStudentSubmissionDetail(req, res, next) {
     });
   } catch (error) {
     console.error('Error getting student submission detail:', error);
+    next(error);
+  }
+}
+
+/**
+ * Get submission detail by submissionId
+ * GET /v1/api/exams/:examId/submissions/detail/:submissionId
+ */
+async function getSubmissionDetailById(req, res, next) {
+  try {
+    const { examId, submissionId } = req.params;
+    const user = req.user;
+
+    if (!mongoose.isValidObjectId(examId) || !mongoose.isValidObjectId(submissionId)) {
+      return res.status(400).json({ ok: false, message: 'Invalid ID format' });
+    }
+
+    // Check exam exists and user has permission
+    const exam = await Exam.findById(examId).populate('questions.questionId');
+    if (!exam) {
+      return res.status(404).json({ ok: false, message: 'Exam not found' });
+    }
+
+    // Only teacher who owns the exam or admin can view
+    const isOwner = String(exam.ownerId) === String(user.id);
+    if (!isOwner && !isAdmin(user)) {
+      return res.status(403).json({ ok: false, message: 'Forbidden' });
+    }
+
+    // Get the specific submission by submissionId
+    const submission = await Submission.findOne({
+      _id: submissionId,
+      examId
+    })
+      .populate('userId', 'name email avatar studentCode')
+      .populate('answers.questionId');
+
+    if (!submission) {
+      return res.status(404).json({ ok: false, message: 'Submission not found' });
+    }
+
+    // Get activity logs
+    const activityLogs = await ActivityLog.find({
+      submissionId: submission._id
+    }).sort({ timestamp: 1 });
+
+    // Get suspicious activities summary
+    const suspiciousActivities = activityLogs.filter(log => log.isSuspicious);
+    const suspiciousActivitySummary = suspiciousActivities.reduce((acc, log) => {
+      if (!acc[log.type]) {
+        acc[log.type] = { type: log.type, count: 0 };
+      }
+      acc[log.type].count++;
+      return acc;
+    }, {});
+
+    // Format answers with question details
+    const formattedAnswers = submission.answers.map(answer => {
+      const question = exam.questions.find(q => 
+        String(q.questionId._id) === String(answer.questionId)
+      );
+      
+      return {
+        question: {
+          _id: answer.questionId,
+          name: question?.questionId?.name,
+          text: question?.questionId?.text,
+          type: question?.questionId?.type,
+          choices: question?.questionId?.choices,
+          correctAnswer: question?.questionId?.correctAnswer,
+          explanation: question?.questionId?.explanation
+        },
+        selectedAnswer: answer.value,
+        isCorrect: answer.isCorrect,
+        earnedMarks: answer.points,
+        marks: question?.marks || 1
+      };
+    });
+
+    res.json({
+      ok: true,
+      data: {
+        _id: submission._id,
+        exam: {
+          _id: exam._id,
+          name: exam.name,
+          description: exam.description,
+          totalMarks: exam.totalMarks
+        },
+        student: {
+          _id: submission.userId._id,
+          name: submission.userId.name,
+          email: submission.userId.email,
+          avatar: submission.userId.avatar,
+          studentCode: submission.userId.studentCode
+        },
+        score: submission.score,
+        totalMarks: submission.maxScore,
+        percentage: submission.percentage,
+        timeSpent: submission.timeSpent,
+        startedAt: submission.startedAt,
+        submittedAt: submission.submittedAt,
+        answers: formattedAnswers,
+        suspiciousActivities: Object.values(suspiciousActivitySummary)
+      }
+    });
+  } catch (error) {
+    console.error('Error getting submission detail by ID:', error);
     next(error);
   }
 }
@@ -836,6 +946,7 @@ module.exports = {
   getExamLeaderboard,
   getExamSubmissions,
   getStudentSubmissionDetail,
+  getSubmissionDetailById,
   getSubmissionActivityLog,
   getOverallExamResults,
   getSubjectAverageScores,
