@@ -32,6 +32,11 @@ async function startSubmission({ examId, user, orgId }) {
     throw { status: 403, message: 'Exam is no longer available' };
   }
 
+  // Check if exam has passed endTime
+  if (exam.endTime && now > exam.endTime) {
+    throw { status: 403, message: 'Exam has expired. The exam end time has passed.' };
+  }
+
   // Check if user has access based on isAllowUser setting
   if (exam.isAllowUser === 'class') {
     if (!exam.allowedClassIds || exam.allowedClassIds.length === 0) {
@@ -165,10 +170,19 @@ async function updateSubmissionAnswers({ submissionId, answers, user }) {
     _id: submissionId,
     userId: user.id,
     status: 'in_progress'
-  });
+  }).populate('examId');
 
   if (!submission) {
     throw { status: 404, message: 'Submission not found or already submitted' };
+  }
+
+  // Check if exam has passed endTime
+  const exam = submission.examId;
+  if (exam && exam.endTime) {
+    const now = new Date();
+    if (now > exam.endTime) {
+      throw { status: 403, message: 'Cannot update answers: Exam has expired. The exam end time has passed.' };
+    }
   }
 
   // Update answers
@@ -207,8 +221,13 @@ async function submitExam({ submissionId, user }) {
     throw { status: 404, message: 'Exam not found' };
   }
 
-  // Check if time limit exceeded
+  // Check if exam has passed endTime
   const now = new Date();
+  if (exam.endTime && now > exam.endTime) {
+    throw { status: 403, message: 'Cannot submit: Exam has expired. The exam end time has passed.' };
+  }
+
+  // Check if time limit exceeded
   const timeSpent = Math.floor((now - submission.startedAt) / 1000); // seconds
   const durationSeconds = exam.duration * 60;
 
