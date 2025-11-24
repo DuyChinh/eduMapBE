@@ -316,26 +316,49 @@ async function getStudentSubmissionDetail(req, res, next) {
       return acc;
     }, {});
 
-    // Format answers with question details
-    const formattedAnswers = submission.answers.map(answer => {
-      const question = exam.questions.find(q => 
-        String(q.questionId._id) === String(answer.questionId)
-      );
+    // Create a map of answers by questionId for quick lookup
+    const answersMap = new Map();
+    submission.answers.forEach(answer => {
+      let questionIdStr = null;
+      if (answer.questionId) {
+        if (mongoose.Types.ObjectId.isValid(answer.questionId)) {
+          questionIdStr = new mongoose.Types.ObjectId(answer.questionId).toString();
+        } else {
+          questionIdStr = String(answer.questionId);
+        }
+      }
+      if (questionIdStr) {
+        answersMap.set(questionIdStr, answer);
+      }
+    });
+
+    // Format answers with question details - include ALL questions from exam
+    const formattedAnswers = exam.questions.map((examQuestion) => {
+      const questionId = examQuestion.questionId._id;
+      let questionIdStr = null;
+      if (questionId) {
+        if (mongoose.Types.ObjectId.isValid(questionId)) {
+          questionIdStr = new mongoose.Types.ObjectId(questionId).toString();
+        } else {
+          questionIdStr = String(questionId);
+        }
+      }
+      const answer = questionIdStr ? answersMap.get(questionIdStr) : null;
       
       return {
         question: {
-          _id: answer.questionId,
-          name: question?.questionId?.name,
-          text: question?.questionId?.text,
-          type: question?.questionId?.type,
-          choices: question?.questionId?.choices,
-          correctAnswer: question?.questionId?.correctAnswer,
-          explanation: question?.questionId?.explanation
+          _id: questionId,
+          name: examQuestion.questionId?.name,
+          text: examQuestion.questionId?.text,
+          type: examQuestion.questionId?.type,
+          choices: examQuestion.questionId?.choices,
+          correctAnswer: examQuestion.questionId?.answer || examQuestion.questionId?.correctAnswer,
+          explanation: examQuestion.questionId?.explanation
         },
-        selectedAnswer: answer.value,
-        isCorrect: answer.isCorrect,
-        earnedMarks: answer.points,
-        marks: question?.marks || 1
+        selectedAnswer: answer ? answer.value : null,
+        isCorrect: answer ? answer.isCorrect : false,
+        earnedMarks: answer ? answer.points : 0,
+        marks: examQuestion.marks || 1
       };
     });
 
@@ -424,26 +447,49 @@ async function getSubmissionDetailById(req, res, next) {
       return acc;
     }, {});
 
-    // Format answers with question details
-    const formattedAnswers = submission.answers.map(answer => {
-      const question = exam.questions.find(q => 
-        String(q.questionId._id) === String(answer.questionId)
-      );
+    // Create a map of answers by questionId for quick lookup
+    const answersMap = new Map();
+    submission.answers.forEach(answer => {
+      let questionIdStr = null;
+      if (answer.questionId) {
+        if (mongoose.Types.ObjectId.isValid(answer.questionId)) {
+          questionIdStr = new mongoose.Types.ObjectId(answer.questionId).toString();
+        } else {
+          questionIdStr = String(answer.questionId);
+        }
+      }
+      if (questionIdStr) {
+        answersMap.set(questionIdStr, answer);
+      }
+    });
+
+    // Format answers with question details - include ALL questions from exam
+    const formattedAnswers = exam.questions.map((examQuestion) => {
+      const questionId = examQuestion.questionId._id;
+      let questionIdStr = null;
+      if (questionId) {
+        if (mongoose.Types.ObjectId.isValid(questionId)) {
+          questionIdStr = new mongoose.Types.ObjectId(questionId).toString();
+        } else {
+          questionIdStr = String(questionId);
+        }
+      }
+      const answer = questionIdStr ? answersMap.get(questionIdStr) : null;
       
       return {
         question: {
-          _id: answer.questionId,
-          name: question?.questionId?.name,
-          text: question?.questionId?.text,
-          type: question?.questionId?.type,
-          choices: question?.questionId?.choices,
-          correctAnswer: question?.questionId?.correctAnswer,
-          explanation: question?.questionId?.explanation
+          _id: questionId,
+          name: examQuestion.questionId?.name,
+          text: examQuestion.questionId?.text,
+          type: examQuestion.questionId?.type,
+          choices: examQuestion.questionId?.choices,
+          correctAnswer: examQuestion.questionId?.answer || examQuestion.questionId?.correctAnswer,
+          explanation: examQuestion.questionId?.explanation
         },
-        selectedAnswer: answer.value,
-        isCorrect: answer.isCorrect,
-        earnedMarks: answer.points,
-        marks: question?.marks || 1
+        selectedAnswer: answer ? answer.value : null,
+        isCorrect: answer ? answer.isCorrect : false,
+        earnedMarks: answer ? answer.points : 0,
+        marks: examQuestion.marks || 1
       };
     });
 
@@ -507,13 +553,22 @@ async function getSubmissionActivityLog(req, res, next) {
     }
 
     // Get the submission (can be in_progress, submitted, or graded)
-    // Get the most recent submission for this exam and student
-    const submission = await Submission.findOne({
-      examId,
-      userId: studentId
-    })
-      .sort({ createdAt: -1 })
-      .limit(1);
+    
+    let submission;
+    if (req.query.submissionId) {
+      submission = await Submission.findOne({
+        _id: req.query.submissionId,
+        examId,
+        userId: studentId
+      });
+    } else {
+      submission = await Submission.findOne({
+        examId,
+        userId: studentId
+      })
+        .sort({ createdAt: -1 })
+        .limit(1);
+    }
 
     if (!submission) {
       return res.status(404).json({ ok: false, message: 'Submission not found' });
@@ -912,27 +967,22 @@ async function resetStudentAttempt(req, res, next) {
       });
     }
 
-    const submissionId = latestSubmission._id.toString();
     const attemptNumber = latestSubmission.attemptNumber;
 
-    // Delete the latest submission
-    await Submission.findByIdAndDelete(latestSubmission._id);
-
-    // Also delete related activity logs and proctor logs for this submission
-    await ActivityLog.deleteMany({
-      submissionId: submissionId
-    });
+    // Reduce attemptNumber by 1 for the latest submission
+    const newAttemptNumber = Math.max(0, attemptNumber - 1);
+    latestSubmission.attemptNumber = newAttemptNumber;
+    await latestSubmission.save();
     
-    await ProctorLog.deleteMany({
-      submissionId: submissionId
-    });
+    console.log(`Reset attempt: Submission ${latestSubmission._id}, attemptNumber ${attemptNumber} -> ${newAttemptNumber}`);
 
     res.json({
       ok: true,
-      message: `Student attempt #${attemptNumber} deleted successfully. Student can now retake the exam (attempt count reduced by 1).`,
+      message: `Student attempt #${attemptNumber} reduced to #${latestSubmission.attemptNumber}. Student can now retake the exam (attempt count reduced by 1).`,
       data: {
-        deletedAttemptNumber: attemptNumber,
-        deletedSubmissionId: submissionId
+        originalAttemptNumber: attemptNumber,
+        newAttemptNumber: latestSubmission.attemptNumber,
+        submissionId: latestSubmission._id.toString()
       }
     });
   } catch (error) {
