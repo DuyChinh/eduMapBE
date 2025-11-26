@@ -54,7 +54,21 @@ async function startSubmission({ examId, user, orgId }) {
   });
 
   if (inProgressSubmission) {
-    // Return existing submission
+    // Check if exam time has expired
+    const now = new Date();
+    const timeSpent = Math.floor((now - inProgressSubmission.startedAt) / 1000);
+    const durationSeconds = exam.duration * 60;
+    const gracePeriodSeconds = (exam.settings?.gracePeriod || 0) * 60;
+    const networkLatencyBuffer = 30;
+    
+    if (timeSpent > durationSeconds + gracePeriodSeconds + networkLatencyBuffer) {
+      throw { 
+        status: 403, 
+        message: 'Exam time has expired. Your submission will be auto-graded shortly.' 
+      };
+    }
+    
+    // Return existing submission (if not expired)
     const examWithQuestions = await Exam.findById(examId)
       .populate('questions.questionId')
       .lean();
@@ -187,74 +201,28 @@ async function submitExam({ submissionId, user }) {
     throw { status: 404, message: 'Exam not found' };
   }
 
-  // Check if time limit exceeded
   const now = new Date();
-  const timeSpent = Math.floor((now - submission.startedAt) / 1000); // seconds
+  let timeSpent = Math.floor((now - submission.startedAt) / 1000); 
   const durationSeconds = exam.duration * 60;
 
-  // Get grace period from settings (default to 0)
   const gracePeriodSeconds = (exam.settings?.gracePeriod || 0) * 60;
-  const networkLatencyBuffer = 30; // 30 seconds buffer for network latency
+  const networkLatencyBuffer = 30; 
 
   let isLate = false;
+  let submittedAt = now;
+
   if (timeSpent > durationSeconds + gracePeriodSeconds + networkLatencyBuffer) {
     if (!exam.settings?.allowLateSubmission) {
       throw { status: 400, message: 'Time limit exceeded' };
     }
     isLate = true;
+    submittedAt = new Date(submission.startedAt.getTime() + durationSeconds * 1000);
+    timeSpent = durationSeconds;
   }
 
-  // Grade answers
-  const questionIds = submission.answers.map(a => a.questionId);
-  const questions = await Question.find({ _id: { $in: questionIds } });
-
-  let totalScore = 0;
-  const gradedAnswers = submission.answers.map(answer => {
-    const question = questions.find(q => q._id.toString() === answer.questionId.toString());
-    if (!question) {
-      return {
-        ...answer.toObject(),
-        isCorrect: false,
-        points: 0
-      };
-    }
-
-    // Find exam question to get marks
-    const examQuestion = exam.questions.find(
-      eq => eq.questionId.toString() === question._id.toString()
-    );
-    const marks = examQuestion?.marks || 1;
-
-    let isCorrect = false;
-    let points = 0;
-
-    // Grade based on question type
-    if (question.type === 'mcq' || question.type === 'tf') {
-      // Multiple choice or true/false
-      const correctAnswer = String(question.answer).trim();
-      const userAnswer = String(answer.value).trim();
-      isCorrect = correctAnswer === userAnswer;
-      points = isCorrect ? marks : 0;
-    } else if (question.type === 'short') {
-      // Short answer - simple text comparison (case insensitive)
-      const correctAnswer = String(question.answer).trim().toLowerCase();
-      const userAnswer = String(answer.value).trim().toLowerCase();
-      isCorrect = correctAnswer === userAnswer;
-      points = isCorrect ? marks : 0;
-    } else {
-      // Essay - not auto-graded, give 0 points
-      isCorrect = false;
-      points = 0;
-    }
-
-    totalScore += points;
-
-    return {
-      ...answer.toObject(),
-      isCorrect,
-      points
-    };
-  });
+  // Grade answers using shared grading logic
+  const { gradeSubmissionAnswers } = require('./cronService');
+  const { gradedAnswers, totalScore } = await gradeSubmissionAnswers(submission, exam);
 
   // Update submission
   submission.answers = gradedAnswers;
@@ -263,9 +231,10 @@ async function submitExam({ submissionId, user }) {
   submission.percentage = exam.totalMarks > 0
     ? Math.round((totalScore / exam.totalMarks) * 100)
     : 0;
-  submission.submittedAt = now;
+  submission.submittedAt = submittedAt;
   submission.timeSpent = timeSpent;
-  submission.status = isLate ? 'late' : 'graded';
+  submission.status = 'graded';
+  submission.isLate = isLate;
 
   await submission.save();
 
