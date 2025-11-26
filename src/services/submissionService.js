@@ -40,9 +40,9 @@ async function startSubmission({ examId, user, orgId }) {
   });
 
   if (existingSubmissions >= exam.maxAttempts) {
-    throw { 
-      status: 403, 
-      message: `You have reached the maximum number of attempts (${existingSubmissions}/${exam.maxAttempts}). You cannot start this exam again.` 
+    throw {
+      status: 403,
+      message: `You have reached the maximum number of attempts (${existingSubmissions}/${exam.maxAttempts}). You cannot start this exam again.`
     };
   }
 
@@ -77,7 +77,7 @@ async function startSubmission({ examId, user, orgId }) {
 
   // Prepare question order (shuffle if needed)
   let questionOrder = examWithQuestions.questions.map(q => q.questionId._id.toString());
-  
+
   if (exam.settings?.randomizeQuestionOrder || exam.settings?.shuffleQuestions) {
     questionOrder = shuffleArray([...questionOrder]);
   }
@@ -96,12 +96,12 @@ async function startSubmission({ examId, user, orgId }) {
     score: 0,
     percentage: 0
   };
-  
+
   // Only add orgId if it exists
   if (orgId || user.orgId) {
     submissionData.orgId = orgId || user.orgId;
   }
-  
+
   const submission = new Submission(submissionData);
 
   await submission.save();
@@ -109,13 +109,13 @@ async function startSubmission({ examId, user, orgId }) {
   // Shuffle choices for each question if needed
   const questionsWithShuffledChoices = examWithQuestions.questions.map(q => {
     const question = { ...q.questionId };
-    
+
     if (exam.settings?.randomizeChoiceOrder || exam.settings?.shuffleChoices) {
       if (question.choices && Array.isArray(question.choices)) {
         question.choices = shuffleArray([...question.choices]);
       }
     }
-    
+
     return {
       ...q,
       questionId: question
@@ -192,8 +192,12 @@ async function submitExam({ submissionId, user }) {
   const timeSpent = Math.floor((now - submission.startedAt) / 1000); // seconds
   const durationSeconds = exam.duration * 60;
 
+  // Get grace period from settings (default to 0)
+  const gracePeriodSeconds = (exam.settings?.gracePeriod || 0) * 60;
+  const networkLatencyBuffer = 30; // 30 seconds buffer for network latency
+
   let isLate = false;
-  if (timeSpent > durationSeconds) {
+  if (timeSpent > durationSeconds + gracePeriodSeconds + networkLatencyBuffer) {
     if (!exam.settings?.allowLateSubmission) {
       throw { status: 400, message: 'Time limit exceeded' };
     }
@@ -256,8 +260,8 @@ async function submitExam({ submissionId, user }) {
   submission.answers = gradedAnswers;
   submission.score = totalScore;
   submission.maxScore = exam.totalMarks;
-  submission.percentage = exam.totalMarks > 0 
-    ? Math.round((totalScore / exam.totalMarks) * 100) 
+  submission.percentage = exam.totalMarks > 0
+    ? Math.round((totalScore / exam.totalMarks) * 100)
     : 0;
   submission.submittedAt = now;
   submission.timeSpent = timeSpent;
@@ -354,7 +358,7 @@ async function getExamLeaderboard({ examId, user }) {
   }
 
   // Get all graded submissions
-  const submissions = await Submission.find({ 
+  const submissions = await Submission.find({
     examId,
     status: { $in: ['graded', 'submitted'] }
   })
@@ -430,7 +434,7 @@ async function getMySubmissions({ userId, filters = {} }) {
     submissions = submissions.filter(submission => {
       const exam = submission.examId;
       if (!exam) return false;
-      
+
       // Check subject name from populated subjectId
       const subject = exam.subjectId;
       if (subject) {
@@ -439,14 +443,14 @@ async function getMySubmissions({ userId, filters = {} }) {
           return true;
         }
       }
-      
+
       // Check subjectCode
       if (exam.subjectCode) {
         if (exam.subjectCode.toLowerCase().includes(filters.subject.toLowerCase())) {
           return true;
         }
       }
-      
+
       return false;
     });
   }
@@ -455,7 +459,7 @@ async function getMySubmissions({ userId, filters = {} }) {
   const formattedSubmissions = submissions.map(submission => {
     const exam = submission.examId || {};
     const subject = exam.subjectId || {};
-    
+
     // Get subject name (prefer current language, fallback to name)
     const getSubjectName = () => {
       if (subject.name) return subject.name;
@@ -465,7 +469,7 @@ async function getMySubmissions({ userId, filters = {} }) {
       if (exam.subjectCode) return exam.subjectCode;
       return '';
     };
-    
+
     return {
       _id: submission._id,
       examId: exam._id,
