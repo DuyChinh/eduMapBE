@@ -969,19 +969,44 @@ async function resetStudentAttempt(req, res, next) {
 
     const attemptNumber = latestSubmission.attemptNumber;
 
-    // Reduce attemptNumber by 1 for the latest submission
-    const newAttemptNumber = Math.max(0, attemptNumber - 1);
-    latestSubmission.attemptNumber = newAttemptNumber;
-    await latestSubmission.save();
+    // Reduce attemptNumber by 1 for ALL submissions of this student for this exam
+    // This ensures consistency when calculating highestAttemptNumber in startSubmission
+    // Simple approach: reduce all submissions, no need to check attemptNumber
+    const result = await Submission.updateMany(
+      {
+        examId,
+        userId: studentId
+      },
+      {
+        $inc: { attemptNumber: -1 }
+      }
+    );
+
+    // Ensure attemptNumber doesn't go below 0
+    await Submission.updateMany(
+      {
+        examId,
+        userId: studentId,
+        attemptNumber: { $lt: 0 }
+      },
+      {
+        $set: { attemptNumber: 0 }
+      }
+    );
     
-    console.log(`Reset attempt: Submission ${latestSubmission._id}, attemptNumber ${attemptNumber} -> ${newAttemptNumber}`);
+    // Get the updated latest submission to get the new attemptNumber
+    const updatedLatestSubmission = await Submission.findById(latestSubmission._id);
+    const newAttemptNumber = updatedLatestSubmission.attemptNumber;
+    
+    console.log(`Reset attempt: Reduced attemptNumber for ALL ${result.modifiedCount} submission(s) of student ${studentId} for exam ${examId}`);
 
     res.json({
       ok: true,
-      message: `Student attempt #${attemptNumber} reduced to #${latestSubmission.attemptNumber}. Student can now retake the exam (attempt count reduced by 1).`,
+      message: `All ${result.modifiedCount} submission(s) of this student have been reduced by 1 attempt. Latest attempt #${attemptNumber} reduced to #${newAttemptNumber}. Student can now retake the exam.`,
       data: {
         originalAttemptNumber: attemptNumber,
-        newAttemptNumber: latestSubmission.attemptNumber,
+        newAttemptNumber: newAttemptNumber,
+        submissionsUpdated: result.modifiedCount,
         submissionId: latestSubmission._id.toString()
       }
     });
