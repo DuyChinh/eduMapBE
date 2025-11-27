@@ -104,17 +104,16 @@ async function autoSubmitExpiredExams() {
         if (timeSpent > durationSeconds + gracePeriodSeconds + networkLatencyBuffer) {
           console.log(`[Cron] Auto-submitting expired submission ${submission._id}`);
 
-          // Determine if late
-          let isLate = false;
+          // Determine if late - if timeSpent exceeds the official duration, it's late
+          // This is for auto-submit via cron, so we always mark as late if over duration
+          const isLate = timeSpent > durationSeconds;
           let submittedAt = now;
           let actualTimeSpent = timeSpent;
 
-          if (timeSpent > durationSeconds + gracePeriodSeconds + networkLatencyBuffer) {
-            if (exam.settings?.allowLateSubmission) {
-              isLate = true;
-              submittedAt = new Date(submission.startedAt.getTime() + durationSeconds * 1000);
-              actualTimeSpent = durationSeconds;
-            }
+          if (isLate) {
+            // If late, set submittedAt to the end of official duration
+            submittedAt = new Date(submission.startedAt.getTime() + durationSeconds * 1000);
+            actualTimeSpent = durationSeconds;
           }
 
           // Grade answers
@@ -129,7 +128,7 @@ async function autoSubmitExpiredExams() {
             : 0;
           submission.submittedAt = submittedAt;
           submission.timeSpent = actualTimeSpent;
-          submission.status = 'graded';
+          submission.status = isLate ? 'late' : 'graded';
           submission.isLate = isLate;
 
           await submission.save();

@@ -78,17 +78,16 @@ async function checkAndAutoSubmit(submission, exam) {
   const networkLatencyBuffer = 30;
 
   if (timeSpent > durationSeconds + gracePeriodSeconds + networkLatencyBuffer) {
-    // Determine if late
-    let isLate = false;
+    // Determine if late - if timeSpent exceeds the official duration, it's late
+    // This is for auto-submit when viewing results, so we always mark as late if over duration
+    const isLate = timeSpent > durationSeconds;
     let submittedAt = now;
     let actualTimeSpent = timeSpent;
 
-    if (timeSpent > durationSeconds + gracePeriodSeconds + networkLatencyBuffer) {
-      if (exam.settings?.allowLateSubmission) {
-        isLate = true;
-        submittedAt = new Date(submission.startedAt.getTime() + durationSeconds * 1000);
-        actualTimeSpent = durationSeconds;
-      }
+    if (isLate) {
+      // If late, set submittedAt to the end of official duration
+      submittedAt = new Date(submission.startedAt.getTime() + durationSeconds * 1000);
+      actualTimeSpent = durationSeconds;
     }
 
     // Grade answers
@@ -178,9 +177,9 @@ async function startSubmission({ examId, user, orgId }) {
     // Check and auto-submit if expired
     const updatedSubmission = await checkAndAutoSubmit(inProgressSubmission, examWithQuestions);
     
-    // If it was auto-submitted (status changed to graded), return it
+    // If it was auto-submitted (status changed to graded or late), return it
     // The frontend should handle this status to show results instead of exam interface
-    if (updatedSubmission.status === 'graded') {
+    if (updatedSubmission.status === 'graded' || updatedSubmission.status === 'late') {
       return {
         submission: updatedSubmission,
         exam: examWithQuestions,
