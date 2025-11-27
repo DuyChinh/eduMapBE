@@ -229,6 +229,31 @@ async function getExamSubmissions(req, res, next) {
       .populate('userId', 'name email avatar studentCode')
       .sort({ submittedAt: -1 });
 
+    // Check for expired in_progress submissions and auto-submit them
+    const submissionService = require('../services/submissionService');
+    const inProgressSubmissions = submissions.filter(s => s.status === 'in_progress');
+    
+    if (inProgressSubmissions.length > 0) {
+      // Process in parallel
+      await Promise.all(inProgressSubmissions.map(async (sub) => {
+        try {
+          await submissionService.checkAndAutoSubmit(sub, exam);
+        } catch (err) {
+          console.error(`Error auto-submitting submission ${sub._id}:`, err);
+        }
+      }));
+      
+      // Re-fetch submissions to get updated statuses
+      // Optimization: We could just update the objects in memory, but re-fetching ensures consistency
+      const updatedSubmissions = await Submission.find({ examId })
+        .populate('userId', 'name email avatar studentCode')
+        .sort({ submittedAt: -1 });
+        
+      // Replace submissions array with updated one
+      submissions.length = 0;
+      submissions.push(...updatedSubmissions);
+    }
+
     const formattedSubmissions = submissions.map(submission => ({
       _id: submission._id,
       student: {

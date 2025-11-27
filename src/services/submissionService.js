@@ -4,6 +4,122 @@ const Exam = require('../models/Exam');
 const Question = require('../models/Question');
 
 /**
+ * Grade a submission's answers
+ * @param {Object} submission - Submission document
+ * @param {Object} exam - Exam document with questions populated
+ * @returns {Object} - Graded answers and total score
+ */
+async function gradeSubmissionAnswers(submission, exam) {
+  const questionIds = submission.answers.map(a => a.questionId);
+  const questions = await Question.find({ _id: { $in: questionIds } });
+
+  let totalScore = 0;
+  const gradedAnswers = submission.answers.map(answer => {
+    const question = questions.find(q => q._id.toString() === answer.questionId.toString());
+    if (!question) {
+      return {
+        ...answer.toObject(),
+        isCorrect: false,
+        points: 0
+      };
+    }
+
+    // Find exam question to get marks
+    const examQuestion = exam.questions.find(
+      eq => eq.questionId.toString() === question._id.toString()
+    );
+    const marks = examQuestion?.marks || 1;
+
+    let isCorrect = false;
+    let points = 0;
+
+    // Grade based on question type
+    if (question.type === 'mcq' || question.type === 'tf') {
+      const correctAnswer = String(question.answer).trim();
+      const userAnswer = String(answer.value).trim();
+      isCorrect = correctAnswer === userAnswer;
+      points = isCorrect ? marks : 0;
+    } else if (question.type === 'short') {
+      const correctAnswer = String(question.answer).trim().toLowerCase();
+      const userAnswer = String(answer.value).trim().toLowerCase();
+      isCorrect = correctAnswer === userAnswer;
+      points = isCorrect ? marks : 0;
+    } else {
+      // Essay - not auto-graded
+      isCorrect = false;
+      points = 0;
+    }
+
+    totalScore += points;
+
+    return {
+      ...answer.toObject(),
+      isCorrect,
+      points
+    };
+  });
+
+  return { gradedAnswers, totalScore };
+}
+
+/**
+ * Checks if a submission is expired and auto-submits it if necessary
+ * @param {Object} submission - The submission object
+ * @param {Object} exam - The exam object
+ * @returns {Object} - The updated submission (or original if not expired)
+ */
+async function checkAndAutoSubmit(submission, exam) {
+  if (submission.status !== 'in_progress') return submission;
+
+  const now = new Date();
+  const timeSpent = Math.floor((now - submission.startedAt) / 1000);
+  const durationSeconds = exam.duration * 60;
+  const gracePeriodSeconds = (exam.settings?.gracePeriod || 0) * 60;
+  const networkLatencyBuffer = 30;
+
+  if (timeSpent > durationSeconds + gracePeriodSeconds + networkLatencyBuffer) {
+    // Determine if late
+    let isLate = false;
+    let submittedAt = now;
+    let actualTimeSpent = timeSpent;
+
+    if (timeSpent > durationSeconds + gracePeriodSeconds + networkLatencyBuffer) {
+      if (exam.settings?.allowLateSubmission) {
+        isLate = true;
+        submittedAt = new Date(submission.startedAt.getTime() + durationSeconds * 1000);
+        actualTimeSpent = durationSeconds;
+      }
+    }
+
+    // Grade answers
+    const { gradedAnswers, totalScore } = await gradeSubmissionAnswers(submission, exam);
+
+    // Update submission
+    submission.answers = gradedAnswers;
+    submission.score = totalScore;
+    submission.maxScore = exam.totalMarks;
+    submission.percentage = exam.totalMarks > 0
+      ? Math.round((totalScore / exam.totalMarks) * 100)
+      : 0;
+    submission.submittedAt = submittedAt;
+    submission.timeSpent = actualTimeSpent;
+    submission.status = 'graded';
+    submission.isLate = isLate;
+
+    await submission.save();
+
+    // Update exam stats
+    await Exam.findByIdAndUpdate(exam._id, {
+      $inc: { 'stats.totalAttempts': 1 }
+    });
+    
+    return submission;
+  }
+  
+  return submission;
+}
+
+/**
  * Starts a new exam submission
  * @param {Object} params - Parameters
  * @param {string} params.examId - Exam ID
@@ -54,25 +170,26 @@ async function startSubmission({ examId, user, orgId }) {
   });
 
   if (inProgressSubmission) {
-    // Check if exam time has expired
-    const now = new Date();
-    const timeSpent = Math.floor((now - inProgressSubmission.startedAt) / 1000);
-    const durationSeconds = exam.duration * 60;
-    const gracePeriodSeconds = (exam.settings?.gracePeriod || 0) * 60;
-    const networkLatencyBuffer = 30;
-    
-    if (timeSpent > durationSeconds + gracePeriodSeconds + networkLatencyBuffer) {
-      throw { 
-        status: 403, 
-        message: 'Exam time has expired. Your submission will be auto-graded shortly.' 
-      };
-    }
-    
-    // Return existing submission (if not expired)
+    // Get exam with questions for checking/returning
     const examWithQuestions = await Exam.findById(examId)
       .populate('questions.questionId')
       .lean();
 
+    // Check and auto-submit if expired
+    const updatedSubmission = await checkAndAutoSubmit(inProgressSubmission, examWithQuestions);
+    
+    // If it was auto-submitted (status changed to graded), return it
+    // The frontend should handle this status to show results instead of exam interface
+    if (updatedSubmission.status === 'graded') {
+      return {
+        submission: updatedSubmission,
+        exam: examWithQuestions,
+        questionOrder: updatedSubmission.questionOrder,
+        isExpired: true // Flag to tell frontend this was auto-submitted
+      };
+    }
+    
+    // Return existing in_progress submission
     return {
       submission: inProgressSubmission,
       exam: examWithQuestions,
@@ -220,8 +337,7 @@ async function submitExam({ submissionId, user }) {
     timeSpent = durationSeconds;
   }
 
-  // Grade answers using shared grading logic
-  const { gradeSubmissionAnswers } = require('./cronService');
+  // Grade answers using local grading logic
   const { gradedAnswers, totalScore } = await gradeSubmissionAnswers(submission, exam);
 
   // Update submission
@@ -486,6 +602,7 @@ module.exports = {
   getSubmissionById,
   getExamSubmissions,
   getExamLeaderboard,
-  getMySubmissions
+  getMySubmissions,
+  checkAndAutoSubmit
 };
 
