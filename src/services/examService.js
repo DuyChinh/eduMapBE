@@ -165,6 +165,11 @@ async function getExamByShareCode({ shareCode }) {
     return null; // No longer available
   }
 
+  // Check if exam has passed endTime
+  if (exam.endTime && now > exam.endTime) {
+    return null;
+  }
+
   return exam;
 }
 

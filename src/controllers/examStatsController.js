@@ -35,7 +35,7 @@ async function getExamStatistics(req, res, next) {
       return res.status(403).json({ ok: false, message: 'Forbidden' });
     }
 
-    // Get all submitted submissions for this exam
+    // Get all submitted submissions for this exam (include 'late' status)
     const submissions = await Submission.find({
       examId,
       status: { $in: ['submitted', 'graded', 'late'] }
@@ -115,7 +115,7 @@ async function getExamLeaderboard(req, res, next) {
       return res.status(403).json({ ok: false, message: 'Leaderboard is hidden for this exam' });
     }
 
-    // Get all submitted and graded submissions for this exam
+    // Get all submitted and graded submissions for this exam (include 'late' status)
     const submissions = await Submission.find({
       examId,
       status: { $in: ['submitted', 'graded', 'late'] }
@@ -309,12 +309,15 @@ async function getStudentSubmissionDetail(req, res, next) {
       return res.status(403).json({ ok: false, message: 'Forbidden' });
     }
 
-    // Get the submission
+    // Get the submission (include 'late' status)
+    // Get the most recent COMPLETED submission (only submitted/graded/late, not in_progress)
+    // Sort by submittedAt descending to get the latest submitted one
     const submission = await Submission.findOne({
       examId,
       userId: studentId,
       status: { $in: ['submitted', 'graded', 'late'] }
     })
+      .sort({ submittedAt: -1 }) // Get the most recent submitted submission
       .populate('userId', 'name email avatar studentCode')
       .populate('answers.questionId');
 
@@ -337,26 +340,49 @@ async function getStudentSubmissionDetail(req, res, next) {
       return acc;
     }, {});
 
-    // Format answers with question details
-    const formattedAnswers = submission.answers.map(answer => {
-      const question = exam.questions.find(q => 
-        String(q.questionId._id) === String(answer.questionId)
-      );
+    // Create a map of answers by questionId for quick lookup
+    const answersMap = new Map();
+    submission.answers.forEach(answer => {
+      let questionIdStr = null;
+      if (answer.questionId) {
+        if (mongoose.Types.ObjectId.isValid(answer.questionId)) {
+          questionIdStr = new mongoose.Types.ObjectId(answer.questionId).toString();
+        } else {
+          questionIdStr = String(answer.questionId);
+        }
+      }
+      if (questionIdStr) {
+        answersMap.set(questionIdStr, answer);
+      }
+    });
+
+    // Format answers with question details - include ALL questions from exam
+    const formattedAnswers = exam.questions.map((examQuestion) => {
+      const questionId = examQuestion.questionId._id;
+      let questionIdStr = null;
+      if (questionId) {
+        if (mongoose.Types.ObjectId.isValid(questionId)) {
+          questionIdStr = new mongoose.Types.ObjectId(questionId).toString();
+        } else {
+          questionIdStr = String(questionId);
+        }
+      }
+      const answer = questionIdStr ? answersMap.get(questionIdStr) : null;
       
       return {
         question: {
-          _id: answer.questionId,
-          name: question?.questionId?.name,
-          text: question?.questionId?.text,
-          type: question?.questionId?.type,
-          choices: question?.questionId?.choices,
-          correctAnswer: question?.questionId?.correctAnswer,
-          explanation: question?.questionId?.explanation
+          _id: questionId,
+          name: examQuestion.questionId?.name,
+          text: examQuestion.questionId?.text,
+          type: examQuestion.questionId?.type,
+          choices: examQuestion.questionId?.choices,
+          correctAnswer: examQuestion.questionId?.answer || examQuestion.questionId?.correctAnswer,
+          explanation: examQuestion.questionId?.explanation
         },
-        selectedAnswer: answer.value,
-        isCorrect: answer.isCorrect,
-        earnedMarks: answer.points,
-        marks: question?.marks || 1
+        selectedAnswer: answer ? answer.value : null,
+        isCorrect: answer ? answer.isCorrect : false,
+        earnedMarks: answer ? answer.points : 0,
+        marks: examQuestion.marks || 1
       };
     });
 
@@ -394,6 +420,137 @@ async function getStudentSubmissionDetail(req, res, next) {
 }
 
 /**
+ * Get submission detail by submissionId
+ * GET /v1/api/exams/:examId/submissions/detail/:submissionId
+ */
+async function getSubmissionDetailById(req, res, next) {
+  try {
+    const { examId, submissionId } = req.params;
+    const user = req.user;
+
+    if (!mongoose.isValidObjectId(examId) || !mongoose.isValidObjectId(submissionId)) {
+      return res.status(400).json({ ok: false, message: 'Invalid ID format' });
+    }
+
+    // Check exam exists and user has permission
+    const exam = await Exam.findById(examId).populate('questions.questionId');
+    if (!exam) {
+      return res.status(404).json({ ok: false, message: 'Exam not found' });
+    }
+
+    // Only teacher who owns the exam or admin can view
+    const isOwner = String(exam.ownerId) === String(user.id);
+    if (!isOwner && !isAdmin(user)) {
+      return res.status(403).json({ ok: false, message: 'Forbidden' });
+    }
+
+    // Get the specific submission by submissionId
+    const submission = await Submission.findOne({
+      _id: submissionId,
+      examId
+    })
+      .populate('userId', 'name email avatar studentCode')
+      .populate('answers.questionId');
+
+    if (!submission) {
+      return res.status(404).json({ ok: false, message: 'Submission not found' });
+    }
+
+    // Get activity logs
+    const activityLogs = await ActivityLog.find({
+      submissionId: submission._id
+    }).sort({ timestamp: 1 });
+
+    // Get suspicious activities summary
+    const suspiciousActivities = activityLogs.filter(log => log.isSuspicious);
+    const suspiciousActivitySummary = suspiciousActivities.reduce((acc, log) => {
+      if (!acc[log.type]) {
+        acc[log.type] = { type: log.type, count: 0 };
+      }
+      acc[log.type].count++;
+      return acc;
+    }, {});
+
+    // Create a map of answers by questionId for quick lookup
+    const answersMap = new Map();
+    submission.answers.forEach(answer => {
+      let questionIdStr = null;
+      if (answer.questionId) {
+        if (mongoose.Types.ObjectId.isValid(answer.questionId)) {
+          questionIdStr = new mongoose.Types.ObjectId(answer.questionId).toString();
+        } else {
+          questionIdStr = String(answer.questionId);
+        }
+      }
+      if (questionIdStr) {
+        answersMap.set(questionIdStr, answer);
+      }
+    });
+
+    // Format answers with question details - include ALL questions from exam
+    const formattedAnswers = exam.questions.map((examQuestion) => {
+      const questionId = examQuestion.questionId._id;
+      let questionIdStr = null;
+      if (questionId) {
+        if (mongoose.Types.ObjectId.isValid(questionId)) {
+          questionIdStr = new mongoose.Types.ObjectId(questionId).toString();
+        } else {
+          questionIdStr = String(questionId);
+        }
+      }
+      const answer = questionIdStr ? answersMap.get(questionIdStr) : null;
+      
+      return {
+        question: {
+          _id: questionId,
+          name: examQuestion.questionId?.name,
+          text: examQuestion.questionId?.text,
+          type: examQuestion.questionId?.type,
+          choices: examQuestion.questionId?.choices,
+          correctAnswer: examQuestion.questionId?.answer || examQuestion.questionId?.correctAnswer,
+          explanation: examQuestion.questionId?.explanation
+        },
+        selectedAnswer: answer ? answer.value : null,
+        isCorrect: answer ? answer.isCorrect : false,
+        earnedMarks: answer ? answer.points : 0,
+        marks: examQuestion.marks || 1
+      };
+    });
+
+    res.json({
+      ok: true,
+      data: {
+        _id: submission._id,
+        exam: {
+          _id: exam._id,
+          name: exam.name,
+          description: exam.description,
+          totalMarks: exam.totalMarks
+        },
+        student: {
+          _id: submission.userId._id,
+          name: submission.userId.name,
+          email: submission.userId.email,
+          avatar: submission.userId.avatar,
+          studentCode: submission.userId.studentCode
+        },
+        score: submission.score,
+        totalMarks: submission.maxScore,
+        percentage: submission.percentage,
+        timeSpent: submission.timeSpent,
+        startedAt: submission.startedAt,
+        submittedAt: submission.submittedAt,
+        answers: formattedAnswers,
+        suspiciousActivities: Object.values(suspiciousActivitySummary)
+      }
+    });
+  } catch (error) {
+    console.error('Error getting submission detail by ID:', error);
+    next(error);
+  }
+}
+
+/**
  * Get student activity log
  * GET /v1/api/exams/:examId/submissions/:studentId/activity
  */
@@ -420,13 +577,22 @@ async function getSubmissionActivityLog(req, res, next) {
     }
 
     // Get the submission (can be in_progress, submitted, or graded)
-    // Get the most recent submission for this exam and student
-    const submission = await Submission.findOne({
-      examId,
-      userId: studentId
-    })
-      .sort({ createdAt: -1 })
-      .limit(1);
+    
+    let submission;
+    if (req.query.submissionId) {
+      submission = await Submission.findOne({
+        _id: req.query.submissionId,
+        examId,
+        userId: studentId
+      });
+    } else {
+      submission = await Submission.findOne({
+        examId,
+        userId: studentId
+      })
+        .sort({ createdAt: -1 })
+        .limit(1);
+    }
 
     if (!submission) {
       return res.status(404).json({ ok: false, message: 'Submission not found' });
@@ -571,7 +737,7 @@ async function getSubjectAverageScores(req, res, next) {
   try {
     const user = req.user;
 
-    // Get all submitted submissions for the user
+    // Get all submitted submissions for the user (include 'late' status)
     const submissions = await Submission.find({
       userId: user.id,
       status: { $in: ['submitted', 'graded', 'late'] }
@@ -652,7 +818,7 @@ async function getScoreDistribution(req, res, next) {
       return res.status(403).json({ ok: false, message: 'Forbidden' });
     }
 
-    // Get all submitted and graded submissions for this exam
+    // Get all submitted and graded submissions for this exam (include 'late' status)
     const submissions = await Submission.find({
       examId,
       status: { $in: ['submitted', 'graded', 'late'] }
@@ -825,27 +991,47 @@ async function resetStudentAttempt(req, res, next) {
       });
     }
 
-    const submissionId = latestSubmission._id.toString();
     const attemptNumber = latestSubmission.attemptNumber;
 
-    // Delete the latest submission
-    await Submission.findByIdAndDelete(latestSubmission._id);
+    // Reduce attemptNumber by 1 for ALL submissions of this student for this exam
+    // This ensures consistency when calculating highestAttemptNumber in startSubmission
+    // Simple approach: reduce all submissions, no need to check attemptNumber
+    const result = await Submission.updateMany(
+      {
+        examId,
+        userId: studentId
+      },
+      {
+        $inc: { attemptNumber: -1 }
+      }
+    );
 
-    // Also delete related activity logs and proctor logs for this submission
-    await ActivityLog.deleteMany({
-      submissionId: submissionId
-    });
+    // Ensure attemptNumber doesn't go below 0
+    await Submission.updateMany(
+      {
+        examId,
+        userId: studentId,
+        attemptNumber: { $lt: 0 }
+      },
+      {
+        $set: { attemptNumber: 0 }
+      }
+    );
     
-    await ProctorLog.deleteMany({
-      submissionId: submissionId
-    });
+    // Get the updated latest submission to get the new attemptNumber
+    const updatedLatestSubmission = await Submission.findById(latestSubmission._id);
+    const newAttemptNumber = updatedLatestSubmission.attemptNumber;
+    
+    console.log(`Reset attempt: Reduced attemptNumber for ALL ${result.modifiedCount} submission(s) of student ${studentId} for exam ${examId}`);
 
     res.json({
       ok: true,
-      message: `Student attempt #${attemptNumber} deleted successfully. Student can now retake the exam (attempt count reduced by 1).`,
+      message: `All ${result.modifiedCount} submission(s) of this student have been reduced by 1 attempt. Latest attempt #${attemptNumber} reduced to #${newAttemptNumber}. Student can now retake the exam.`,
       data: {
-        deletedAttemptNumber: attemptNumber,
-        deletedSubmissionId: submissionId
+        originalAttemptNumber: attemptNumber,
+        newAttemptNumber: newAttemptNumber,
+        submissionsUpdated: result.modifiedCount,
+        submissionId: latestSubmission._id.toString()
       }
     });
   } catch (error) {
@@ -859,10 +1045,10 @@ module.exports = {
   getExamLeaderboard,
   getExamSubmissions,
   getStudentSubmissionDetail,
+  getSubmissionDetailById,
   getSubmissionActivityLog,
   getOverallExamResults,
   getSubjectAverageScores,
   getScoreDistribution,
   resetStudentAttempt
 };
-

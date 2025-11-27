@@ -147,11 +147,30 @@ async function startSubmission({ examId, user, orgId }) {
     throw { status: 403, message: 'Exam is no longer available' };
   }
 
-  // Check max attempts
+  // Check if user has access based on isAllowUser setting
+  if (exam.isAllowUser === 'class') {
+    if (!exam.allowedClassIds || exam.allowedClassIds.length === 0) {
+      throw { status: 403, message: 'This exam is restricted to specific classes. No classes have been assigned.' };
+    }
+    
+    // Check if student is in any of the allowed classes
+    const Class = require('../models/Class');
+    const userId = new mongoose.Types.ObjectId(user.id);
+    
+    const allowedClasses = await Class.find({
+      _id: { $in: exam.allowedClassIds },
+      studentIds: userId
+    });
+    
+    if (!allowedClasses || allowedClasses.length === 0) {
+      throw { status: 403, message: 'You are not enrolled in any of the classes allowed for this exam.' };
+    }
+  }
+
   const existingSubmissions = await Submission.countDocuments({
     examId,
     userId: user.id,
-    status: { $in: ['submitted', 'graded'] }
+    status: { $in: ['submitted', 'graded', 'late'] }
   });
 
   if (existingSubmissions >= exam.maxAttempts) {
@@ -194,6 +213,30 @@ async function startSubmission({ examId, user, orgId }) {
       exam: examWithQuestions,
       questionOrder: inProgressSubmission.questionOrder
     };
+  }
+
+  if (exam.endTime && now > exam.endTime) {
+    const recentSubmission = await Submission.findOne({
+      examId,
+      userId: user.id,
+      status: { $in: ['submitted', 'graded', 'late'] }
+    })
+      .sort({ submittedAt: -1 })
+      .limit(1);
+
+    if (recentSubmission && recentSubmission.submittedAt) {
+      const timeSinceSubmit = Math.floor((now - recentSubmission.submittedAt) / 1000);
+      if (timeSinceSubmit <= 300 && exam.endTime > recentSubmission.submittedAt) {
+        throw {
+          status: 400,
+          message: 'Your exam submission has already been submitted. Please check your results.',
+          autoSubmitted: true,
+          submissionId: recentSubmission._id
+        };
+      }
+    }
+
+    throw { status: 403, message: 'Exam has expired. The exam end time has passed.' };
   }
 
   // Get exam questions
@@ -275,10 +318,19 @@ async function updateSubmissionAnswers({ submissionId, answers, user }) {
     _id: submissionId,
     userId: user.id,
     status: 'in_progress'
-  });
+  }).populate('examId');
 
   if (!submission) {
     throw { status: 404, message: 'Submission not found or already submitted' };
+  }
+
+  // Check if exam has passed endTime
+  const exam = submission.examId;
+  if (exam && exam.endTime) {
+    const now = new Date();
+    if (now > exam.endTime) {
+      throw { status: 403, message: 'Cannot update answers: Exam has expired. The exam end time has passed.' };
+    }
   }
 
   // Update answers
@@ -299,9 +351,10 @@ async function updateSubmissionAnswers({ submissionId, answers, user }) {
  * @param {Object} params - Parameters
  * @param {string} params.submissionId - Submission ID
  * @param {Object} params.user - User object
+ * @param {boolean} params.isAutoSubmit - If true, bypass endTime check and set timeSpent = duration
  * @returns {Object} - Graded submission
  */
-async function submitExam({ submissionId, user }) {
+async function submitExam({ submissionId, user, isAutoSubmit = false }) {
   const submission = await Submission.findOne({
     _id: submissionId,
     userId: user.id,

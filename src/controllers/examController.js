@@ -35,7 +35,7 @@ async function createExam(req, res, next) {
       examPassword, autoMonitoring, studentVerification, eduMapOnly, 
       hideGroupTitles, sectionsStartFromQ1, hideLeaderboard, addTitleInfo, 
       preExamNotification, preExamNotificationText, examPurpose, 
-      isAllowUser, availableFrom, availableUntil, shuffleQuestions, 
+      isAllowUser, allowedClassIds, availableFrom, availableUntil, shuffleQuestions, 
       shuffleChoices, maxAttempts, viewMark, viewExamAndAnswer,
       status // 'draft' or 'published'
     } = req.body;
@@ -190,6 +190,7 @@ async function createExam(req, res, next) {
       gradeId: gradeId || undefined,
       examPurpose: examPurpose || 'exam',
       isAllowUser: isAllowUser || 'everyone',
+      allowedClassIds: (isAllowUser === 'class' && allowedClassIds && Array.isArray(allowedClassIds)) ? allowedClassIds : [],
       availableFrom: availableFrom ? new Date(availableFrom) : undefined,
       availableUntil: availableUntil ? new Date(availableUntil) : undefined,
       fee: fee !== undefined ? fee : 0,
