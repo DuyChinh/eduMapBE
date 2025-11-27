@@ -38,7 +38,7 @@ async function getExamStatistics(req, res, next) {
     // Get all submitted submissions for this exam
     const submissions = await Submission.find({
       examId,
-      status: { $in: ['submitted', 'graded'] }
+      status: { $in: ['submitted', 'graded', 'late'] }
     });
 
     const totalSubmissions = submissions.length;
@@ -118,7 +118,7 @@ async function getExamLeaderboard(req, res, next) {
     // Get all submitted and graded submissions for this exam
     const submissions = await Submission.find({
       examId,
-      status: { $in: ['submitted', 'graded'] }
+      status: { $in: ['submitted', 'graded', 'late'] }
     })
       .populate('userId', 'name email avatar studentCode')
       .sort({ submittedAt: -1 });
@@ -313,7 +313,7 @@ async function getStudentSubmissionDetail(req, res, next) {
     const submission = await Submission.findOne({
       examId,
       userId: studentId,
-      status: { $in: ['submitted', 'graded'] }
+      status: { $in: ['submitted', 'graded', 'late'] }
     })
       .populate('userId', 'name email avatar studentCode')
       .populate('answers.questionId');
@@ -574,7 +574,7 @@ async function getSubjectAverageScores(req, res, next) {
     // Get all submitted submissions for the user
     const submissions = await Submission.find({
       userId: user.id,
-      status: { $in: ['submitted', 'graded'] }
+      status: { $in: ['submitted', 'graded', 'late'] }
     }).populate('examId', 'name subjectCode totalMarks');
 
     // Group by subject
@@ -655,7 +655,7 @@ async function getScoreDistribution(req, res, next) {
     // Get all submitted and graded submissions for this exam
     const submissions = await Submission.find({
       examId,
-      status: { $in: ['submitted', 'graded'] }
+      status: { $in: ['submitted', 'graded', 'late'] }
     })
       .populate('userId', 'name email studentCode')
       .sort({ submittedAt: -1 });

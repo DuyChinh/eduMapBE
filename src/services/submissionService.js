@@ -103,7 +103,7 @@ async function checkAndAutoSubmit(submission, exam) {
       : 0;
     submission.submittedAt = submittedAt;
     submission.timeSpent = actualTimeSpent;
-    submission.status = 'graded';
+    submission.status = isLate ? 'late' : 'graded';
     submission.isLate = isLate;
 
     await submission.save();
@@ -349,7 +349,7 @@ async function submitExam({ submissionId, user }) {
     : 0;
   submission.submittedAt = submittedAt;
   submission.timeSpent = timeSpent;
-  submission.status = 'graded';
+  submission.status = isLate ? 'late' : 'graded';
   submission.isLate = isLate;
 
   await submission.save();
