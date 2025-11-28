@@ -4,6 +4,121 @@ const Exam = require('../models/Exam');
 const Question = require('../models/Question');
 
 /**
+ * Grade a submission's answers
+ * @param {Object} submission - Submission document
+ * @param {Object} exam - Exam document with questions populated
+ * @returns {Object} - Graded answers and total score
+ */
+async function gradeSubmissionAnswers(submission, exam) {
+  const questionIds = submission.answers.map(a => a.questionId);
+  const questions = await Question.find({ _id: { $in: questionIds } });
+
+  let totalScore = 0;
+  const gradedAnswers = submission.answers.map(answer => {
+    const question = questions.find(q => q._id.toString() === answer.questionId.toString());
+    if (!question) {
+      return {
+        ...answer.toObject(),
+        isCorrect: false,
+        points: 0
+      };
+    }
+
+    // Find exam question to get marks
+    const examQuestion = exam.questions.find(
+      eq => eq.questionId.toString() === question._id.toString()
+    );
+    const marks = examQuestion?.marks || 1;
+
+    let isCorrect = false;
+    let points = 0;
+
+    // Grade based on question type
+    if (question.type === 'mcq' || question.type === 'tf') {
+      const correctAnswer = String(question.answer).trim();
+      const userAnswer = String(answer.value).trim();
+      isCorrect = correctAnswer === userAnswer;
+      points = isCorrect ? marks : 0;
+    } else if (question.type === 'short') {
+      const correctAnswer = String(question.answer).trim().toLowerCase();
+      const userAnswer = String(answer.value).trim().toLowerCase();
+      isCorrect = correctAnswer === userAnswer;
+      points = isCorrect ? marks : 0;
+    } else {
+      // Essay - not auto-graded
+      isCorrect = false;
+      points = 0;
+    }
+
+    totalScore += points;
+
+    return {
+      ...answer.toObject(),
+      isCorrect,
+      points
+    };
+  });
+
+  return { gradedAnswers, totalScore };
+}
+
+/**
+ * Checks if a submission is expired and auto-submits it if necessary
+ * @param {Object} submission - The submission object
+ * @param {Object} exam - The exam object
+ * @returns {Object} - The updated submission (or original if not expired)
+ */
+async function checkAndAutoSubmit(submission, exam) {
+  if (submission.status !== 'in_progress') return submission;
+
+  const now = new Date();
+  const timeSpent = Math.floor((now - submission.startedAt) / 1000);
+  const durationSeconds = exam.duration * 60;
+  const gracePeriodSeconds = (exam.settings?.gracePeriod || 0) * 60;
+  const networkLatencyBuffer = 30;
+
+  if (timeSpent > durationSeconds + gracePeriodSeconds + networkLatencyBuffer) {
+    // Determine if late - if timeSpent exceeds the official duration, it's late
+    // This is for auto-submit when viewing results, so we always mark as late if over duration
+    const isLate = timeSpent > durationSeconds;
+    let submittedAt = now;
+    let actualTimeSpent = timeSpent;
+
+    if (isLate) {
+      // If late, set submittedAt to the end of official duration
+      submittedAt = new Date(submission.startedAt.getTime() + durationSeconds * 1000);
+      actualTimeSpent = durationSeconds;
+    }
+
+    // Grade answers
+    const { gradedAnswers, totalScore } = await gradeSubmissionAnswers(submission, exam);
+
+    // Update submission
+    submission.answers = gradedAnswers;
+    submission.score = totalScore;
+    submission.maxScore = exam.totalMarks;
+    submission.percentage = exam.totalMarks > 0
+      ? Math.round((totalScore / exam.totalMarks) * 100)
+      : 0;
+    submission.submittedAt = submittedAt;
+    submission.timeSpent = actualTimeSpent;
+    submission.status = isLate ? 'late' : 'graded';
+    submission.isLate = isLate;
+
+    await submission.save();
+
+    // Update exam stats
+    await Exam.findByIdAndUpdate(exam._id, {
+      $inc: { 'stats.totalAttempts': 1 }
+    });
+    
+    return submission;
+  }
+  
+  return submission;
+}
+
+/**
  * Starts a new exam submission
  * @param {Object} params - Parameters
  * @param {string} params.examId - Exam ID
@@ -59,9 +174,9 @@ async function startSubmission({ examId, user, orgId }) {
   });
 
   if (existingSubmissions >= exam.maxAttempts) {
-    throw { 
-      status: 403, 
-      message: `You have reached the maximum number of attempts (${existingSubmissions}/${exam.maxAttempts}). You cannot start this exam again.` 
+    throw {
+      status: 403,
+      message: `You have reached the maximum number of attempts (${existingSubmissions}/${exam.maxAttempts}). You cannot start this exam again.`
     };
   }
 
@@ -73,39 +188,26 @@ async function startSubmission({ examId, user, orgId }) {
   });
 
   if (inProgressSubmission) {
-    const startedAt = inProgressSubmission.startedAt;
-    if (startedAt) {
-      const timeSpent = Math.floor((now - startedAt) / 1000); // seconds
-      const durationSeconds = exam.duration * 60;
-      const timeRemaining = durationSeconds - timeSpent;
-
-      if (timeRemaining <= 0) {
-        const freshSubmission = await Submission.findById(inProgressSubmission._id)
-          .populate('examId');
-        
-        if (!freshSubmission) {
-          throw { status: 404, message: 'Submission not found' };
-        }
-
-        const autoSubmittedSubmission = await submitExam({
-          submissionId: freshSubmission._id,
-          user,
-          isAutoSubmit: true 
-        });
-        
-        throw { 
-          status: 400, 
-          message: 'Your exam time has expired. Your submission has been automatically submitted.',
-          autoSubmitted: true,
-          submissionId: autoSubmittedSubmission._id
-        };
-      }
-    }
-
+    // Get exam with questions for checking/returning
     const examWithQuestions = await Exam.findById(examId)
       .populate('questions.questionId')
       .lean();
 
+    // Check and auto-submit if expired
+    const updatedSubmission = await checkAndAutoSubmit(inProgressSubmission, examWithQuestions);
+    
+    // If it was auto-submitted (status changed to graded or late), return it
+    // The frontend should handle this status to show results instead of exam interface
+    if (updatedSubmission.status === 'graded' || updatedSubmission.status === 'late') {
+      return {
+        submission: updatedSubmission,
+        exam: examWithQuestions,
+        questionOrder: updatedSubmission.questionOrder,
+        isExpired: true // Flag to tell frontend this was auto-submitted
+      };
+    }
+    
+    // Return existing in_progress submission
     return {
       submission: inProgressSubmission,
       exam: examWithQuestions,
@@ -148,7 +250,7 @@ async function startSubmission({ examId, user, orgId }) {
 
   // Prepare question order (shuffle if needed)
   let questionOrder = examWithQuestions.questions.map(q => q.questionId._id.toString());
-  
+
   if (exam.settings?.randomizeQuestionOrder || exam.settings?.shuffleQuestions) {
     questionOrder = shuffleArray([...questionOrder]);
   }
@@ -167,12 +269,12 @@ async function startSubmission({ examId, user, orgId }) {
     score: 0,
     percentage: 0
   };
-  
+
   // Only add orgId if it exists
   if (orgId || user.orgId) {
     submissionData.orgId = orgId || user.orgId;
   }
-  
+
   const submission = new Submission(submissionData);
 
   await submission.save();
@@ -180,13 +282,13 @@ async function startSubmission({ examId, user, orgId }) {
   // Shuffle choices for each question if needed
   const questionsWithShuffledChoices = examWithQuestions.questions.map(q => {
     const question = { ...q.questionId };
-    
+
     if (exam.settings?.randomizeChoiceOrder || exam.settings?.shuffleChoices) {
       if (question.choices && Array.isArray(question.choices)) {
         question.choices = shuffleArray([...question.choices]);
       }
     }
-    
+
     return {
       ...q,
       questionId: question
@@ -269,191 +371,38 @@ async function submitExam({ submissionId, user, isAutoSubmit = false }) {
   }
 
   const now = new Date();
+  let timeSpent = Math.floor((now - submission.startedAt) / 1000); 
   const durationSeconds = exam.duration * 60;
-  let timeSpent;
+
+  const gracePeriodSeconds = (exam.settings?.gracePeriod || 0) * 60;
+  const networkLatencyBuffer = 30; 
+
   let isLate = false;
+  let submittedAt = now;
 
-  if (isAutoSubmit) {
-    timeSpent = durationSeconds;
+  if (timeSpent > durationSeconds + gracePeriodSeconds + networkLatencyBuffer) {
+    if (!exam.settings?.allowLateSubmission) {
+      throw { status: 400, message: 'Time limit exceeded' };
+    }
     isLate = true;
-  } else {
-    if (exam.endTime && now > exam.endTime) {
-      throw { status: 403, message: 'Cannot submit: Exam has expired. The exam end time has passed.' };
-    }
-
-    // Check if time limit exceeded
-    timeSpent = Math.floor((now - submission.startedAt) / 1000); // seconds
-
-    if (timeSpent > durationSeconds) {
-      if (!exam.settings?.allowLateSubmission) {
-        throw { status: 400, message: 'Time limit exceeded' };
-      }
-      isLate = true;
-    }
+    submittedAt = new Date(submission.startedAt.getTime() + durationSeconds * 1000);
+    timeSpent = durationSeconds;
   }
 
-  // Grade answers
-  const answersArray = submission.answers || [];
-  
-  console.log('Grading submission:', submission._id);
-  console.log('Answers count:', answersArray.length);
-  console.log('Is auto-submit:', isAutoSubmit);
-  console.log('Is late:', isLate);
-  
-  // If no answers, still grade and return score 0
-  if (answersArray.length === 0) {
-    console.log('No answers found, setting score to 0');
-    submission.answers = [];
-    submission.score = 0;
-    submission.maxScore = exam.totalMarks;
-    submission.percentage = 0;
-    submission.submittedAt = now;
-    submission.timeSpent = timeSpent;
-    submission.status = isLate ? 'late' : 'graded';
-    await submission.save();
-    
-    // Update exam stats
-    await Exam.findByIdAndUpdate(exam._id, {
-      $inc: { 'stats.totalAttempts': 1 }
-    });
-    
-    return submission;
-  }
-  
-  // Get question IDs from answers
-  const questionIds = answersArray
-    .map(a => {
-      if (a.questionId) {
-        try {
-          return mongoose.Types.ObjectId.isValid(a.questionId) 
-            ? new mongoose.Types.ObjectId(a.questionId) 
-            : null;
-        } catch (e) {
-          return null;
-        }
-      }
-      return null;
-    })
-    .filter(Boolean);
-  
-  console.log('Question IDs to grade:', questionIds.length);
-  
-  const questions = questionIds.length > 0 
-    ? await Question.find({ _id: { $in: questionIds } })
-    : [];
-
-  console.log('Questions found:', questions.length);
-
-  // Create a map for quick lookup
-  const questionMap = new Map();
-  questions.forEach(q => {
-    questionMap.set(q._id.toString(), q);
-  });
-
-  let totalScore = 0;
-  const gradedAnswers = answersArray.map(answer => {
-    // Handle both ObjectId and string formats
-    let answerQuestionId = null;
-    try {
-      if (answer.questionId) {
-        if (mongoose.Types.ObjectId.isValid(answer.questionId)) {
-          answerQuestionId = new mongoose.Types.ObjectId(answer.questionId).toString();
-        } else {
-          answerQuestionId = String(answer.questionId);
-        }
-      }
-    } catch (e) {
-      console.error('Error processing questionId:', answer.questionId, e);
-    }
-    
-    const question = answerQuestionId ? questionMap.get(answerQuestionId) : null;
-    
-    if (!question) {
-      console.log('Question not found for answer, questionId:', answerQuestionId);
-      return {
-        ...(answer.toObject ? answer.toObject() : answer),
-        questionId: answer.questionId,
-        value: answer.value,
-        isCorrect: false,
-        points: 0
-      };
-    }
-
-    // Find exam question to get marks
-    let examQuestion = null;
-    for (const eq of exam.questions || []) {
-      let eqQuestionId = null;
-      try {
-        if (eq.questionId) {
-          if (mongoose.Types.ObjectId.isValid(eq.questionId)) {
-            eqQuestionId = new mongoose.Types.ObjectId(eq.questionId).toString();
-          } else {
-            eqQuestionId = String(eq.questionId);
-          }
-        }
-      } catch (e) {
-        continue;
-      }
-      
-      if (eqQuestionId === answerQuestionId) {
-        examQuestion = eq;
-        break;
-      }
-    }
-    
-    const marks = examQuestion?.marks || 1;
-
-    let isCorrect = false;
-    let points = 0;
-
-    // Only grade if answer has a value
-    if (answer.value !== null && answer.value !== undefined && answer.value !== '') {
-      // Grade based on question type
-      if (question.type === 'mcq' || question.type === 'tf') {
-        // Multiple choice or true/false
-        const correctAnswer = String(question.answer || '').trim();
-        const userAnswer = String(answer.value || '').trim();
-        isCorrect = correctAnswer === userAnswer && correctAnswer !== '';
-        points = isCorrect ? marks : 0;
-      } else if (question.type === 'short') {
-        // Short answer - simple text comparison (case insensitive)
-        const correctAnswer = String(question.answer || '').trim().toLowerCase();
-        const userAnswer = String(answer.value || '').trim().toLowerCase();
-        isCorrect = correctAnswer === userAnswer && correctAnswer !== '';
-        points = isCorrect ? marks : 0;
-      } else {
-        isCorrect = false;
-        points = 0;
-      }
-    } else {
-      // No answer provided
-      isCorrect = false;
-      points = 0;
-    }
-
-    totalScore += points;
-
-    return {
-      ...(answer.toObject ? answer.toObject() : answer),
-      questionId: answer.questionId,
-      value: answer.value,
-      isCorrect,
-      points
-    };
-  });
-  
-  console.log('Total score calculated:', totalScore);
+  // Grade answers using local grading logic
+  const { gradedAnswers, totalScore } = await gradeSubmissionAnswers(submission, exam);
 
   // Update submission
   submission.answers = gradedAnswers;
   submission.score = totalScore;
   submission.maxScore = exam.totalMarks;
-  submission.percentage = exam.totalMarks > 0 
-    ? Math.round((totalScore / exam.totalMarks) * 100) 
+  submission.percentage = exam.totalMarks > 0
+    ? Math.round((totalScore / exam.totalMarks) * 100)
     : 0;
-  submission.submittedAt = now;
+  submission.submittedAt = submittedAt;
   submission.timeSpent = timeSpent;
   submission.status = isLate ? 'late' : 'graded';
+  submission.isLate = isLate;
 
   await submission.save();
 
@@ -546,7 +495,7 @@ async function getExamLeaderboard({ examId, user }) {
   }
 
   // Get all graded submissions
-  const submissions = await Submission.find({ 
+  const submissions = await Submission.find({
     examId,
     status: { $in: ['graded', 'submitted'] }
   })
@@ -622,7 +571,7 @@ async function getMySubmissions({ userId, filters = {} }) {
     submissions = submissions.filter(submission => {
       const exam = submission.examId;
       if (!exam) return false;
-      
+
       // Check subject name from populated subjectId
       const subject = exam.subjectId;
       if (subject) {
@@ -631,14 +580,14 @@ async function getMySubmissions({ userId, filters = {} }) {
           return true;
         }
       }
-      
+
       // Check subjectCode
       if (exam.subjectCode) {
         if (exam.subjectCode.toLowerCase().includes(filters.subject.toLowerCase())) {
           return true;
         }
       }
-      
+
       return false;
     });
   }
@@ -647,7 +596,7 @@ async function getMySubmissions({ userId, filters = {} }) {
   const formattedSubmissions = submissions.map(submission => {
     const exam = submission.examId || {};
     const subject = exam.subjectId || {};
-    
+
     // Get subject name (prefer current language, fallback to name)
     const getSubjectName = () => {
       if (subject.name) return subject.name;
@@ -657,7 +606,7 @@ async function getMySubmissions({ userId, filters = {} }) {
       if (exam.subjectCode) return exam.subjectCode;
       return '';
     };
-    
+
     return {
       _id: submission._id,
       examId: exam._id,
@@ -705,6 +654,7 @@ module.exports = {
   getSubmissionById,
   getExamSubmissions,
   getExamLeaderboard,
-  getMySubmissions
+  getMySubmissions,
+  checkAndAutoSubmit
 };
 
