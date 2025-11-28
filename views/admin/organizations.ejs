@@ -1,0 +1,247 @@
+<%- include('../partials/header', { title: 'Organizations Management', currentPage: 'organizations', user: user }) %>
+
+<div class="organizations-page">
+    <div class="page-header mb-3">
+        <div class="page-actions">
+            <button class="btn btn-primary" onclick="refreshOrgs()">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Filters</h5>
+        </div>
+        <div class="card-body">
+            <form id="filterForm" onsubmit="filterOrgs(event)">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Plan</label>
+                        <select name="plan" id="planFilter" class="form-select">
+                            <option value="">All</option>
+                            <option value="free">Free</option>
+                            <option value="pro">Pro</option>
+                            <option value="enterprise">Enterprise</option>
+                        </select>
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label">Search</label>
+                        <input type="text" name="search" id="searchFilter" class="form-control" placeholder="Name or domain...">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="clearFilters()">
+                            <i class="fas fa-times"></i> Clear
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Organizations Table -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Organizations List (<span id="totalOrgs"><%= organizations.length || 0 %></span>)</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Domain</th>
+                            <th>Plan</th>
+                            <th>Users</th>
+                            <th>Max Students</th>
+                            <th>Max Exams</th>
+                            <th>Created At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (organizations && organizations.length > 0) { %>
+                            <% organizations.forEach(org => { %>
+                                <tr>
+                                    <td><code><%= org._id.toString().substring(0, 8) %>...</code></td>
+                                    <td><%= org.name %></td>
+                                    <td><%= org.domain || 'N/A' %></td>
+                                    <td>
+                                        <span class="badge bg-<%= org.plan === 'free' ? 'secondary' : org.plan === 'pro' ? 'primary' : 'success' %>">
+                                            <%= org.plan === 'free' ? 'Free' : org.plan === 'pro' ? 'Pro' : 'Enterprise' %>
+                                        </span>
+                                    </td>
+                                    <td><%= org.userCount || 0 %></td>
+                                    <td><%= org.settings?.maxStudents || 100 %></td>
+                                    <td><%= org.settings?.maxExams || 10 %></td>
+                                    <td><%= new Date(org.createdAt).toLocaleDateString('en-US') %></td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="/admin/organizations/<%= org._id %>" class="btn btn-sm btn-info" title="View Details">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="/admin/organizations/<%= org._id %>/edit" class="btn btn-sm btn-primary" title="Edit">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <button class="btn btn-sm btn-danger" onclick="deleteOrg('<%= org._id %>', '<%= org.name %>')" title="Delete">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        <% } else { %>
+                            <tr>
+                                <td colspan="9" class="text-center">No data available</td>
+                            </tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Bootstrap Pagination -->
+            <% if (pagination && pagination.pages > 1) { %>
+                <nav aria-label="Page navigation" class="mt-3">
+                    <ul class="pagination justify-content-center">
+                        <% if (pagination.page > 1) { %>
+                            <li class="page-item">
+                                <a class="page-link" href="javascript:void(0)" onclick="goToPage(<%= pagination.page - 1 %>)">
+                                    <i class="fas fa-chevron-left"></i> Previous
+                                </a>
+                            </li>
+                        <% } %>
+                        <% 
+                            let startPage = Math.max(1, pagination.page - 2);
+                            let endPage = Math.min(pagination.pages, pagination.page + 2);
+                            for (let i = startPage; i <= endPage; i++) { 
+                        %>
+                            <li class="page-item <%= i === pagination.page ? 'active' : '' %>">
+                                <a class="page-link" href="javascript:void(0)" onclick="goToPage(<%= i %>)"><%= i %></a>
+                            </li>
+                        <% } %>
+                        <% if (pagination.page < pagination.pages) { %>
+                            <li class="page-item">
+                                <a class="page-link" href="javascript:void(0)" onclick="goToPage(<%= pagination.page + 1 %>)">
+                                    Next <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </li>
+                        <% } %>
+                    </ul>
+                </nav>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentPage = <%= pagination?.page || 1 %>;
+    let currentFilters = {};
+
+    function filterOrgs(e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        currentFilters = {
+            plan: formData.get('plan') || '',
+            search: formData.get('search') || ''
+        };
+        currentPage = 1;
+        loadOrgs();
+    }
+
+    function clearFilters() {
+        document.getElementById('planFilter').value = '';
+        document.getElementById('searchFilter').value = '';
+        currentFilters = {};
+        currentPage = 1;
+        loadOrgs();
+    }
+
+    function goToPage(page) {
+        currentPage = page;
+        loadOrgs();
+    }
+
+    function loadOrgs() {
+        const params = new URLSearchParams({ page: currentPage, ...currentFilters });
+        window.location.href = `/admin/organizations?${params.toString()}`;
+    }
+
+    function refreshOrgs() {
+        loadOrgs();
+    }
+
+    function saveOrg(e) {
+        e.preventDefault();
+        const orgId = document.getElementById('editOrgId').value;
+        fetch(`/v1/api/admin/organizations/${orgId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${getToken()}`
+            },
+            body: JSON.stringify({
+                name: document.getElementById('editOrgName').value,
+                domain: document.getElementById('editOrgDomain').value,
+                plan: document.getElementById('editOrgPlan').value,
+                settings: {
+                    maxStudents: parseInt(document.getElementById('editOrgMaxStudents').value),
+                    maxExams: parseInt(document.getElementById('editOrgMaxExams').value)
+                }
+            })
+        })
+        .then(res => {
+            if (!res.ok) {
+                return res.json().then(err => Promise.reject(err));
+            }
+            return res.json();
+        })
+        .then(data => {
+            if (data.ok) {
+                alert('Organization updated successfully!');
+                const modal = bootstrap.Modal.getInstance(document.getElementById('editOrgModal'));
+                modal.hide();
+                loadOrgs();
+            } else {
+                alert('Error: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(err => {
+            console.error('Error updating organization:', err);
+            alert('Error: ' + (err.message || 'Failed to update organization'));
+        });
+    }
+
+    function deleteOrg(orgId, orgName) {
+        if (!confirm(`Are you sure you want to delete organization "${orgName}"?`)) return;
+        fetch(`/v1/api/admin/organizations/${orgId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.ok) {
+                alert('Organization deleted successfully!');
+                loadOrgs();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(err => alert('Error deleting organization'));
+    }
+
+    function getToken() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'admin_token') return value;
+        }
+        return '';
+    }
+</script>
+
+<%- include('../partials/footer') %>

@@ -1,0 +1,106 @@
+<%- include('../partials/header', { title: title, currentPage: 'users', user: user }) %>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Edit User</h2>
+        <a href="/admin/users/<%= detailUser._id %>" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Detail
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">User Information</h5>
+        </div>
+        <div class="card-body">
+            <form id="editUserForm" onsubmit="saveUser(event)">
+                <input type="hidden" id="editUserId" value="<%= detailUser._id %>">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Name</label>
+                        <input type="text" id="editUserName" class="form-control" value="<%= detailUser.name || '' %>" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" value="<%= detailUser.email || '' %>" disabled>
+                        <small class="text-muted">Email cannot be changed</small>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Role</label>
+                        <select id="editUserRole" class="form-select" required>
+                            <option value="student" <%= detailUser.role === 'student' ? 'selected' : '' %>>Student</option>
+                            <option value="teacher" <%= detailUser.role === 'teacher' ? 'selected' : '' %>>Teacher</option>
+                            <option value="admin" <%= detailUser.role === 'admin' ? 'selected' : '' %>>Admin</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Status</label>
+                        <select id="editUserStatus" class="form-select" required>
+                            <option value="active" <%= detailUser.status === 'active' ? 'selected' : '' %>>Active</option>
+                            <option value="suspended" <%= detailUser.status === 'suspended' ? 'selected' : '' %>>Suspended</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Changes
+                    </button>
+                    <a href="/admin/users/<%= detailUser._id %>" class="btn btn-secondary">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function saveUser(e) {
+        e.preventDefault();
+        const userId = document.getElementById('editUserId').value;
+        const formData = {
+            name: document.getElementById('editUserName').value,
+            role: document.getElementById('editUserRole').value,
+            status: document.getElementById('editUserStatus').value
+        };
+
+        fetch(`/v1/api/admin/users/${userId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${getToken()}`
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(res => {
+            if (!res.ok) {
+                return res.json().then(err => Promise.reject(err));
+            }
+            return res.json();
+        })
+        .then(data => {
+            if (data.ok) {
+                alert('User updated successfully!');
+                window.location.href = `/admin/users/${userId}`;
+            } else {
+                alert('Error: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(err => {
+            console.error('Error updating user:', err);
+            alert('Error: ' + (err.message || 'Failed to update user. Please check console for details.'));
+        });
+    }
+
+    function getToken() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'admin_token') return value;
+        }
+        return '';
+    }
+</script>
+
+<%- include('../partials/footer') %>
+

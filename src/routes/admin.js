@@ -1,0 +1,44 @@
+const express = require('express');
+const router = express.Router();
+const adminController = require('../controllers/adminController');
+const authMiddleware = require('../middleware/authMiddleware');
+
+// All admin routes require authentication and admin role
+router.use(authMiddleware.authenticate);
+router.use(authMiddleware.isAdmin);
+
+// API routes - These return JSON data
+router.get('/dashboard', adminController.getDashboard);
+router.get('/users', adminController.getUsers);
+router.get('/users/:userId', adminController.getUserById);
+router.put('/users/:userId', adminController.updateUser);
+router.delete('/users/:userId', adminController.deleteUser);
+router.get('/organizations', adminController.getOrganizations);
+router.get('/organizations/:orgId', adminController.getOrganizationById);
+router.put('/organizations/:orgId', adminController.updateOrganization);
+router.delete('/organizations/:orgId', adminController.deleteOrganization);
+router.get('/analytics', adminController.getAnalytics);
+
+// Chat Sessions routes
+router.get('/chat-sessions', adminController.getChatSessions);
+router.get('/chat-sessions/:sessionId', adminController.getChatSessionById);
+router.put('/chat-sessions/:sessionId', adminController.updateChatSession);
+router.delete('/chat-sessions/:sessionId', adminController.deleteChatSession);
+
+// Chat History routes
+router.get('/chat-history', adminController.getChatHistory);
+router.get('/chat-history/:historyId', adminController.getChatHistoryById);
+router.put('/chat-history/:historyId', adminController.updateChatHistory);
+router.delete('/chat-history/:historyId', adminController.deleteChatHistory);
+
+// Questions routes
+router.get('/questions', adminController.getQuestions);
+router.get('/questions/:questionId', adminController.getQuestionById);
+router.put('/questions/:questionId', adminController.updateQuestion);
+router.delete('/questions/:questionId', adminController.deleteQuestion);
+
+// Submissions routes
+router.delete('/submissions/:submissionId', adminController.deleteSubmission);
+
+module.exports = router;
+

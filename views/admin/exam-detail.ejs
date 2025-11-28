@@ -1,0 +1,142 @@
+<%- include('../partials/header', { title: title, currentPage: 'exams', user: user }) %>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Exam Details</h2>
+        <div>
+            <button class="btn btn-danger me-2" onclick="deleteExam('<%= exam._id %>', '<%= exam.name %>')">
+                <i class="fas fa-trash"></i> Delete
+            </button>
+            <a href="/admin/exams" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Exams
+            </a>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Exam Information</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <strong>ID:</strong><br>
+                    <code><%= exam._id %></code>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Name:</strong><br>
+                    <%= exam.name || 'N/A' %>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Owner:</strong><br>
+                    <%= exam.ownerId ? (exam.ownerId.name || exam.ownerId.email || 'N/A') : 'N/A' %>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Status:</strong><br>
+                    <span class="badge bg-<%= exam.status === 'published' ? 'success' : 'warning' %>">
+                        <%= exam.status === 'published' ? 'Published' : 'Draft' %>
+                    </span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Duration:</strong><br>
+                    <%= exam.duration || 0 %> minutes
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Total Marks:</strong><br>
+                    <%= exam.totalMarks || 0 %>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Questions:</strong><br>
+                    <%= exam.questions ? exam.questions.length : 0 %>
+                </div>
+                <div class="col-md-12 mb-3">
+                    <strong>Description:</strong><br>
+                    <%= exam.description || 'N/A' %>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Created At:</strong><br>
+                    <%= new Date(exam.createdAt).toLocaleString('en-US') %>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Updated At:</strong><br>
+                    <%= new Date(exam.updatedAt).toLocaleString('en-US') %>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <% if (exam.questions && exam.questions.length > 0) { %>
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Questions (<%= exam.questions.length %>)</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Question ID</th>
+                                <th>Points</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% exam.questions.forEach((q, index) => { %>
+                                <tr>
+                                    <td><%= index + 1 %></td>
+                                    <td><code><%= q.questionId ? q.questionId._id : q.questionId %></code></td>
+                                    <td><%= q.points || 0 %></td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    <% } %>
+</div>
+
+<script>
+    function deleteExam(examId, examName) {
+        if (!confirm(`Are you sure you want to delete exam "${examName}"? This action cannot be undone.`)) {
+            return;
+        }
+
+        fetch(`/v1/api/exams/${examId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`
+            }
+        })
+        .then(res => {
+            if (!res.ok) {
+                return res.json().then(err => Promise.reject(err));
+            }
+            return res.json();
+        })
+        .then(data => {
+            if (data.ok) {
+                alert('Exam deleted successfully!');
+                window.location.href = '/admin/exams';
+            } else {
+                alert('Error: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(err => {
+            console.error('Error deleting exam:', err);
+            alert('Error: ' + (err.message || 'Failed to delete exam'));
+        });
+    }
+
+    function getToken() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'admin_token') return value;
+        }
+        return '';
+    }
+</script>
+
+<%- include('../partials/footer') %>
+

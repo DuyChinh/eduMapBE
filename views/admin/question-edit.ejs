@@ -1,0 +1,159 @@
+<%- include('../partials/header', { title: title, currentPage: 'questions', user: user }) %>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Edit Question</h2>
+        <a href="/admin/questions/<%= question._id %>" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Detail
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Question Information</h5>
+        </div>
+        <div class="card-body">
+            <form id="editQuestionForm" onsubmit="saveQuestion(event)">
+                <input type="hidden" id="editQuestionId" value="<%= question._id %>">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Name</label>
+                        <input type="text" id="editQuestionName" class="form-control" value="<%= question.name || '' %>" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Type</label>
+                        <select id="editQuestionType" class="form-select" required>
+                            <option value="mcq" <%= question.type === 'mcq' ? 'selected' : '' %>>MCQ</option>
+                            <option value="tf" <%= question.type === 'tf' ? 'selected' : '' %>>True/False</option>
+                            <option value="short" <%= question.type === 'short' ? 'selected' : '' %>>Short Answer</option>
+                            <option value="essay" <%= question.type === 'essay' ? 'selected' : '' %>>Essay</option>
+                        </select>
+                    </div>
+                    <div class="col-md-12 mb-3">
+                        <label class="form-label">Text</label>
+                        <textarea id="editQuestionText" class="form-control" rows="4" required><%= question.text || '' %></textarea>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Level</label>
+                        <input type="number" id="editQuestionLevel" class="form-control" value="<%= question.level || 1 %>" min="1" max="5">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="form-check mt-4">
+                            <input class="form-check-input" type="checkbox" id="editQuestionIsPublic" <%= question.isPublic ? 'checked' : '' %>>
+                            <label class="form-check-label" for="editQuestionIsPublic">Is Public</label>
+                        </div>
+                    </div>
+                    <% if (question.choices && question.choices.length > 0) { %>
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">Choices</label>
+                            <div id="choicesContainer">
+                                <% question.choices.forEach((choice, index) => { %>
+                                    <div class="input-group mb-2">
+                                        <span class="input-group-text"><%= choice.key || (index + 1) %></span>
+                                        <input type="text" class="form-control choice-input" value="<%= choice.text || choice %>" data-key="<%= choice.key || String.fromCharCode(97 + index) %>">
+                                    </div>
+                                <% }); %>
+                            </div>
+                        </div>
+                    <% } %>
+                    <div class="col-md-12 mb-3">
+                        <label class="form-label">Answer</label>
+                        <input type="text" id="editQuestionAnswer" class="form-control" value="<%= typeof question.answer === 'string' ? question.answer : JSON.stringify(question.answer) %>" required>
+                        <small class="text-muted">For MCQ, enter the choice key (e.g., "a", "b"). For others, enter the answer text.</small>
+                    </div>
+                    <% if (question.explanation) { %>
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">Explanation</label>
+                            <textarea id="editQuestionExplanation" class="form-control" rows="3"><%= question.explanation || '' %></textarea>
+                        </div>
+                    <% } else { %>
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">Explanation</label>
+                            <textarea id="editQuestionExplanation" class="form-control" rows="3"></textarea>
+                        </div>
+                    <% } %>
+                </div>
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Changes
+                    </button>
+                    <a href="/admin/questions/<%= question._id %>" class="btn btn-secondary">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function saveQuestion(e) {
+        e.preventDefault();
+        const questionId = document.getElementById('editQuestionId').value;
+        
+        // Collect choices if they exist
+        const choices = [];
+        const choiceInputs = document.querySelectorAll('.choice-input');
+        choiceInputs.forEach((input, index) => {
+            const key = input.dataset.key || String.fromCharCode(97 + index);
+            choices.push({
+                key: key,
+                text: input.value
+            });
+        });
+
+        const formData = {
+            name: document.getElementById('editQuestionName').value,
+            type: document.getElementById('editQuestionType').value,
+            text: document.getElementById('editQuestionText').value,
+            level: parseInt(document.getElementById('editQuestionLevel').value) || 1,
+            isPublic: document.getElementById('editQuestionIsPublic').checked,
+            answer: document.getElementById('editQuestionAnswer').value,
+            explanation: document.getElementById('editQuestionExplanation').value
+        };
+
+        // Only add choices if they exist
+        if (choices.length > 0) {
+            formData.choices = choices;
+        }
+
+        fetch(`/v1/api/admin/questions/${questionId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${getToken()}`
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(res => {
+            if (!res.ok) {
+                return res.json().then(err => Promise.reject(err));
+            }
+            return res.json();
+        })
+        .then(data => {
+            if (data.ok) {
+                alert('Question updated successfully!');
+                window.location.href = `/admin/questions/${questionId}`;
+            } else {
+                alert('Error: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(err => {
+            console.error('Error updating question:', err);
+            alert('Error: ' + (err.message || 'Failed to update question. Please check console for details.'));
+        });
+    }
+
+    function getToken() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'admin_token') return value;
+        }
+        return '';
+    }
+</script>
+
+<%- include('../partials/footer') %>
+
