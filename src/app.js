@@ -13,17 +13,18 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
+app.use('/uploads', express.static('uploads'));
 app.use(passport.initialize());
+
+// Routes version 1
+// app.use('/auth', authRoutes);
+configureRoutes(app);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).send('Something broke!');
 });
-
-// Routes version 1
-// app.use('/auth', authRoutes);
-configureRoutes(app);
 
 // Start the server
 const PORT = process.env.PORT || 3000;
