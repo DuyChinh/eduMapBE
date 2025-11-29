@@ -7,6 +7,7 @@ const Class = require('../models/Class');
 const Question = require('../models/Question');
 const ChatSession = require('../models/ChatSession');
 const ChatHistory = require('../models/ChatHistory');
+const ProctorLog = require('../models/ProctorLog');
 
 /**
  * Get dashboard statistics
@@ -838,6 +839,233 @@ async function updateSubmission(submissionId, updateData) {
   return submission;
 }
 
+/**
+ * Get all classes with pagination
+ * @param {Object} options - Query options (page, limit, search, orgId, teacherId)
+ * @returns {Object} - Paginated classes
+ */
+async function getClasses(options = {}) {
+  const { page = 1, limit = 20, search = '', orgId, teacherId } = options;
+  const skip = (page - 1) * limit;
+
+  const query = {};
+  if (search) {
+    query.$or = [
+      { name: { $regex: search, $options: 'i' } },
+      { code: { $regex: search, $options: 'i' } }
+    ];
+  }
+  if (orgId) {
+    query.orgId = orgId;
+  }
+  if (teacherId) {
+    query.teacherId = teacherId;
+  }
+
+  const [classes, total] = await Promise.all([
+    Class.find(query)
+      .populate('orgId', 'name')
+      .populate('teacherId', 'name email')
+      .populate('studentIds', 'name email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    Class.countDocuments(query)
+  ]);
+
+  return {
+    classes,
+    pagination: {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit)
+    }
+  };
+}
+
+/**
+ * Get class by ID
+ * @param {String} classId - Class ID
+ * @returns {Object} - Class
+ */
+async function getClassById(classId) {
+  const classDoc = await Class.findById(classId)
+    .populate('orgId', 'name domain')
+    .populate('teacherId', 'name email role')
+    .populate('studentIds', 'name email role')
+    .populate('studentJoins.studentId', 'name email')
+    .lean();
+  
+  if (!classDoc) {
+    throw new Error('Class not found');
+  }
+
+  return classDoc;
+}
+
+/**
+ * Update class
+ * @param {String} classId - Class ID
+ * @param {Object} updateData - Data to update
+ * @returns {Object} - Updated class
+ */
+async function updateClass(classId, updateData) {
+  const allowedFields = ['name', 'code', 'orgId', 'teacherId', 'studentIds', 'settings', 'metadata'];
+  const filteredData = {};
+  
+  Object.keys(updateData).forEach(key => {
+    if (allowedFields.includes(key)) {
+      // Handle orgId: can be null/undefined to remove organization
+      if (key === 'orgId') {
+        filteredData.orgId = updateData.orgId || null;
+      } else {
+        filteredData[key] = updateData[key];
+      }
+    }
+  });
+
+  // Validate orgId if provided
+  if (filteredData.orgId) {
+    const Organization = require('../models/Organization');
+    const org = await Organization.findById(filteredData.orgId);
+    if (!org) {
+      throw new Error('Organization not found');
+    }
+  }
+
+  // Validate teacherId if provided
+  if (filteredData.teacherId) {
+    const teacher = await User.findById(filteredData.teacherId);
+    if (!teacher) {
+      throw new Error('Teacher not found');
+    }
+    if (teacher.role !== 'teacher' && teacher.role !== 'admin') {
+      throw new Error('Teacher ID must belong to a teacher or admin');
+    }
+  }
+
+  // Validate studentIds if provided
+  if (filteredData.studentIds && Array.isArray(filteredData.studentIds)) {
+    const students = await User.find({ _id: { $in: filteredData.studentIds } });
+    if (students.length !== filteredData.studentIds.length) {
+      throw new Error('Some student IDs are invalid');
+    }
+  }
+
+  const classDoc = await Class.findByIdAndUpdate(
+    classId,
+    { $set: filteredData },
+    { new: true, runValidators: true }
+  )
+    .populate('orgId', 'name')
+    .populate('teacherId', 'name email')
+    .populate('studentIds', 'name email')
+    .lean();
+
+  if (!classDoc) {
+    throw new Error('Class not found');
+  }
+
+  return classDoc;
+}
+
+/**
+ * Delete class
+ * @param {String} classId - Class ID
+ * @returns {Object} - Deletion result
+ */
+async function deleteClass(classId) {
+  const classDoc = await Class.findByIdAndDelete(classId);
+  
+  if (!classDoc) {
+    throw new Error('Class not found');
+  }
+
+  return { message: 'Class deleted successfully' };
+}
+
+/**
+ * Get all proctor logs with pagination
+ * @param {Object} options - Query options (page, limit, search, submissionId, userId, event, severity)
+ * @returns {Object} - Paginated proctor logs
+ */
+async function getProctorLogs(options = {}) {
+  const { page = 1, limit = 20, search = '', submissionId, userId, event, severity } = options;
+  const skip = (page - 1) * limit;
+
+  const query = {};
+  if (submissionId) {
+    query.submissionId = submissionId;
+  }
+  if (userId) {
+    query.userId = userId;
+  }
+  if (event) {
+    query.event = event;
+  }
+  if (severity) {
+    query.severity = severity;
+  }
+
+  const [logs, total] = await Promise.all([
+    ProctorLog.find(query)
+      .populate('orgId', 'name')
+      .populate('submissionId', 'examId userId status')
+      .populate('userId', 'name email')
+      .sort({ ts: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    ProctorLog.countDocuments(query)
+  ]);
+
+  return {
+    logs,
+    pagination: {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit)
+    }
+  };
+}
+
+/**
+ * Get proctor log by ID
+ * @param {String} logId - Log ID
+ * @returns {Object} - Proctor log
+ */
+async function getProctorLogById(logId) {
+  const log = await ProctorLog.findById(logId)
+    .populate('orgId', 'name domain')
+    .populate('submissionId', 'examId userId status score')
+    .populate('userId', 'name email role')
+    .lean();
+  
+  if (!log) {
+    throw new Error('Proctor log not found');
+  }
+
+  return log;
+}
+
+/**
+ * Delete proctor log
+ * @param {String} logId - Log ID
+ * @returns {Object} - Deletion result
+ */
+async function deleteProctorLog(logId) {
+  const log = await ProctorLog.findByIdAndDelete(logId);
+  
+  if (!log) {
+    throw new Error('Proctor log not found');
+  }
+
+  return { message: 'Proctor log deleted successfully' };
+}
+
 module.exports = {
   getDashboardStats,
   getUsers,
@@ -859,6 +1087,13 @@ module.exports = {
   deleteQuestion,
   deleteSubmission,
   updateExam,
-  updateSubmission
+  updateSubmission,
+  getClasses,
+  getClassById,
+  updateClass,
+  deleteClass,
+  getProctorLogs,
+  getProctorLogById,
+  deleteProctorLog
 };
 

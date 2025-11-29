@@ -69,6 +69,11 @@ router.get('/chat-history/:historyId/edit', adminViewController.renderChatHistor
 router.get('/questions', adminViewController.renderQuestions);
 router.get('/questions/:questionId', adminViewController.renderQuestionDetail);
 router.get('/questions/:questionId/edit', adminViewController.renderQuestionEdit);
+router.get('/classes', adminViewController.renderClasses);
+router.get('/classes/:classId', adminViewController.renderClassDetail);
+router.get('/classes/:classId/edit', adminViewController.renderClassEdit);
+router.get('/proctor-logs', adminViewController.renderProctorLogs);
+router.get('/proctor-logs/:logId', adminViewController.renderProctorLogDetail);
 
 module.exports = router;
 

@@ -751,6 +751,229 @@ async function deleteSubmission(req, res, next) {
   }
 }
 
+/**
+ * Get classes list
+ * GET /v1/api/admin/classes
+ */
+async function getClasses(req, res, next) {
+  try {
+    const { search, orgId, teacherId, page, limit } = req.query;
+
+    const result = await adminService.getClasses({
+      search: search || '',
+      orgId: orgId || null,
+      teacherId: teacherId || null,
+      page: parseInt(page) || 1,
+      limit: parseInt(limit) || 20
+    });
+
+    res.json({
+      ok: true,
+      data: result.classes,
+      pagination: result.pagination
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Get class by ID
+ * GET /v1/api/admin/classes/:classId
+ */
+async function getClassById(req, res, next) {
+  try {
+    const { classId } = req.params;
+    const mongoose = require('mongoose');
+
+    if (!mongoose.isValidObjectId(classId)) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Invalid class ID format'
+      });
+    }
+
+    const classDoc = await adminService.getClassById(classId);
+
+    res.json({
+      ok: true,
+      data: classDoc
+    });
+  } catch (error) {
+    if (error.message === 'Class not found') {
+      return res.status(404).json({
+        ok: false,
+        message: 'Class not found'
+      });
+    }
+    next(error);
+  }
+}
+
+/**
+ * Update class
+ * PUT /v1/api/admin/classes/:classId
+ */
+async function updateClass(req, res, next) {
+  try {
+    const { classId } = req.params;
+    const mongoose = require('mongoose');
+
+    if (!mongoose.isValidObjectId(classId)) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Invalid class ID format'
+      });
+    }
+
+    const classDoc = await adminService.updateClass(classId, req.body);
+
+    res.json({
+      ok: true,
+      message: 'Class updated successfully',
+      data: classDoc
+    });
+  } catch (error) {
+    if (error.message === 'Class not found' || 
+        error.message === 'Teacher not found' ||
+        error.message === 'Teacher ID must belong to a teacher or admin' ||
+        error.message === 'Some student IDs are invalid') {
+      return res.status(400).json({
+        ok: false,
+        message: error.message
+      });
+    }
+    next(error);
+  }
+}
+
+/**
+ * Delete class
+ * DELETE /v1/api/admin/classes/:classId
+ */
+async function deleteClass(req, res, next) {
+  try {
+    const { classId } = req.params;
+    const mongoose = require('mongoose');
+
+    if (!mongoose.isValidObjectId(classId)) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Invalid class ID format'
+      });
+    }
+
+    await adminService.deleteClass(classId);
+
+    res.json({
+      ok: true,
+      message: 'Class deleted successfully'
+    });
+  } catch (error) {
+    if (error.message === 'Class not found') {
+      return res.status(404).json({
+        ok: false,
+        message: 'Class not found'
+      });
+    }
+    next(error);
+  }
+}
+
+/**
+ * Get proctor logs list
+ * GET /v1/api/admin/proctor-logs
+ */
+async function getProctorLogs(req, res, next) {
+  try {
+    const { search, submissionId, userId, event, severity, page, limit } = req.query;
+
+    const result = await adminService.getProctorLogs({
+      search: search || '',
+      submissionId: submissionId || null,
+      userId: userId || null,
+      event: event || null,
+      severity: severity || null,
+      page: parseInt(page) || 1,
+      limit: parseInt(limit) || 20
+    });
+
+    res.json({
+      ok: true,
+      data: result.logs,
+      pagination: result.pagination
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Get proctor log by ID
+ * GET /v1/api/admin/proctor-logs/:logId
+ */
+async function getProctorLogById(req, res, next) {
+  try {
+    const { logId } = req.params;
+    const mongoose = require('mongoose');
+
+    if (!mongoose.isValidObjectId(logId)) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Invalid log ID format'
+      });
+    }
+
+    const log = await adminService.getProctorLogById(logId);
+
+    res.json({
+      ok: true,
+      data: log
+    });
+  } catch (error) {
+    if (error.message === 'Proctor log not found') {
+      return res.status(404).json({
+        ok: false,
+        message: 'Proctor log not found'
+      });
+    }
+    next(error);
+  }
+}
+
+/**
+ * Delete proctor log
+ * DELETE /v1/api/admin/proctor-logs/:logId
+ */
+async function deleteProctorLog(req, res, next) {
+  try {
+    const { logId } = req.params;
+    const mongoose = require('mongoose');
+
+    if (!mongoose.isValidObjectId(logId)) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Invalid log ID format'
+      });
+    }
+
+    await adminService.deleteProctorLog(logId);
+
+    res.json({
+      ok: true,
+      message: 'Proctor log deleted successfully'
+    });
+  } catch (error) {
+    if (error.message === 'Proctor log not found') {
+      return res.status(404).json({
+        ok: false,
+        message: 'Proctor log not found'
+      });
+    }
+    next(error);
+  }
+}
+
 module.exports = {
   getDashboard,
   getUsers,
@@ -776,6 +999,13 @@ module.exports = {
   deleteQuestion,
   deleteSubmission,
   updateExam,
-  updateSubmission
+  updateSubmission,
+  getClasses,
+  getClassById,
+  updateClass,
+  deleteClass,
+  getProctorLogs,
+  getProctorLogById,
+  deleteProctorLog
 };
 

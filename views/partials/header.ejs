@@ -57,6 +57,14 @@
                     <i class="fas fa-question-circle"></i>
                     <span>Questions</span>
                 </a>
+                <a href="/admin/classes" class="nav-item <%= currentPage === 'classes' ? 'active' : '' %>">
+                    <i class="fas fa-chalkboard-teacher"></i>
+                    <span>Classes</span>
+                </a>
+                <a href="/admin/proctor-logs" class="nav-item <%= currentPage === 'proctor-logs' ? 'active' : '' %>">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Proctor Logs</span>
+                </a>
             </nav>
             <div class="sidebar-footer">
                 <a href="/v1/api/auth/logout" class="nav-item">

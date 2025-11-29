@@ -44,5 +44,16 @@ router.delete('/submissions/:submissionId', adminController.deleteSubmission);
 // Exams routes
 router.put('/exams/:examId', adminController.updateExam);
 
+// Classes routes
+router.get('/classes', adminController.getClasses);
+router.get('/classes/:classId', adminController.getClassById);
+router.put('/classes/:classId', adminController.updateClass);
+router.delete('/classes/:classId', adminController.deleteClass);
+
+// Proctor Logs routes
+router.get('/proctor-logs', adminController.getProctorLogs);
+router.get('/proctor-logs/:logId', adminController.getProctorLogById);
+router.delete('/proctor-logs/:logId', adminController.deleteProctorLog);
+
 module.exports = router;
 

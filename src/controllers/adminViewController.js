@@ -844,6 +844,203 @@ async function renderSubmissionEdit(req, res, next) {
   }
 }
 
+/**
+ * Render classes management page
+ * GET /admin/classes
+ */
+async function renderClasses(req, res, next) {
+  try {
+    const { search, orgId, teacherId, page = 1, limit = 20 } = req.query;
+    
+    const result = await adminService.getClasses({
+      search: search || '',
+      orgId: orgId || null,
+      teacherId: teacherId || null,
+      page: parseInt(page),
+      limit: parseInt(limit)
+    });
+
+    res.render('admin/classes', {
+      title: 'Classes Management',
+      currentPage: 'classes',
+      user: req.user,
+      classes: result.classes,
+      pagination: result.pagination
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Render class detail page
+ * GET /admin/classes/:classId
+ */
+async function renderClassDetail(req, res, next) {
+  try {
+    const { classId } = req.params;
+    const mongoose = require('mongoose');
+    
+    if (!mongoose.isValidObjectId(classId)) {
+      return res.status(400).render('admin/error', {
+        title: 'Error',
+        user: req.user,
+        message: 'Invalid class ID format'
+      });
+    }
+
+    const classDoc = await adminService.getClassById(classId);
+
+    res.render('admin/class-detail', {
+      title: `Class: ${classDoc.name || classDoc.code}`,
+      currentPage: 'classes',
+      user: req.user,
+      classDoc
+    });
+  } catch (error) {
+    if (error.message === 'Class not found') {
+      return res.status(404).render('admin/error', {
+        title: 'Not Found',
+        user: req.user,
+        message: 'Class not found'
+      });
+    }
+    next(error);
+  }
+}
+
+/**
+ * Render class edit page
+ * GET /admin/classes/:classId/edit
+ */
+async function renderClassEdit(req, res, next) {
+  try {
+    const { classId } = req.params;
+    const mongoose = require('mongoose');
+    
+    if (!mongoose.isValidObjectId(classId)) {
+      return res.status(400).render('admin/error', {
+        title: 'Error',
+        user: req.user,
+        message: 'Invalid class ID format'
+      });
+    }
+
+    const classDoc = await adminService.getClassById(classId);
+    
+    // Get list of teachers and admins for owner dropdown
+    const teachers = await User.find({
+      role: { $in: ['teacher', 'admin'] },
+      status: 'active'
+    })
+      .select('name email role')
+      .sort({ name: 1 })
+      .lean();
+
+    // Get list of students for studentIds dropdown
+    const students = await User.find({
+      role: 'student',
+      status: 'active'
+    })
+      .select('name email')
+      .sort({ name: 1 })
+      .lean();
+
+    // Get list of organizations for orgId dropdown
+    const Organization = require('../models/Organization');
+    const organizations = await Organization.find()
+      .select('name domain')
+      .sort({ name: 1 })
+      .lean();
+
+    res.render('admin/class-edit', {
+      title: `Edit Class: ${classDoc.name || classDoc.code}`,
+      currentPage: 'classes',
+      user: req.user,
+      classDoc,
+      teachers,
+      students,
+      organizations
+    });
+  } catch (error) {
+    if (error.message === 'Class not found') {
+      return res.status(404).render('admin/error', {
+        title: 'Not Found',
+        user: req.user,
+        message: 'Class not found'
+      });
+    }
+    next(error);
+  }
+}
+
+/**
+ * Render proctor logs management page
+ * GET /admin/proctor-logs
+ */
+async function renderProctorLogs(req, res, next) {
+  try {
+    const { search, submissionId, userId, event, severity, page = 1, limit = 20 } = req.query;
+    
+    const result = await adminService.getProctorLogs({
+      search: search || '',
+      submissionId: submissionId || null,
+      userId: userId || null,
+      event: event || null,
+      severity: severity || null,
+      page: parseInt(page),
+      limit: parseInt(limit)
+    });
+
+    res.render('admin/proctor-logs', {
+      title: 'Proctor Logs Management',
+      currentPage: 'proctor-logs',
+      user: req.user,
+      logs: result.logs,
+      pagination: result.pagination
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Render proctor log detail page
+ * GET /admin/proctor-logs/:logId
+ */
+async function renderProctorLogDetail(req, res, next) {
+  try {
+    const { logId } = req.params;
+    const mongoose = require('mongoose');
+    
+    if (!mongoose.isValidObjectId(logId)) {
+      return res.status(400).render('admin/error', {
+        title: 'Error',
+        user: req.user,
+        message: 'Invalid log ID format'
+      });
+    }
+
+    const log = await adminService.getProctorLogById(logId);
+
+    res.render('admin/proctor-log-detail', {
+      title: `Proctor Log: ${log.event || log._id}`,
+      currentPage: 'proctor-logs',
+      user: req.user,
+      log
+    });
+  } catch (error) {
+    if (error.message === 'Proctor log not found') {
+      return res.status(404).render('admin/error', {
+        title: 'Not Found',
+        user: req.user,
+        message: 'Proctor log not found'
+      });
+    }
+    next(error);
+  }
+}
+
 module.exports = {
   renderDashboard,
   renderUsers,
@@ -867,6 +1064,11 @@ module.exports = {
   renderChatHistoryEdit,
   renderQuestions,
   renderQuestionDetail,
-  renderQuestionEdit
+  renderQuestionEdit,
+  renderClasses,
+  renderClassDetail,
+  renderClassEdit,
+  renderProctorLogs,
+  renderProctorLogDetail
 };
 
