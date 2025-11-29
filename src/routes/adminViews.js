@@ -56,8 +56,10 @@ router.get('/organizations/:orgId/edit', adminViewController.renderOrganizationE
 router.get('/analytics', adminViewController.renderAnalytics);
 router.get('/exams', adminViewController.renderExams);
 router.get('/exams/:examId', adminViewController.renderExamDetail);
+router.get('/exams/:examId/edit', adminViewController.renderExamEdit);
 router.get('/submissions', adminViewController.renderSubmissions);
 router.get('/submissions/:submissionId', adminViewController.renderSubmissionDetail);
+router.get('/submissions/:submissionId/edit', adminViewController.renderSubmissionEdit);
 router.get('/chat-sessions', adminViewController.renderChatSessions);
 router.get('/chat-sessions/:sessionId', adminViewController.renderChatSessionDetail);
 router.get('/chat-sessions/:sessionId/edit', adminViewController.renderChatSessionEdit);

@@ -202,17 +202,17 @@
         })
         .then(data => {
             if (data.ok) {
-                alert('Organization updated successfully!');
+                showNotification('Organization updated successfully!', 'success');
                 const modal = bootstrap.Modal.getInstance(document.getElementById('editOrgModal'));
                 modal.hide();
                 loadOrgs();
             } else {
-                alert('Error: ' + (data.message || 'Unknown error'));
+                showNotification('Error: ' + (data.message || 'Unknown error'), 'danger');
             }
         })
         .catch(err => {
             console.error('Error updating organization:', err);
-            alert('Error: ' + (err.message || 'Failed to update organization'));
+            showNotification('Error: ' + (err.message || 'Failed to update organization'), 'danger');
         });
     }
 
@@ -225,13 +225,16 @@
         .then(res => res.json())
         .then(data => {
             if (data.ok) {
-                alert('Organization deleted successfully!');
+                showNotification('Organization deleted successfully!', 'success');
                 loadOrgs();
             } else {
-                alert('Error: ' + data.message);
+                showNotification('Error: ' + data.message, 'danger');
             }
         })
-        .catch(err => alert('Error deleting organization'));
+        .catch(err => {
+            console.error('Error deleting organization:', err);
+            showNotification('Error deleting organization', 'danger');
+        });
     }
 
     function getToken() {

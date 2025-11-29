@@ -3,8 +3,8 @@
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>Edit Chat Session</h2>
-        <a href="/admin/chat-sessions/<%= session._id %>" class="btn btn-secondary">
-            <i class="fas fa-arrow-left"></i> Back to Detail
+        <a href="/admin/chat-sessions" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Chat Sessions
         </a>
     </div>
 
@@ -29,7 +29,7 @@
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-save"></i> Save Changes
                     </button>
-                    <a href="/admin/chat-sessions/<%= session._id %>" class="btn btn-secondary">
+                    <a href="/admin/chat-sessions" class="btn btn-secondary">
                         Cancel
                     </a>
                 </div>
@@ -63,15 +63,15 @@
         })
         .then(data => {
             if (data.ok) {
-                alert('Session updated successfully!');
-                window.location.href = `/admin/chat-sessions/${sessionId}`;
+                showNotification('Session updated successfully!', 'success');
+                window.location.href = '/admin/chat-sessions';
             } else {
-                alert('Error: ' + (data.message || 'Unknown error'));
+                showNotification('Error: ' + (data.message || 'Unknown error'), 'danger');
             }
         })
         .catch(err => {
             console.error('Error updating session:', err);
-            alert('Error: ' + (err.message || 'Failed to update session. Please check console for details.'));
+            showNotification('Error: ' + (err.message || 'Failed to update session. Please check console for details.'), 'danger');
         });
     }
 

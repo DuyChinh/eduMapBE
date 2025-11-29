@@ -204,13 +204,16 @@
         .then(res => res.json())
         .then(data => {
             if (data.ok) {
-                alert('History deleted successfully!');
+                showNotification('History deleted successfully!', 'success');
                 loadHistory();
             } else {
-                alert('Error: ' + data.message);
+                showNotification('Error: ' + data.message, 'danger');
             }
         })
-        .catch(err => alert('Error deleting history'));
+        .catch(err => {
+            console.error('Error deleting history:', err);
+            showNotification('Error deleting history', 'danger');
+        });
     }
 
     function getToken() {

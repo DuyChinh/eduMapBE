@@ -3,8 +3,8 @@
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>Edit Question</h2>
-        <a href="/admin/questions/<%= question._id %>" class="btn btn-secondary">
-            <i class="fas fa-arrow-left"></i> Back to Detail
+        <a href="/admin/questions" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Questions
         </a>
     </div>
 
@@ -27,6 +27,24 @@
                             <option value="tf" <%= question.type === 'tf' ? 'selected' : '' %>>True/False</option>
                             <option value="short" <%= question.type === 'short' ? 'selected' : '' %>>Short Answer</option>
                             <option value="essay" <%= question.type === 'essay' ? 'selected' : '' %>>Essay</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Owner</label>
+                        <select id="editQuestionOwnerId" class="form-select" required>
+                            <option value="">Select Owner</option>
+                            <% if (users && users.length > 0) { %>
+                                <% users.forEach(u => { %>
+                                    <% 
+                                        const currentOwnerId = question.ownerId ? question.ownerId.toString() : '';
+                                        const userId = u._id.toString();
+                                        const isSelected = currentOwnerId === userId;
+                                    %>
+                                    <option value="<%= u._id %>" <%= isSelected ? 'selected' : '' %>>
+                                        <%= u.name %> (<%= u.email %>) - <%= u.role %>
+                                    </option>
+                                <% }); %>
+                            <% } %>
                         </select>
                     </div>
                     <div class="col-md-12 mb-3">
@@ -77,7 +95,7 @@
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-save"></i> Save Changes
                     </button>
-                    <a href="/admin/questions/<%= question._id %>" class="btn btn-secondary">
+                    <a href="/admin/questions" class="btn btn-secondary">
                         Cancel
                     </a>
                 </div>
@@ -109,7 +127,8 @@
             level: parseInt(document.getElementById('editQuestionLevel').value) || 1,
             isPublic: document.getElementById('editQuestionIsPublic').checked,
             answer: document.getElementById('editQuestionAnswer').value,
-            explanation: document.getElementById('editQuestionExplanation').value
+            explanation: document.getElementById('editQuestionExplanation').value,
+            ownerId: document.getElementById('editQuestionOwnerId').value
         };
 
         // Only add choices if they exist
@@ -133,15 +152,17 @@
         })
         .then(data => {
             if (data.ok) {
-                alert('Question updated successfully!');
-                window.location.href = `/admin/questions/${questionId}`;
+                showNotification('Question updated successfully!', 'success');
+                setTimeout(() => {
+                    window.location.href = '/admin/questions';
+                }, 800);
             } else {
-                alert('Error: ' + (data.message || 'Unknown error'));
+                showNotification('Error: ' + (data.message || 'Unknown error'), 'danger');
             }
         })
         .catch(err => {
             console.error('Error updating question:', err);
-            alert('Error: ' + (err.message || 'Failed to update question. Please check console for details.'));
+            showNotification('Error: ' + (err.message || 'Failed to update question. Please check console for details.'), 'danger');
         });
     }
 

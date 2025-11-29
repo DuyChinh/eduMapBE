@@ -86,6 +86,9 @@
                                             <a href="/admin/submissions/<%= sub._id %>" class="btn btn-sm btn-info" title="View Details">
                                                 <i class="fas fa-eye"></i>
                                             </a>
+                                            <a href="/admin/submissions/<%= sub._id %>/edit" class="btn btn-sm btn-primary" title="Edit">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
                                             <button class="btn btn-sm btn-danger" onclick="deleteSubmission('<%= sub._id %>')" title="Delete">
                                                 <i class="fas fa-trash"></i>
                                             </button>
@@ -192,15 +195,15 @@
         })
         .then(data => {
             if (data.ok) {
-                alert('Submission deleted successfully!');
+                showNotification('Submission deleted successfully!', 'success');
                 loadSubmissions();
             } else {
-                alert('Error: ' + (data.message || 'Unknown error'));
+                showNotification('Error: ' + (data.message || 'Unknown error'), 'danger');
             }
         })
         .catch(err => {
             console.error('Error deleting submission:', err);
-            alert('Error: ' + (err.message || 'Failed to delete submission'));
+            showNotification('Error: ' + (err.message || 'Failed to delete submission'), 'danger');
         });
     }
 

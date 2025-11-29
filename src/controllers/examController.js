@@ -246,8 +246,6 @@ async function getAllExams(req, res, next) {
 
     // Teachers can only view their own exams, admins can view all
     const filterOwnerId = isTeacher(req.user) && !ownerId ? req.user.id : ownerId;
-    console.log('filterOwnerId', filterOwnerId);
-  
 
     const examData = await examService.getAllExams({
       ownerId: filterOwnerId,

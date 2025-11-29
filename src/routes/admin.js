@@ -38,7 +38,11 @@ router.put('/questions/:questionId', adminController.updateQuestion);
 router.delete('/questions/:questionId', adminController.deleteQuestion);
 
 // Submissions routes
+router.put('/submissions/:submissionId', adminController.updateSubmission);
 router.delete('/submissions/:submissionId', adminController.deleteSubmission);
+
+// Exams routes
+router.put('/exams/:examId', adminController.updateExam);
 
 module.exports = router;
 

@@ -3,8 +3,8 @@
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>Edit Chat History</h2>
-        <a href="/admin/chat-history/<%= history._id %>" class="btn btn-secondary">
-            <i class="fas fa-arrow-left"></i> Back to Detail
+        <a href="/admin/chat-history" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Chat History
         </a>
     </div>
 
@@ -31,7 +31,7 @@
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-save"></i> Save Changes
                     </button>
-                    <a href="/admin/chat-history/<%= history._id %>" class="btn btn-secondary">
+                    <a href="/admin/chat-history" class="btn btn-secondary">
                         Cancel
                     </a>
                 </div>
@@ -65,15 +65,15 @@
         })
         .then(data => {
             if (data.ok) {
-                alert('History updated successfully!');
-                window.location.href = `/admin/chat-history/${historyId}`;
+                showNotification('History updated successfully!', 'success');
+                window.location.href = '/admin/chat-history';
             } else {
-                alert('Error: ' + (data.message || 'Unknown error'));
+                showNotification('Error: ' + (data.message || 'Unknown error'), 'danger');
             }
         })
         .catch(err => {
             console.error('Error updating history:', err);
-            alert('Error: ' + (err.message || 'Failed to update history. Please check console for details.'));
+            showNotification('Error: ' + (err.message || 'Failed to update history. Please check console for details.'), 'danger');
         });
     }
 

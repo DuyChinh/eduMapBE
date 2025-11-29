@@ -170,13 +170,16 @@
         .then(res => res.json())
         .then(data => {
             if (data.ok) {
-                alert('Session deleted successfully!');
+                showNotification('Session deleted successfully!', 'success');
                 loadSessions();
             } else {
-                alert('Error: ' + data.message);
+                showNotification('Error: ' + data.message, 'danger');
             }
         })
-        .catch(err => alert('Error deleting session'));
+        .catch(err => {
+            console.error('Error deleting session:', err);
+            showNotification('Error deleting session', 'danger');
+        });
     }
 
     function getToken() {

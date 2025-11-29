@@ -41,10 +41,38 @@ async function apiCall(url, options = {}) {
     }
 }
 
-// Show notification
+// Show notification using Bootstrap alerts
 function showNotification(message, type = 'info') {
-    // Simple alert for now, can be enhanced with toast notifications
-    alert(message);
+    const existing = document.getElementById('global-bootstrap-alert');
+    if (existing) {
+        existing.remove();
+    }
+
+    const alertType = {
+        success: 'alert-success',
+        error: 'alert-danger',
+        danger: 'alert-danger',
+        warning: 'alert-warning',
+        info: 'alert-info'
+    }[type] || 'alert-info';
+
+    const alertDiv = document.createElement('div');
+    alertDiv.id = 'global-bootstrap-alert';
+    alertDiv.className = `alert ${alertType} alert-dismissible fade show position-fixed top-0 end-0 m-3`;
+    alertDiv.role = 'alert';
+    alertDiv.style.zIndex = 1060;
+    alertDiv.innerHTML = `
+        <span>${message}</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+
+    document.body.appendChild(alertDiv);
+
+    // Auto dismiss after 4 seconds
+    setTimeout(() => {
+        const alertInstance = bootstrap.Alert.getOrCreateInstance(alertDiv);
+        alertInstance.close();
+    }, 160000);
 }
 
 // Format date

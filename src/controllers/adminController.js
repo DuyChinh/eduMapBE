@@ -132,6 +132,66 @@ async function updateUser(req, res, next) {
 }
 
 /**
+ * Update exam
+ * PUT /v1/api/admin/exams/:examId
+ */
+async function updateExam(req, res, next) {
+  try {
+    const { examId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(examId)) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Invalid exam ID'
+      });
+    }
+    const exam = await adminService.updateExam(examId, req.body);
+    res.json({
+      ok: true,
+      data: exam,
+      message: 'Exam updated successfully'
+    });
+  } catch (error) {
+    if (error.message === 'Exam not found') {
+      return res.status(404).json({
+        ok: false,
+        message: error.message
+      });
+    }
+    next(error);
+  }
+}
+
+/**
+ * Update submission
+ * PUT /v1/api/admin/submissions/:submissionId
+ */
+async function updateSubmission(req, res, next) {
+  try {
+    const { submissionId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(submissionId)) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Invalid submission ID'
+      });
+    }
+    const submission = await adminService.updateSubmission(submissionId, req.body);
+    res.json({
+      ok: true,
+      data: submission,
+      message: 'Submission updated successfully'
+    });
+  } catch (error) {
+    if (error.message === 'Submission not found') {
+      return res.status(404).json({
+        ok: false,
+        message: error.message
+      });
+    }
+    next(error);
+  }
+}
+
+/**
  * Delete user
  * DELETE /v1/api/admin/users/:userId
  */
@@ -714,6 +774,8 @@ module.exports = {
   getQuestionById,
   updateQuestion,
   deleteQuestion,
-  deleteSubmission
+  deleteSubmission,
+  updateExam,
+  updateSubmission
 };
 

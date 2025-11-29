@@ -205,14 +205,14 @@
         .then(res => res.json())
         .then(data => {
             if (data.ok) {
-                alert('User deleted successfully!');
+                showNotification('User deleted successfully!', 'success');
                 loadUsers();
             } else {
-                alert('Error: ' + data.message);
+                showNotification('Error: ' + data.message, 'danger');
             }
         })
         .catch(err => {
-            alert('Error deleting user');
+            showNotification('Error deleting user', 'danger');
         });
     }
 

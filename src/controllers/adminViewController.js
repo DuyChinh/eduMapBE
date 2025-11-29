@@ -724,11 +724,21 @@ async function renderQuestionEdit(req, res, next) {
 
     const question = await adminService.getQuestionById(questionId);
 
+    // Get all users (teachers/admins) for owner selection
+    const users = await User.find({
+      role: { $in: ['teacher', 'admin'] },
+      status: 'active'
+    })
+      .select('name email role')
+      .sort({ name: 1 })
+      .lean();
+
     res.render('admin/question-edit', {
       title: `Edit Question: ${question.name || question._id}`,
       currentPage: 'questions',
       user: req.user,
-      question
+      question,
+      users
     });
   } catch (error) {
     if (error.message === 'Question not found') {
@@ -738,6 +748,98 @@ async function renderQuestionEdit(req, res, next) {
         message: 'Question not found'
       });
     }
+    next(error);
+  }
+}
+
+/**
+ * Render exam edit page
+ * GET /admin/exams/:examId/edit
+ */
+async function renderExamEdit(req, res, next) {
+  try {
+    const { examId } = req.params;
+    const mongoose = require('mongoose');
+    
+    if (!mongoose.isValidObjectId(examId)) {
+      return res.status(400).render('admin/error', {
+        title: 'Error',
+        user: req.user,
+        message: 'Invalid exam ID format'
+      });
+    }
+
+    const exam = await Exam.findById(examId)
+      .populate('ownerId', 'name email')
+      .populate('questions.questionId')
+      .lean();
+
+    if (!exam) {
+      return res.status(404).render('admin/error', {
+        title: 'Not Found',
+        user: req.user,
+        message: 'Exam not found'
+      });
+    }
+
+    // Get all users for owner selection (teachers and admins only)
+    const users = await User.find({ 
+      role: { $in: ['teacher', 'admin'] },
+      status: 'active'
+    })
+      .select('name email role')
+      .sort({ name: 1 })
+      .lean();
+
+    res.render('admin/exam-edit', {
+      title: `Edit Exam: ${exam.name}`,
+      currentPage: 'exams',
+      user: req.user,
+      exam,
+      users
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Render submission edit page
+ * GET /admin/submissions/:submissionId/edit
+ */
+async function renderSubmissionEdit(req, res, next) {
+  try {
+    const { submissionId } = req.params;
+    const mongoose = require('mongoose');
+    
+    if (!mongoose.isValidObjectId(submissionId)) {
+      return res.status(400).render('admin/error', {
+        title: 'Error',
+        user: req.user,
+        message: 'Invalid submission ID format'
+      });
+    }
+
+    const submission = await Submission.findById(submissionId)
+      .populate('userId', 'name email')
+      .populate('examId', 'name totalMarks')
+      .lean();
+
+    if (!submission) {
+      return res.status(404).render('admin/error', {
+        title: 'Not Found',
+        user: req.user,
+        message: 'Submission not found'
+      });
+    }
+
+    res.render('admin/submission-edit', {
+      title: `Edit Submission: ${submission._id}`,
+      currentPage: 'submissions',
+      user: req.user,
+      submission
+    });
+  } catch (error) {
     next(error);
   }
 }
@@ -753,8 +855,10 @@ module.exports = {
   renderAnalytics,
   renderExams,
   renderExamDetail,
+  renderExamEdit,
   renderSubmissions,
   renderSubmissionDetail,
+  renderSubmissionEdit,
   renderChatSessions,
   renderChatSessionDetail,
   renderChatSessionEdit,

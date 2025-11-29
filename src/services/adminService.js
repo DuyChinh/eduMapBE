@@ -186,6 +186,21 @@ async function updateUser({ userId, updates }) {
     }
   }
 
+  // Handle password update separately
+  if (updates.password) {
+    const bcrypt = require('bcryptjs');
+    const { validatePassword } = require('../utils/passwordValidator');
+    
+    // Validate password strength
+    const passwordValidation = validatePassword(updates.password);
+    if (!passwordValidation.isValid) {
+      throw { status: 400, message: `Password validation failed: ${passwordValidation.errors.join(', ')}` };
+    }
+    
+    // Hash password
+    updateData.password = await bcrypt.hash(updates.password, 10);
+  }
+
   if (Object.keys(updateData).length === 0) {
     throw { status: 400, message: 'No valid fields to update' };
   }
@@ -695,7 +710,7 @@ async function getQuestionById(questionId) {
  * @returns {Object} - Updated question
  */
 async function updateQuestion(questionId, updateData) {
-  const allowedFields = ['name', 'text', 'choices', 'answer', 'explanation', 'level', 'isPublic', 'tags'];
+  const allowedFields = ['name', 'text', 'choices', 'answer', 'explanation', 'level', 'isPublic', 'tags', 'ownerId'];
   const filteredData = {};
   
   Object.keys(updateData).forEach(key => {
@@ -703,6 +718,11 @@ async function updateQuestion(questionId, updateData) {
       filteredData[key] = updateData[key];
     }
   });
+
+  // Validate ownerId if provided
+  if (filteredData.ownerId && !mongoose.isValidObjectId(filteredData.ownerId)) {
+    throw new Error('Invalid owner ID format');
+  }
 
   const question = await Question.findByIdAndUpdate(
     questionId,
@@ -750,6 +770,74 @@ async function deleteSubmission(submissionId) {
   return { message: 'Submission deleted successfully' };
 }
 
+/**
+ * Update exam
+ * @param {String} examId - Exam ID
+ * @param {Object} updateData - Data to update
+ * @returns {Object} - Updated exam
+ */
+async function updateExam(examId, updateData) {
+  const allowedFields = ['name', 'description', 'duration', 'totalMarks', 'status', 'startTime', 'endTime', 'settings', 'examPassword', 'ownerId'];
+  const filteredData = {};
+  
+  Object.keys(updateData).forEach(key => {
+    if (allowedFields.includes(key)) {
+      filteredData[key] = updateData[key];
+    }
+  });
+
+  // Validate ownerId if provided
+  if (filteredData.ownerId && !mongoose.isValidObjectId(filteredData.ownerId)) {
+    throw new Error('Invalid owner ID format');
+  }
+
+  const exam = await Exam.findByIdAndUpdate(
+    examId,
+    { $set: filteredData },
+    { new: true, runValidators: true }
+  )
+    .populate('ownerId', 'name email')
+    .lean();
+
+  if (!exam) {
+    throw new Error('Exam not found');
+  }
+
+  return exam;
+}
+
+/**
+ * Update submission
+ * @param {String} submissionId - Submission ID
+ * @param {Object} updateData - Data to update
+ * @returns {Object} - Updated submission
+ */
+async function updateSubmission(submissionId, updateData) {
+  const allowedFields = ['score', 'percentage', 'status', 'timeSpent', 'submittedAt'];
+  const filteredData = {};
+  
+  Object.keys(updateData).forEach(key => {
+    if (allowedFields.includes(key)) {
+      filteredData[key] = updateData[key];
+    }
+  });
+
+  const submission = await Submission.findByIdAndUpdate(
+    submissionId,
+    { $set: filteredData },
+    { new: true, runValidators: true }
+  )
+    .populate('userId', 'name email')
+    .populate('examId', 'name totalMarks')
+    .lean();
+
+  if (!submission) {
+    throw new Error('Submission not found');
+  }
+
+  return submission;
+}
+
 module.exports = {
   getDashboardStats,
   getUsers,
@@ -769,6 +857,8 @@ module.exports = {
   getQuestionById,
   updateQuestion,
   deleteQuestion,
-  deleteSubmission
+  deleteSubmission,
+  updateExam,
+  updateSubmission
 };
 

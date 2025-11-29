@@ -84,6 +84,9 @@
                                             <a href="/admin/exams/<%= exam._id %>" class="btn btn-sm btn-info" title="View Details">
                                                 <i class="fas fa-eye"></i>
                                             </a>
+                                            <a href="/admin/exams/<%= exam._id %>/edit" class="btn btn-sm btn-primary" title="Edit">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
                                             <button class="btn btn-sm btn-danger" onclick="deleteExam('<%= exam._id %>', '<%= exam.name %>')" title="Delete">
                                                 <i class="fas fa-trash"></i>
                                             </button>
@@ -190,15 +193,15 @@
         })
         .then(data => {
             if (data.ok) {
-                alert('Exam deleted successfully!');
+                showNotification('Exam deleted successfully!', 'success');
                 loadExams();
             } else {
-                alert('Error: ' + (data.message || 'Unknown error'));
+                showNotification('Error: ' + (data.message || 'Unknown error'), 'danger');
             }
         })
         .catch(err => {
             console.error('Error deleting exam:', err);
-            alert('Error: ' + (err.message || 'Failed to delete exam'));
+            showNotification('Error: ' + (err.message || 'Failed to delete exam'), 'danger');
         });
     }
 
