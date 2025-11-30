@@ -99,7 +99,7 @@ async function getExamStatistics(req, res, next) {
 async function getExamLeaderboard(req, res, next) {
   try {
     const { examId } = req.params;
-    const { limit = 50 } = req.query;
+    const { page = 1, limit = 20 } = req.query;
 
     if (!mongoose.isValidObjectId(examId)) {
       return res.status(400).json({ ok: false, message: 'Invalid exam ID format' });
@@ -130,51 +130,54 @@ async function getExamLeaderboard(req, res, next) {
       });
     }
 
-    // Group submissions by userId
+    // Group submissions by userId and get the latest submission for each user
     const userSubmissionsMap = {};
     submissions.forEach(sub => {
       const userId = String(sub.userId._id);
       if (!userSubmissionsMap[userId]) {
-        userSubmissionsMap[userId] = [];
-      }
-      userSubmissionsMap[userId].push(sub);
-    });
-
-    // For each user, select the best submission based on logic:
-    // - If scores are equal: choose the one with lower timeSpent (faster)
-    // - Otherwise: choose the one with higher score
-    const bestSubmissions = [];
-    
-    Object.values(userSubmissionsMap).forEach(userSubs => {
-      let bestSub;
-      if (userSubs.length === 1) {
-        bestSub = userSubs[0];
+        userSubmissionsMap[userId] = sub;
       } else {
-        // Multiple submissions, apply selection logic
-        // Sort by score (descending), then by timeSpent (ascending)
-        userSubs.sort((a, b) => {
-          if (a.score !== b.score) {
-            return b.score - a.score; // Higher score first
+        // Keep the most recent submission (submittedAt is already sorted descending)
+        // If current submission is more recent, replace it
+        const existing = userSubmissionsMap[userId];
+        if (sub.submittedAt && existing.submittedAt) {
+          if (new Date(sub.submittedAt) > new Date(existing.submittedAt)) {
+            userSubmissionsMap[userId] = sub;
           }
-          return (a.timeSpent || 0) - (b.timeSpent || 0); // Lower timeSpent first
-        });
-        bestSub = userSubs[0];
+        } else if (sub.submittedAt && !existing.submittedAt) {
+          userSubmissionsMap[userId] = sub;
+        }
       }
-      bestSubmissions.push(bestSub);
     });
 
-    // Sort all best submissions by score (descending), then by timeSpent (ascending)
-    bestSubmissions.sort((a, b) => {
+    // Convert map to array of latest submissions
+    const latestSubmissions = Object.values(userSubmissionsMap);
+
+    // Sort all latest submissions by score (descending), then by timeSpent (ascending), then by submittedAt (descending)
+    latestSubmissions.sort((a, b) => {
       if (a.score !== b.score) {
         return b.score - a.score; // Higher score first
       }
-      return (a.timeSpent || 0) - (b.timeSpent || 0); // Lower timeSpent first
+      if ((a.timeSpent || 0) !== (b.timeSpent || 0)) {
+        return (a.timeSpent || 0) - (b.timeSpent || 0); // Lower timeSpent first
+      }
+      // If score and timeSpent are equal, sort by submittedAt (most recent first)
+      const aDate = a.submittedAt ? new Date(a.submittedAt) : new Date(0);
+      const bDate = b.submittedAt ? new Date(b.submittedAt) : new Date(0);
+      return bDate - aDate;
     });
 
-    // Apply limit and format leaderboard data with ranks
-    const limitedSubmissions = bestSubmissions.slice(0, parseInt(limit));
-    const leaderboard = limitedSubmissions.map((submission, index) => ({
-      rank: index + 1,
+    // Calculate pagination
+    const total = latestSubmissions.length;
+    const nPage = Number(page) || 1;
+    const nLimit = Number(limit) || 20;
+    const skip = (nPage - 1) * nLimit;
+    const totalPages = Math.max(1, Math.ceil(total / nLimit));
+
+    // Apply pagination
+    const paginatedSubmissions = latestSubmissions.slice(skip, skip + nLimit);
+    const leaderboard = paginatedSubmissions.map((submission, index) => ({
+      rank: skip + index + 1, // Rank based on global position
       student: {
         _id: submission.userId._id,
         name: submission.userId.name,
@@ -191,7 +194,13 @@ async function getExamLeaderboard(req, res, next) {
 
     res.json({
       ok: true,
-      data: leaderboard
+      data: leaderboard,
+      pagination: {
+        total,
+        page: nPage,
+        limit: nLimit,
+        pages: totalPages
+      }
     });
   } catch (error) {
     console.error('Error getting exam leaderboard:', error);
@@ -201,11 +210,18 @@ async function getExamLeaderboard(req, res, next) {
 
 /**
  * Get all submissions for an exam
- * GET /v1/api/exams/:examId/submissions
+ * GET /v1/api/exams/:examId/submissions?all=true&status=graded&search=name (optional)
+ * By default, returns only the most recent submission for each user
+ * If all=true, returns all submissions
+ * Query params:
+ *   - all: if 'true', returns all submissions (default: only most recent per user)
+ *   - status: filter by status (graded, in_progress, late, submitted)
+ *   - search: search by student name (case-insensitive)
  */
 async function getExamSubmissions(req, res, next) {
   try {
     const { examId } = req.params;
+    const { all, status, search, page = 1, limit = 10 } = req.query;
     const user = req.user;
 
     if (!mongoose.isValidObjectId(examId)) {
@@ -225,7 +241,7 @@ async function getExamSubmissions(req, res, next) {
     }
 
     // Get all submissions for this exam
-    const submissions = await Submission.find({ examId })
+    let submissions = await Submission.find({ examId })
       .populate('userId', 'name email profile studentCode')
       .sort({ submittedAt: -1 });
 
@@ -245,16 +261,67 @@ async function getExamSubmissions(req, res, next) {
       
       // Re-fetch submissions to get updated statuses
       // Optimization: We could just update the objects in memory, but re-fetching ensures consistency
-      const updatedSubmissions = await Submission.find({ examId })
+      submissions = await Submission.find({ examId })
         .populate('userId', 'name email profile studentCode')
         .sort({ submittedAt: -1 });
-        
-      // Replace submissions array with updated one
-      submissions.length = 0;
-      submissions.push(...updatedSubmissions);
     }
 
-    const formattedSubmissions = submissions.map(submission => ({
+    // If all=true, return all submissions. Otherwise, return only the most recent submission for each user
+    if (all !== 'true') {
+      // Group submissions by userId and get the most recent one for each user
+      const userSubmissionsMap = {};
+      submissions.forEach(sub => {
+        const userId = String(sub.userId._id);
+        if (!userSubmissionsMap[userId]) {
+          userSubmissionsMap[userId] = sub;
+        } else {
+          // Keep the most recent submission (submittedAt is already sorted descending)
+          // If current submission is more recent, replace it
+          const existing = userSubmissionsMap[userId];
+          if (sub.submittedAt && existing.submittedAt) {
+            if (new Date(sub.submittedAt) > new Date(existing.submittedAt)) {
+              userSubmissionsMap[userId] = sub;
+            }
+          } else if (sub.submittedAt && !existing.submittedAt) {
+            userSubmissionsMap[userId] = sub;
+          }
+        }
+      });
+      
+      // Convert map back to array
+      submissions = Object.values(userSubmissionsMap);
+    }
+
+    // Filter by status if provided
+    if (status) {
+      const validStatuses = ['graded', 'in_progress', 'late', 'submitted'];
+      if (validStatuses.includes(status)) {
+        submissions = submissions.filter(sub => sub.status === status);
+      }
+    }
+
+    // Filter by student name (search) if provided
+    if (search && search.trim()) {
+      const searchTerm = search.trim().toLowerCase();
+      submissions = submissions.filter(sub => {
+        const studentName = sub.userId?.name || '';
+        const studentCode = sub.userId?.studentCode || '';
+        return studentName.toLowerCase().includes(searchTerm) || 
+               studentCode.toLowerCase().includes(searchTerm);
+      });
+    }
+
+    // Calculate pagination
+    const total = submissions.length;
+    const nPage = Number(page) || 1;
+    const nLimit = Number(limit) || 10;
+    const skip = (nPage - 1) * nLimit;
+    const totalPages = Math.max(1, Math.ceil(total / nLimit));
+
+    // Apply pagination
+    const paginatedSubmissions = submissions.slice(skip, skip + nLimit);
+
+    const formattedSubmissions = paginatedSubmissions.map(submission => ({
       _id: submission._id,
       student: {
         _id: submission.userId._id,
@@ -275,7 +342,13 @@ async function getExamSubmissions(req, res, next) {
 
     res.json({
       ok: true,
-      data: formattedSubmissions
+      data: formattedSubmissions,
+      pagination: {
+        total,
+        page: nPage,
+        limit: nLimit,
+        pages: totalPages
+      }
     });
   } catch (error) {
     console.error('Error getting exam submissions:', error);
