@@ -499,7 +499,7 @@ async function getExamLeaderboard({ examId, user }) {
     examId,
     status: { $in: ['graded', 'submitted'] }
   })
-    .populate('userId', 'name email')
+    .populate('userId', 'name email profile')
     .sort({ score: -1, submittedAt: 1 }); // Sort by score descending, then by submittedAt ascending
 
   // Build leaderboard
@@ -508,6 +508,7 @@ async function getExamLeaderboard({ examId, user }) {
     userId: submission.userId._id,
     name: submission.userId.name || 'Unknown',
     email: submission.userId.email,
+    avatar: submission.userId.profile?.avatar || null,
     score: submission.score || 0,
     maxScore: submission.maxScore || exam.totalMarks,
     percentage: submission.percentage || 0,

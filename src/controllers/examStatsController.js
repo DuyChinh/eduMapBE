@@ -120,7 +120,7 @@ async function getExamLeaderboard(req, res, next) {
       examId,
       status: { $in: ['submitted', 'graded', 'late'] }
     })
-      .populate('userId', 'name email avatar studentCode')
+      .populate('userId', 'name email profile studentCode')
       .sort({ submittedAt: -1 });
 
     if (submissions.length === 0) {
@@ -179,7 +179,7 @@ async function getExamLeaderboard(req, res, next) {
         _id: submission.userId._id,
         name: submission.userId.name,
         email: submission.userId.email,
-        avatar: submission.userId.avatar,
+        avatar: submission.userId.profile?.avatar || null,
         studentCode: submission.userId.studentCode
       },
       score: submission.score,
@@ -226,7 +226,7 @@ async function getExamSubmissions(req, res, next) {
 
     // Get all submissions for this exam
     const submissions = await Submission.find({ examId })
-      .populate('userId', 'name email avatar studentCode')
+      .populate('userId', 'name email profile studentCode')
       .sort({ submittedAt: -1 });
 
     // Check for expired in_progress submissions and auto-submit them
@@ -246,7 +246,7 @@ async function getExamSubmissions(req, res, next) {
       // Re-fetch submissions to get updated statuses
       // Optimization: We could just update the objects in memory, but re-fetching ensures consistency
       const updatedSubmissions = await Submission.find({ examId })
-        .populate('userId', 'name email avatar studentCode')
+        .populate('userId', 'name email profile studentCode')
         .sort({ submittedAt: -1 });
         
       // Replace submissions array with updated one
@@ -260,7 +260,7 @@ async function getExamSubmissions(req, res, next) {
         _id: submission.userId._id,
         name: submission.userId.name,
         email: submission.userId.email,
-        avatar: submission.userId.avatar,
+        avatar: submission.userId.profile?.avatar || null,
         studentCode: submission.userId.studentCode
       },
       status: submission.status,
@@ -318,7 +318,7 @@ async function getStudentSubmissionDetail(req, res, next) {
       status: { $in: ['submitted', 'graded', 'late'] }
     })
       .sort({ submittedAt: -1 }) // Get the most recent submitted submission
-      .populate('userId', 'name email avatar studentCode')
+      .populate('userId', 'name email profile studentCode')
       .populate('answers.questionId');
 
     if (!submission) {
@@ -400,7 +400,7 @@ async function getStudentSubmissionDetail(req, res, next) {
           _id: submission.userId._id,
           name: submission.userId.name,
           email: submission.userId.email,
-          avatar: submission.userId.avatar,
+          avatar: submission.userId.profile?.avatar || null,
           studentCode: submission.userId.studentCode
         },
         score: submission.score,
@@ -449,7 +449,7 @@ async function getSubmissionDetailById(req, res, next) {
       _id: submissionId,
       examId
     })
-      .populate('userId', 'name email avatar studentCode')
+      .populate('userId', 'name email profile studentCode')
       .populate('answers.questionId');
 
     if (!submission) {
@@ -531,7 +531,7 @@ async function getSubmissionDetailById(req, res, next) {
           _id: submission.userId._id,
           name: submission.userId.name,
           email: submission.userId.email,
-          avatar: submission.userId.avatar,
+          avatar: submission.userId.profile?.avatar || null,
           studentCode: submission.userId.studentCode
         },
         score: submission.score,
