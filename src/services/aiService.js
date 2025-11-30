@@ -1,5 +1,4 @@
-const axios = require('axios');
-const https = require('https');
+const { GoogleGenAI } = require('@google/genai');
 
 // Initialize Gemini API
 const apiKey = process.env.GEMINI_API_KEY;
@@ -7,62 +6,54 @@ if (!apiKey) {
     console.error("CRITICAL ERROR: GEMINI_API_KEY is missing in .env file");
 }
 
+const client = new GoogleGenAI({ apiKey: apiKey });
+
 const generateResponse = async (prompt, attachments = [], history = []) => {
     try {
-        // Use gemini-2.0-flash (new standard model)
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-
+        // Prepare contents array with history and current message
         let contents = [];
 
-        // Add history first
+        // Add history first (if any)
         if (history && history.length > 0) {
-            contents = [...history];
+            // Convert history format to match new API
+            history.forEach(msg => {
+                contents.push({
+                    role: msg.role,
+                    parts: msg.parts || [{ text: msg.text || '' }]
+                });
+            });
         }
 
-        // Current message parts
+        // Prepare current message parts
         const currentParts = [{ text: prompt }];
 
+        // Add attachments if any
         if (attachments && attachments.length > 0) {
             attachments.forEach(att => {
                 currentParts.push({
-                    inline_data: {
-                        mime_type: att.mimeType,
+                    inlineData: {
+                        mimeType: att.mimeType,
                         data: att.data
                     }
                 });
             });
         }
 
-        // Add current message to contents
+        // Add current user message
         contents.push({
             role: 'user',
             parts: currentParts
         });
 
-        const payload = {
+        // Generate content using new API
+        const response = await client.models.generateContent({
+            model: 'gemini-2.5-flash',
             contents: contents
-        };
-
-        // Force IPv4 to avoid ETIMEDOUT on IPv6
-        const httpsAgent = new https.Agent({ family: 4 });
-
-        const response = await axios.post(url, payload, {
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            httpsAgent: httpsAgent,
-            timeout: 30000 // 30 seconds timeout
         });
 
         // Extract text from response
-        if (response.data &&
-            response.data.candidates &&
-            response.data.candidates.length > 0 &&
-            response.data.candidates[0].content &&
-            response.data.candidates[0].content.parts &&
-            response.data.candidates[0].content.parts.length > 0) {
-
-            return response.data.candidates[0].content.parts[0].text;
+        if (response && response.text) {
+            return response.text;
         }
 
         return "I didn't get a response from the AI.";
