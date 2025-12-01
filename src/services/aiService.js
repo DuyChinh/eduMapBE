@@ -1,6 +1,8 @@
 const { GoogleGenAI } = require('@google/genai');
 
 // Initialize Gemini API
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
     console.error("CRITICAL ERROR: GEMINI_API_KEY is missing in .env file");
@@ -45,18 +47,42 @@ const generateResponse = async (prompt, attachments = [], history = []) => {
             parts: currentParts
         });
 
-        // Generate content using new API
-        const response = await client.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: contents
-        });
+        // Retry logic
+        let attempt = 0;
+        const maxRetries = 3;
 
-        // Extract text from response
-        if (response && response.text) {
-            return response.text;
+        while (attempt < maxRetries) {
+            try {
+                // Generate content using new API
+                const response = await client.models.generateContent({
+                    model: 'gemini-2.5-flash',
+                    contents: contents
+                });
+
+                // Extract text from response
+                if (response && response.text) {
+                    return response.text;
+                }
+
+                return "I didn't get a response from the AI.";
+
+            } catch (error) {
+                const isRateLimit = error.status === 429 || 
+                                  (error.message && error.message.includes("429")) ||
+                                  (error.message && error.message.includes("RESOURCE_EXHAUSTED"));
+                
+                attempt++;
+                
+                if (isRateLimit && attempt < maxRetries) {
+                    const waitTime = 2000 * Math.pow(2, attempt - 1);
+                    console.warn(`[Lần ${attempt}] Gặp lỗi 429 (Rate Limit). Chờ ${waitTime/1000}s...`);
+                    await sleep(waitTime);
+                    continue;
+                }
+                
+                throw error;
+            }
         }
-
-        return "I didn't get a response from the AI.";
 
     } catch (error) {
         console.error("Error generating AI response:", error.message);
