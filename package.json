@@ -15,7 +15,7 @@
     "db:reset": "npm run migrate:down && npm run migrate:up && npm run seed"
   },
   "dependencies": {
-    "@google/genai": "^1.30.0",
+    "@google/genai": "^1.0.0",
     "axios": "^1.7.9",
     "bcryptjs": "^3.0.2",
     "cloudinary": "^1.41.0",
