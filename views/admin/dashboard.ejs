@@ -1,0 +1,217 @@
+<%- include('../partials/header', { title: 'Dashboard', currentPage: 'dashboard', user: user }) %>
+
+<div class="dashboard">
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon users">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="stat-info">
+                <h3><%= stats.users.total || 0 %></h3>
+                <p>Total Users</p>
+                <div class="stat-detail">
+                    <span class="badge teacher"><%= stats.users.teachers || 0 %> Teachers</span>
+                    <span class="badge student"><%= stats.users.students || 0 %> Students</span>
+                    <span class="badge admin"><%= stats.users.admins || 0 %> Admins</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon organizations">
+                <i class="fas fa-building"></i>
+            </div>
+            <div class="stat-info">
+                <h3><%= stats.organizations.total || 0 %></h3>
+                <p>Organizations</p>
+                <div class="stat-detail">
+                    <span class="badge recent">+<%= stats.organizations.recent || 0 %> new</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon exams">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <div class="stat-info">
+                <h3><%= stats.exams.total || 0 %></h3>
+                <p>Exams</p>
+                <div class="stat-detail">
+                    <span class="badge published"><%= stats.exams.published || 0 %> Published</span>
+                    <span class="badge draft"><%= stats.exams.draft || 0 %> Draft</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon submissions">
+                <i class="fas fa-clipboard-check"></i>
+            </div>
+            <div class="stat-info">
+                <h3><%= stats.submissions.total || 0 %></h3>
+                <p>Submissions</p>
+                <div class="stat-detail">
+                    <span class="badge completed"><%= stats.submissions.completed || 0 %> Completed</span>
+                    <span class="badge avg-score">Avg Score: <%= stats.submissions.averageScore || 0 %></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon classes">
+                <i class="fas fa-chalkboard-teacher"></i>
+            </div>
+            <div class="stat-info">
+                <h3><%= stats.classes.total || 0 %></h3>
+                <p>Classes</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon questions">
+                <i class="fas fa-question-circle"></i>
+            </div>
+            <div class="stat-info">
+                <h3><%= stats.questions.total || 0 %></h3>
+                <p>Questions</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">User Status</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="userStatusChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Exam Status</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="examStatusChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Recent Activity (Last 7 Days)</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="stat-icon users me-3">
+                            <i class="fas fa-user-plus"></i>
+                        </div>
+                        <div>
+                            <strong>+<%= stats.users.recent || 0 %> New Users</strong>
+                            <p class="text-muted mb-0">Registered in the last 7 days</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="stat-icon exams me-3">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <div>
+                            <strong>+<%= stats.exams.recent || 0 %> New Exams</strong>
+                            <p class="text-muted mb-0">Created in the last 7 days</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="stat-icon submissions me-3">
+                            <i class="fas fa-clipboard-check"></i>
+                        </div>
+                        <div>
+                            <strong>+<%= stats.submissions.recent || 0 %> Submissions</strong>
+                            <p class="text-muted mb-0">Submitted in the last 7 days</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // User Status Chart
+    const userStatusCtx = document.getElementById('userStatusChart');
+    if (userStatusCtx) {
+        const activeUsers = <%= stats.users.active || 0 %>;
+        const suspendedUsers = <%= stats.users.suspended || 0 %>;
+        
+        new Chart(userStatusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Active', 'Suspended'],
+                datasets: [{
+                    data: [activeUsers, suspendedUsers],
+                    backgroundColor: ['#10b981', '#ef4444']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+
+    // Exam Status Chart
+    const examStatusCtx = document.getElementById('examStatusChart');
+    if (examStatusCtx) {
+        const publishedExams = <%= stats.exams.published || 0 %>;
+        const draftExams = <%= stats.exams.draft || 0 %>;
+        
+        new Chart(examStatusCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Published', 'Draft'],
+                datasets: [{
+                    label: 'Count',
+                    data: [publishedExams, draftExams],
+                    backgroundColor: ['#3b82f6', '#f59e0b']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                }
+            }
+        });
+    }
+</script>
+
+<%- include('../partials/footer') %>

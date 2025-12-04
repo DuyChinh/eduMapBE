@@ -1,0 +1,195 @@
+<%- include('../partials/header', { title: 'Classes Management', currentPage: 'classes', user: user }) %>
+
+<div class="classes-page">
+    <div class="page-header mb-3">
+        <div class="page-actions">
+            <button class="btn btn-primary" onclick="refreshClasses()">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Filters</h5>
+        </div>
+        <div class="card-body">
+            <form id="filterForm" onsubmit="filterClasses(event)">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Search</label>
+                        <input type="text" name="search" id="searchFilter" class="form-control" placeholder="Name or code...">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="clearFilters()">
+                            <i class="fas fa-times"></i> Clear
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Classes Table -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Classes List (<span id="totalClasses"><%= classes.length || 0 %></span>)</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Code</th>
+                            <th>Organization</th>
+                            <th>Teacher</th>
+                            <th>Students</th>
+                            <th>Created At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (classes && classes.length > 0) { %>
+                            <% classes.forEach(classDoc => { %>
+                                <tr>
+                                    <td><code><%= classDoc._id.toString().substring(0, 8) %>...</code></td>
+                                    <td><%= classDoc.name %></td>
+                                    <td><code><%= classDoc.code %></code></td>
+                                    <td><%= classDoc.orgId ? (classDoc.orgId.name || 'N/A') : 'N/A' %></td>
+                                    <td><%= classDoc.teacherId ? (classDoc.teacherId.name || 'N/A') : 'N/A' %></td>
+                                    <td><%= classDoc.studentIds ? classDoc.studentIds.length : 0 %></td>
+                                    <td><%= new Date(classDoc.createdAt).toLocaleDateString('en-US') %></td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="/admin/classes/<%= classDoc._id %>" class="btn btn-sm btn-info" title="View Details">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="/admin/classes/<%= classDoc._id %>/edit" class="btn btn-sm btn-primary" title="Edit">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <button class="btn btn-sm btn-danger" onclick="deleteClass('<%= classDoc._id %>', '<%= classDoc.name %>')" title="Delete">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        <% } else { %>
+                            <tr>
+                                <td colspan="8" class="text-center">No data available</td>
+                            </tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Bootstrap Pagination -->
+            <% if (pagination && pagination.pages > 1) { %>
+                <nav aria-label="Page navigation" class="mt-3">
+                    <ul class="pagination justify-content-center">
+                        <% if (pagination.page > 1) { %>
+                            <li class="page-item">
+                                <a class="page-link" href="javascript:void(0)" onclick="goToPage(<%= pagination.page - 1 %>)">
+                                    <i class="fas fa-chevron-left"></i> Previous
+                                </a>
+                            </li>
+                        <% } %>
+                        <% 
+                            let startPage = Math.max(1, pagination.page - 2);
+                            let endPage = Math.min(pagination.pages, pagination.page + 2);
+                            for (let i = startPage; i <= endPage; i++) { 
+                        %>
+                            <li class="page-item <%= i === pagination.page ? 'active' : '' %>">
+                                <a class="page-link" href="javascript:void(0)" onclick="goToPage(<%= i %>)"><%= i %></a>
+                            </li>
+                        <% } %>
+                        <% if (pagination.page < pagination.pages) { %>
+                            <li class="page-item">
+                                <a class="page-link" href="javascript:void(0)" onclick="goToPage(<%= pagination.page + 1 %>)">
+                                    Next <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </li>
+                        <% } %>
+                    </ul>
+                </nav>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentPage = <%= pagination?.page || 1 %>;
+    let currentFilters = {};
+
+    function filterClasses(e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        currentFilters = {
+            search: formData.get('search') || ''
+        };
+        currentPage = 1;
+        loadClasses();
+    }
+
+    function clearFilters() {
+        document.getElementById('searchFilter').value = '';
+        currentFilters = {};
+        currentPage = 1;
+        loadClasses();
+    }
+
+    function goToPage(page) {
+        currentPage = page;
+        loadClasses();
+    }
+
+    function loadClasses() {
+        const params = new URLSearchParams({ page: currentPage, ...currentFilters });
+        window.location.href = `/admin/classes?${params.toString()}`;
+    }
+
+    function refreshClasses() {
+        loadClasses();
+    }
+
+    function deleteClass(classId, className) {
+        if (!confirm(`Are you sure you want to delete class "${className}"?`)) return;
+        fetch(`/v1/api/admin/classes/${classId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.ok) {
+                showNotification('Class deleted successfully!', 'success');
+                setTimeout(() => {
+                    loadClasses();
+                }, 800);
+            } else {
+                showNotification('Error: ' + data.message, 'danger');
+            }
+        })
+        .catch(err => {
+            console.error('Error deleting class:', err);
+            showNotification('Error deleting class', 'danger');
+        });
+    }
+
+    function getToken() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'admin_token') return value;
+        }
+        return '';
+    }
+</script>
+
+<%- include('../partials/footer') %>
+

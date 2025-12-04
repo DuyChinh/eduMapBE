@@ -26,6 +26,10 @@ const configureRoutes = (app) => {
     v1.use('/reports', reportRoutes);
     v1.use('/exam-results', examResultsRoutes);
     v1.use('/ai', aiRoutes);
+    
+    // Admin API routes
+    const adminRoutes = require('./admin');
+    v1.use('/admin', adminRoutes);
 
     v1.use((req, res) => {
         res.status(404).json({

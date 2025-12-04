@@ -1,24 +1,26 @@
 {
   "name": "express-app",
   "version": "1.0.0",
-  "description": "A simple Express application",
+  "description": "",
   "main": "src/app.js",
   "scripts": {
     "start": "nodemon src/app.js",
+    "dev": "nodemon src/app.js",
     "test": "jest",
+    "migrate:create": "migrate-mongo create",
     "migrate:up": "migrate-mongo up",
     "migrate:down": "migrate-mongo down",
     "migrate:status": "migrate-mongo status",
-    "migrate:create": "migrate-mongo create",
     "seed": "node src/scripts/seed.js",
-    "seed:clear": "node src/scripts/seed.js --clear",
-    "db:reset": "npm run migrate:down && npm run migrate:up && npm run seed"
+    "seed:clean": "node src/scripts/seed.js --clean"
   },
   "dependencies": {
+    "@google/genai": "^1.0.0",
     "@google/generative-ai": "^0.24.1",
-    "axios": "^1.11.0",
+    "axios": "^1.7.9",
     "bcryptjs": "^3.0.2",
     "cloudinary": "^2.8.0",
+    "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
     "dotenv": "^10.0.0",

@@ -1,0 +1,296 @@
+<%- include('../partials/header', { title: 'Analytics', currentPage: 'analytics', user: user }) %>
+
+<div class="analytics-page">
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">System Analytics</h5>
+        </div>
+        <div class="card-body">
+            <form id="dateFilterForm" onsubmit="filterByDate(event)">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label">Start Date</label>
+                        <input type="date" id="startDate" name="startDate" class="form-control" value="<%= startDate || '' %>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">End Date</label>
+                        <input type="date" id="endDate" name="endDate" class="form-control" value="<%= endDate || '' %>">
+                    </div>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-filter"></i> Filter
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-12 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">User Growth</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="userGrowthChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-12 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Exam Creation</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="examGrowthChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-12 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Submission Activity</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="submissionActivityChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Users by Role</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="usersByRoleChart" style="max-height: 250px;"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Exams by Status</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="examsByStatusChart" style="max-height: 250px;"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Submissions by Status</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="submissionsByStatusChart" style="max-height: 250px;"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Organizations by Plan</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="orgsByPlanChart" style="max-height: 250px;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const analytics = <%- JSON.stringify(analytics || {}) %>;
+
+    // User Growth Chart
+    const userGrowthCtx = document.getElementById('userGrowthChart');
+    if (userGrowthCtx && analytics.userGrowth && analytics.userGrowth.length > 0) {
+        new Chart(userGrowthCtx, {
+            type: 'line',
+            data: {
+                labels: analytics.userGrowth.map(item => item._id || 'Unknown'),
+                datasets: [{
+                    label: 'New Users',
+                    data: analytics.userGrowth.map(item => item.count || 0),
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    } else if (userGrowthCtx) {
+        userGrowthCtx.parentElement.innerHTML = '<p class="text-muted text-center p-4">No data available</p>';
+    }
+
+    // Exam Growth Chart
+    const examGrowthCtx = document.getElementById('examGrowthChart');
+    if (examGrowthCtx && analytics.examGrowth && analytics.examGrowth.length > 0) {
+        new Chart(examGrowthCtx, {
+            type: 'line',
+            data: {
+                labels: analytics.examGrowth.map(item => item._id || 'Unknown'),
+                datasets: [{
+                    label: 'New Exams',
+                    data: analytics.examGrowth.map(item => item.count || 0),
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    } else if (examGrowthCtx) {
+        examGrowthCtx.parentElement.innerHTML = '<p class="text-muted text-center p-4">No data available</p>';
+    }
+
+    // Submission Activity Chart
+    const submissionCtx = document.getElementById('submissionActivityChart');
+    if (submissionCtx && analytics.submissionActivity && analytics.submissionActivity.length > 0) {
+        new Chart(submissionCtx, {
+            type: 'bar',
+            data: {
+                labels: analytics.submissionActivity.map(item => item._id || 'Unknown'),
+                datasets: [{
+                    label: 'Submissions',
+                    data: analytics.submissionActivity.map(item => item.count || 0),
+                    backgroundColor: '#f59e0b'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    } else if (submissionCtx) {
+        submissionCtx.parentElement.innerHTML = '<p class="text-muted text-center p-4">No data available</p>';
+    }
+
+    // Users by Role
+    const usersByRoleCtx = document.getElementById('usersByRoleChart');
+    if (usersByRoleCtx && analytics.usersByRole && analytics.usersByRole.length > 0) {
+        new Chart(usersByRoleCtx, {
+            type: 'doughnut',
+            data: {
+                labels: analytics.usersByRole.map(item => item._id || 'Unknown'),
+                datasets: [{
+                    data: analytics.usersByRole.map(item => item.count || 0),
+                    backgroundColor: ['#3b82f6', '#10b981', '#f59e0b']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    } else if (usersByRoleCtx) {
+        usersByRoleCtx.parentElement.innerHTML = '<p class="text-muted text-center p-4">No data available</p>';
+    }
+
+    // Exams by Status
+    const examsByStatusCtx = document.getElementById('examsByStatusChart');
+    if (examsByStatusCtx && analytics.examsByStatus && analytics.examsByStatus.length > 0) {
+        new Chart(examsByStatusCtx, {
+            type: 'pie',
+            data: {
+                labels: analytics.examsByStatus.map(item => item._id || 'Unknown'),
+                datasets: [{
+                    data: analytics.examsByStatus.map(item => item.count || 0),
+                    backgroundColor: ['#10b981', '#f59e0b', '#ef4444']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    } else if (examsByStatusCtx) {
+        examsByStatusCtx.parentElement.innerHTML = '<p class="text-muted text-center p-4">No data available</p>';
+    }
+
+    // Submissions by Status
+    const submissionsByStatusCtx = document.getElementById('submissionsByStatusChart');
+    if (submissionsByStatusCtx && analytics.submissionsByStatus && analytics.submissionsByStatus.length > 0) {
+        new Chart(submissionsByStatusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: analytics.submissionsByStatus.map(item => item._id || 'Unknown'),
+                datasets: [{
+                    data: analytics.submissionsByStatus.map(item => item.count || 0),
+                    backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    } else if (submissionsByStatusCtx) {
+        submissionsByStatusCtx.parentElement.innerHTML = '<p class="text-muted text-center p-4">No data available</p>';
+    }
+
+    // Organizations by Plan
+    const orgsByPlanCtx = document.getElementById('orgsByPlanChart');
+    if (orgsByPlanCtx && analytics.organizationsByPlan && analytics.organizationsByPlan.length > 0) {
+        new Chart(orgsByPlanCtx, {
+            type: 'bar',
+            data: {
+                labels: analytics.organizationsByPlan.map(item => item._id || 'Unknown'),
+                datasets: [{
+                    label: 'Count',
+                    data: analytics.organizationsByPlan.map(item => item.count || 0),
+                    backgroundColor: ['#6b7280', '#3b82f6', '#8b5cf6']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    } else if (orgsByPlanCtx) {
+        orgsByPlanCtx.parentElement.innerHTML = '<p class="text-muted text-center p-4">No data available</p>';
+    }
+
+    function filterByDate(e) {
+        e.preventDefault();
+        const startDate = document.getElementById('startDate').value;
+        const endDate = document.getElementById('endDate').value;
+        const params = new URLSearchParams();
+        if (startDate) params.append('startDate', startDate);
+        if (endDate) params.append('endDate', endDate);
+        window.location.href = `/admin/analytics?${params.toString()}`;
+    }
+</script>
+
+<%- include('../partials/footer') %>
