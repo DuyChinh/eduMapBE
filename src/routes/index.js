@@ -28,9 +28,9 @@ const configureRoutes = (app) => {
     v1.use('/chatbot', chatbotRoutes);
 
     v1.use((req, res) => {
-    res.status(404).json({
-        message: 'API endpoint not found'
-    });
+        res.status(404).json({
+            message: 'API endpoint not found'
+        });
     });
 };
 
