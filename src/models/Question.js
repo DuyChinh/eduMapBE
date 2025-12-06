@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 
 const ChoiceSchema = new mongoose.Schema({
   key: { type: String, required: true },
-  text: { type: String, required: true }
+  text: { type: String, required: true },
+  image: { type: String }
 }, { _id: false });
 
 const QuestionSchema = new mongoose.Schema({
@@ -51,6 +52,9 @@ const QuestionSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  images: [{
+    type: String
+  }],
   tags: [{
     type: String
   }],

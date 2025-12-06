@@ -1,24 +1,24 @@
 const mongoose = require('mongoose');
 
 const ExamQuestionSchema = new mongoose.Schema({
-  questionId: { 
-    type: mongoose.Schema.Types.ObjectId, 
+  questionId: {
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'Question',
-    required: true 
+    required: true
   },
-  order: { 
-    type: Number, 
+  order: {
+    type: Number,
     required: true,
     min: 1
   },
-  marks: { 
-    type: Number, 
+  marks: {
+    type: Number,
     default: 1,
     min: 0
   },
-  isRequired: { 
-    type: Boolean, 
-    default: true 
+  isRequired: {
+    type: Boolean,
+    default: true
   }
 }, { _id: false });
 
@@ -43,7 +43,7 @@ const ExamSchema = new mongoose.Schema({
     min: 0
   },
   questions: [ExamQuestionSchema],
-  
+
   // Scheduling
   startTime: {
     type: Date,
@@ -53,7 +53,7 @@ const ExamSchema = new mongoose.Schema({
   endTime: {
     type: Date,
     required: false,
-    default: function() {
+    default: function () {
       const now = new Date();
       now.setDate(now.getDate() + 3); // +3 days
       return now;
@@ -63,7 +63,7 @@ const ExamSchema = new mongoose.Schema({
     type: String,
     default: 'Asia/Ho_Chi_Minh'
   },
-  
+
   // Subject
   subjectId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -77,7 +77,7 @@ const ExamSchema = new mongoose.Schema({
     uppercase: true,
     required: false
   },
-  
+
   // Grade
   gradeId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -85,7 +85,7 @@ const ExamSchema = new mongoose.Schema({
     required: false,
     index: true
   },
-  
+
   // Exam Purpose
   examPurpose: {
     type: String,
@@ -93,7 +93,7 @@ const ExamSchema = new mongoose.Schema({
     default: 'exam',
     required: false
   },
-  
+
   // Access Control
   isAllowUser: {
     type: String,
@@ -101,14 +101,14 @@ const ExamSchema = new mongoose.Schema({
     required: true,
     default: 'everyone'
   },
-  
+
   // Allowed Class IDs (when isAllowUser is 'class')
   allowedClassIds: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Class',
     required: false
   }],
-  
+
   // Availability Window
   availableFrom: {
     type: Date,
@@ -120,14 +120,14 @@ const ExamSchema = new mongoose.Schema({
     required: false,
     default: null
   },
-  
+
   // Fee
   fee: {
     type: Number,
     default: 0,
     min: 0
   },
-  
+
   // Exam Password
   examPassword: {
     type: String,
@@ -135,7 +135,7 @@ const ExamSchema = new mongoose.Schema({
     required: false,
     default: ''
   },
-  
+
   // Max Attempts
   maxAttempts: {
     type: Number,
@@ -143,7 +143,7 @@ const ExamSchema = new mongoose.Schema({
     min: 1,
     default: 1
   },
-  
+
   // View Mark (when to show score)
   viewMark: {
     type: Number,
@@ -151,7 +151,7 @@ const ExamSchema = new mongoose.Schema({
     required: true,
     default: 1
   },
-  
+
   // View Exam and Answer (when to show exam and answers)
   viewExamAndAnswer: {
     type: Number,
@@ -159,7 +159,7 @@ const ExamSchema = new mongoose.Schema({
     required: true,
     default: 1
   },
-  
+
   // Security & Monitoring
   autoMonitoring: {
     type: String,
@@ -174,7 +174,7 @@ const ExamSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  
+
   // Display Settings
   hideGroupTitles: {
     type: Boolean,
@@ -202,7 +202,7 @@ const ExamSchema = new mongoose.Schema({
     trim: true,
     default: ''
   },
-  
+
   // Ownership
   ownerId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -217,7 +217,7 @@ const ExamSchema = new mongoose.Schema({
     allowReview: { type: Boolean, default: true },
     showCorrectAnswer: { type: Boolean, default: false },
     timeLimit: { type: Boolean, default: true },
-    
+
     // Shuffle settings (moved to main level for easier access)
     shuffleQuestions: { type: Boolean, default: false },
     shuffleChoices: { type: Boolean, default: false },
@@ -289,7 +289,7 @@ const ExamSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-  
+
   // Share code for published exams
   shareCode: {
     type: String,
@@ -299,7 +299,7 @@ const ExamSchema = new mongoose.Schema({
     sparse: true, // Allow multiple null values
     index: true
   },
-  
+
   // Statistics
   stats: {
     totalAttempts: { type: Number, default: 0 },
@@ -311,7 +311,7 @@ const ExamSchema = new mongoose.Schema({
 });
 
 // Indexes
-ExamSchema.index({ ownerId: 1 });
+
 ExamSchema.index({ status: 1 });
 ExamSchema.index({ isActive: 1 });
 ExamSchema.index({ 'questions.questionId': 1 });
@@ -327,42 +327,42 @@ ExamSchema.index({ viewExamAndAnswer: 1 });
 ExamSchema.index({ maxAttempts: 1 });
 
 // Virtual for question count
-ExamSchema.virtual('questionCount').get(function() {
+ExamSchema.virtual('questionCount').get(function () {
   return this.questions.length;
 });
 
 // Pre-save validation
-ExamSchema.pre('save', function(next) {
+ExamSchema.pre('save', function (next) {
   // Validate scheduling
   if (this.startTime && this.endTime) {
     if (this.startTime >= this.endTime) {
       return next(new Error('Start time must be before end time'));
     }
-    
+
     // Check if duration matches the time range
     const timeDiffMinutes = (this.endTime - this.startTime) / (1000 * 60);
     if (timeDiffMinutes < this.duration) {
       return next(new Error('Exam duration cannot exceed the time range'));
     }
   }
-  
+
   // Validate availability window
   if (this.availableFrom && this.availableUntil) {
     if (this.availableFrom >= this.availableUntil) {
       return next(new Error('Available from time must be before available until time'));
     }
   }
-  
+
   // Validate name is not empty after trim
   if (!this.name || this.name.trim().length === 0) {
     return next(new Error('Exam name cannot be empty'));
   }
-  
+
   next();
 });
 
 // Instance methods
-ExamSchema.methods.addQuestion = function(questionId, options = {}) {
+ExamSchema.methods.addQuestion = function (questionId, options = {}) {
   const maxOrder = Math.max(...this.questions.map(q => q.order), 0);
   this.questions.push({
     questionId,
@@ -373,12 +373,12 @@ ExamSchema.methods.addQuestion = function(questionId, options = {}) {
   return this.save();
 };
 
-ExamSchema.methods.removeQuestion = function(questionId) {
+ExamSchema.methods.removeQuestion = function (questionId) {
   this.questions = this.questions.filter(q => !q.questionId.equals(questionId));
   return this.save();
 };
 
-ExamSchema.methods.reorderQuestions = function() {
+ExamSchema.methods.reorderQuestions = function () {
   this.questions.forEach((question, index) => {
     question.order = index + 1;
   });
