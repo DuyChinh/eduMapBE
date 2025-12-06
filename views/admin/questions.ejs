@@ -1,0 +1,146 @@
+<%- include('../partials/header', { title: title, currentPage: 'questions', user: user }) %>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Questions Management</h2>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Questions List (<span><%= questions.length || 0 %></span>)</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Owner</th>
+                            <th>Subject</th>
+                            <th>Level</th>
+                            <th>Is Public</th>
+                            <th>Created At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (questions && questions.length > 0) { %>
+                            <% questions.forEach(question => { %>
+                                <tr>
+                                    <td><code><%= question._id.toString().substring(0, 8) %>...</code></td>
+                                    <td><%= question.name || 'N/A' %></td>
+                                    <td>
+                                        <span class="badge bg-info"><%= question.type || 'mcq' %></span>
+                                    </td>
+                                    <td><%= question.ownerId ? (question.ownerId.name || question.ownerId.email || 'N/A') : 'N/A' %></td>
+                                    <td><%= question.subjectId ? (question.subjectId.name || question.subjectId.code || 'N/A') : 'N/A' %></td>
+                                    <td><%= question.level || 'N/A' %></td>
+                                    <td>
+                                        <span class="badge bg-<%= question.isPublic ? 'success' : 'secondary' %>">
+                                            <%= question.isPublic ? 'Yes' : 'No' %>
+                                        </span>
+                                    </td>
+                                    <td><%= new Date(question.createdAt).toLocaleDateString('en-US') %></td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="/admin/questions/<%= question._id %>" class="btn btn-sm btn-info" title="View Details">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="/admin/questions/<%= question._id %>/edit" class="btn btn-sm btn-primary" title="Edit">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <button class="btn btn-sm btn-danger" onclick="deleteQuestion('<%= question._id %>', '<%= question.name || 'Question' %>')" title="Delete">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        <% } else { %>
+                            <tr>
+                                <td colspan="9" class="text-center">No data available</td>
+                            </tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <% if (pagination && pagination.pages > 1) { %>
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center">
+                <% if (pagination.page > 1) { %>
+                    <li class="page-item">
+                        <a class="page-link" href="?page=<%= pagination.page - 1 %>">
+                            <i class="fas fa-chevron-left"></i> Previous
+                        </a>
+                    </li>
+                <% } %>
+                <% 
+                    let startPage = Math.max(1, pagination.page - 2);
+                    let endPage = Math.min(pagination.pages, pagination.page + 2);
+                    for (let i = startPage; i <= endPage; i++) { 
+                %>
+                    <li class="page-item <%= i === pagination.page ? 'active' : '' %>">
+                        <a class="page-link" href="?page=<%= i %>"><%= i %></a>
+                    </li>
+                <% } %>
+                <% if (pagination.page < pagination.pages) { %>
+                    <li class="page-item">
+                        <a class="page-link" href="?page=<%= pagination.page + 1 %>">
+                            Next <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                <% } %>
+            </ul>
+        </nav>
+    <% } %>
+</div>
+
+<script>
+    function deleteQuestion(questionId, questionName) {
+        if (!confirm(`Are you sure you want to delete question "${questionName}"? This action cannot be undone.`)) {
+            return;
+        }
+
+        fetch(`/v1/api/admin/questions/${questionId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`
+            }
+        })
+        .then(res => {
+            if (!res.ok) {
+                return res.json().then(err => Promise.reject(err));
+            }
+            return res.json();
+        })
+        .then(data => {
+            if (data.ok) {
+                alert('Question deleted successfully!');
+                window.location.reload();
+            } else {
+                alert('Error: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(err => {
+            console.error('Error deleting question:', err);
+            alert('Error: ' + (err.message || 'Failed to delete question'));
+        });
+    }
+
+    function getToken() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'admin_token') return value;
+        }
+        return '';
+    }
+</script>
+
+<%- include('../partials/footer') %>
+

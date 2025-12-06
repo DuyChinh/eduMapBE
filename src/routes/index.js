@@ -30,6 +30,10 @@ const configureRoutes = (app) => {
     v1.use('/ai', aiRoutes);
     v1.use('/mindmaps', mindmapRoutes);
     v1.use('/upload', uploadRoutes);
+    
+    // Admin API routes
+    const adminRoutes = require('./admin');
+    v1.use('/admin', adminRoutes);
 
     v1.use((req, res) => {
         res.status(404).json({

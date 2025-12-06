@@ -1,0 +1,166 @@
+<%- include('../partials/header', { title: title, currentPage: 'proctor-logs', user: user }) %>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Proctor Log Details</h2>
+        <div>
+            <button class="btn btn-danger me-2" onclick="deleteLog('<%= log._id %>')">
+                <i class="fas fa-trash"></i> Delete
+            </button>
+            <a href="/admin/proctor-logs" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Proctor Logs
+            </a>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Log Information</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <strong>ID:</strong><br>
+                    <code><%= log._id %></code>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Event:</strong><br>
+                    <span class="badge bg-info">
+                        <%= log.event || 'N/A' %>
+                    </span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Severity:</strong><br>
+                    <span class="badge bg-<%= log.severity === 'critical' ? 'danger' : log.severity === 'high' ? 'warning' : log.severity === 'medium' ? 'info' : 'secondary' %>">
+                        <%= log.severity ? log.severity.charAt(0).toUpperCase() + log.severity.slice(1) : 'Low' %>
+                    </span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Timestamp:</strong><br>
+                    <%= new Date(log.ts || log.createdAt).toLocaleString('en-US') %>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>User:</strong><br>
+                    <%= log.userId ? (log.userId.name || 'N/A') : 'N/A' %>
+                    <% if (log.userId && log.userId.email) { %>
+                        <br><small class="text-muted"><%= log.userId.email %></small>
+                        <% if (log.userId.role) { %>
+                            <br><span class="badge bg-secondary"><%= log.userId.role %></span>
+                        <% } %>
+                    <% } %>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Submission:</strong><br>
+                    <% if (log.submissionId) { %>
+                        <code><%= log.submissionId._id ? log.submissionId._id.toString() : 'N/A' %></code>
+                        <% if (log.submissionId.status) { %>
+                            <br><span class="badge bg-info"><%= log.submissionId.status %></span>
+                        <% } %>
+                    <% } else { %>
+                        N/A
+                    <% } %>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Organization:</strong><br>
+                    <%= log.orgId ? (log.orgId.name || 'N/A') : 'N/A' %>
+                    <% if (log.orgId && log.orgId.domain) { %>
+                        <br><small class="text-muted"><%= log.orgId.domain %></small>
+                    <% } %>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Created At:</strong><br>
+                    <%= new Date(log.createdAt).toLocaleString('en-US') %>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metadata -->
+    <% if (log.meta) { %>
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Metadata</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <% if (log.meta.visible !== undefined) { %>
+                <div class="col-md-6 mb-3">
+                    <strong>Visible:</strong><br>
+                    <span class="badge bg-<%= log.meta.visible ? 'success' : 'secondary' %>">
+                        <%= log.meta.visible ? 'Yes' : 'No' %>
+                    </span>
+                </div>
+                <% } %>
+                <% if (log.meta.reason) { %>
+                <div class="col-md-6 mb-3">
+                    <strong>Reason:</strong><br>
+                    <%= log.meta.reason %>
+                </div>
+                <% } %>
+                <% if (log.meta.url) { %>
+                <div class="col-md-12 mb-3">
+                    <strong>URL:</strong><br>
+                    <a href="<%= log.meta.url %>" target="_blank"><%= log.meta.url %></a>
+                </div>
+                <% } %>
+                <% if (log.meta.userAgent) { %>
+                <div class="col-md-12 mb-3">
+                    <strong>User Agent:</strong><br>
+                    <code><%= log.meta.userAgent %></code>
+                </div>
+                <% } %>
+                <% if (log.meta.ip) { %>
+                <div class="col-md-6 mb-3">
+                    <strong>IP Address:</strong><br>
+                    <code><%= log.meta.ip %></code>
+                </div>
+                <% } %>
+                <% if (log.meta.coordinates && (log.meta.coordinates.x !== undefined || log.meta.coordinates.y !== undefined)) { %>
+                <div class="col-md-6 mb-3">
+                    <strong>Coordinates:</strong><br>
+                    X: <%= log.meta.coordinates.x || 'N/A' %>, Y: <%= log.meta.coordinates.y || 'N/A' %>
+                </div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+    <% } %>
+</div>
+
+<script>
+    function deleteLog(logId) {
+        if (!confirm('Are you sure you want to delete this proctor log?')) return;
+        fetch(`/v1/api/admin/proctor-logs/${logId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.ok) {
+                showNotification('Proctor log deleted successfully!', 'success');
+                setTimeout(() => {
+                    window.location.href = '/admin/proctor-logs';
+                }, 800);
+            } else {
+                showNotification('Error: ' + data.message, 'danger');
+            }
+        })
+        .catch(err => {
+            console.error('Error deleting proctor log:', err);
+            showNotification('Error deleting proctor log', 'danger');
+        });
+    }
+
+    function getToken() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'admin_token') return value;
+        }
+        return '';
+    }
+</script>
+
+<%- include('../partials/footer') %>
+
+

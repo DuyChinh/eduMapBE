@@ -1,0 +1,156 @@
+<%- include('../partials/header', { title: title, currentPage: 'exams', user: user }) %>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Edit Exam</h2>
+        <a href="/admin/exams" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Exams
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Exam Information</h5>
+        </div>
+        <div class="card-body">
+            <form id="editExamForm" onsubmit="saveExam(event)">
+                <input type="hidden" id="editExamId" value="<%= exam._id %>">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Name</label>
+                        <input type="text" id="editExamName" class="form-control" value="<%= exam.name || '' %>" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Status</label>
+                        <select id="editExamStatus" class="form-select" required>
+                            <option value="draft" <%= exam.status === 'draft' ? 'selected' : '' %>>Draft</option>
+                            <option value="published" <%= exam.status === 'published' ? 'selected' : '' %>>Published</option>
+                        </select>
+                    </div>
+                    <div class="col-md-12 mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea id="editExamDescription" class="form-control" rows="3"><%= exam.description || '' %></textarea>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Duration (minutes)</label>
+                        <input type="number" id="editExamDuration" class="form-control" value="<%= exam.duration || 0 %>" min="1" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Total Marks</label>
+                        <input type="number" id="editExamTotalMarks" class="form-control" value="<%= exam.totalMarks || 0 %>" min="0" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Owner</label>
+                        <select id="editExamOwnerId" class="form-select" required>
+                            <option value="">Select Owner</option>
+                            <% if (users && users.length > 0) { %>
+                                <% users.forEach(user => { %>
+                                    <% 
+                                        const currentOwnerId = exam.ownerId ? (exam.ownerId._id ? exam.ownerId._id.toString() : exam.ownerId.toString()) : '';
+                                        const userId = user._id.toString();
+                                        const isSelected = currentOwnerId === userId;
+                                    %>
+                                    <option value="<%= user._id %>" <%= isSelected ? 'selected' : '' %>>
+                                        <%= user.name %> (<%= user.email %>) - <%= user.role %>
+                                    </option>
+                                <% }); %>
+                            <% } %>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Exam Password (optional)</label>
+                        <input type="text" id="editExamPassword" class="form-control" value="<%= exam.examPassword || '' %>" placeholder="Leave blank for no password">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Start Time (optional)</label>
+                        <input type="datetime-local" id="editExamStartTime" class="form-control" value="<%= exam.startTime ? new Date(exam.startTime).toISOString().slice(0, 16) : '' %>">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">End Time (optional)</label>
+                        <input type="datetime-local" id="editExamEndTime" class="form-control" value="<%= exam.endTime ? new Date(exam.endTime).toISOString().slice(0, 16) : '' %>">
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Changes
+                    </button>
+                    <a href="/admin/exams" class="btn btn-secondary">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function saveExam(e) {
+        e.preventDefault();
+        const examId = document.getElementById('editExamId').value;
+        const formData = {
+            name: document.getElementById('editExamName').value,
+            description: document.getElementById('editExamDescription').value,
+            duration: parseInt(document.getElementById('editExamDuration').value),
+            totalMarks: parseInt(document.getElementById('editExamTotalMarks').value),
+            status: document.getElementById('editExamStatus').value,
+            ownerId: document.getElementById('editExamOwnerId').value
+        };
+
+        // Add optional fields
+        const examPassword = document.getElementById('editExamPassword').value;
+        if (examPassword && examPassword.trim() !== '') {
+            formData.examPassword = examPassword;
+        }
+
+        const startTime = document.getElementById('editExamStartTime').value;
+        if (startTime) {
+            formData.startTime = new Date(startTime).toISOString();
+        }
+
+        const endTime = document.getElementById('editExamEndTime').value;
+        if (endTime) {
+            formData.endTime = new Date(endTime).toISOString();
+        }
+
+        fetch(`/v1/api/admin/exams/${examId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${getToken()}`
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(res => {
+            if (!res.ok) {
+                return res.json().then(err => Promise.reject(err));
+            }
+            return res.json();
+        })
+        .then(data => {
+            if (data.ok) {
+                showNotification('Exam updated successfully!', 'success');
+                setTimeout(() => {
+                    window.location.href = '/admin/exams';
+                }, 800);
+            } else {
+                showNotification('Error: ' + (data.message || 'Unknown error'), 'danger');
+            }
+        })
+        .catch(err => {
+            console.error('Error updating exam:', err);
+            showNotification('Error: ' + (err.message || 'Failed to update exam. Please check console for details.'), 'danger');
+        });
+    }
+
+    function getToken() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'admin_token') return value;
+        }
+        return '';
+    }
+</script>
+
+<%- include('../partials/footer') %>
+

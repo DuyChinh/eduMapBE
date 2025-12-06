@@ -1,0 +1,53 @@
+<%- include('../partials/header', { title: title, currentPage: 'chat-sessions', user: user }) %>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Chat Session Details</h2>
+        <div>
+            <a href="/admin/chat-sessions/<%= session._id %>/edit" class="btn btn-primary me-2">
+                <i class="fas fa-edit"></i> Edit
+            </a>
+            <a href="/admin/chat-sessions" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Chat Sessions
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Session Information</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <strong>ID:</strong><br>
+                    <code><%= session._id %></code>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>User:</strong><br>
+                    <%= session.userId ? (session.userId.name || session.userId.email || 'N/A') : 'N/A' %>
+                </div>
+                <div class="col-md-12 mb-3">
+                    <strong>Title:</strong><br>
+                    <%= session.title || 'New Chat' %>
+                </div>
+                <div class="col-md-12 mb-3">
+                    <strong>Last Message:</strong><br>
+                    <%= session.lastMessage || 'N/A' %>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Created At:</strong><br>
+                    <%= new Date(session.createdAt).toLocaleString('en-US') %>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Updated At:</strong><br>
+                    <%= new Date(session.updatedAt).toLocaleString('en-US') %>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<%- include('../partials/footer') %>
+
