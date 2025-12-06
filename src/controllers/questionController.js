@@ -26,17 +26,17 @@ function validateByType(body) {
     if (!Array.isArray(body.choices) || body.choices.length < 2) {
       errors.push('choices must have at least 2 items for mcq');
     }
-    
+
     // Check if choices is array of strings (new format) or array of objects (old format)
     const isNewFormat = body.choices.every(choice => typeof choice === 'string');
     const isOldFormat = body.choices.every(choice => choice && typeof choice === 'object' && choice.key && choice.text);
-    
+
     if (!isNewFormat && !isOldFormat) {
       errors.push('choices must be array of strings or array of objects with key and text');
     }
-    
+
     if (body.answer == null) errors.push('answer is required');
-    
+
     if (isNewFormat) {
       // New format: answer is index (number)
       const answerIndex = Number(body.answer);
@@ -107,7 +107,7 @@ async function patch(req, res, next) {
       return res.status(403).json({ ok: false, message: 'Only owner can modify this question' });
 
     // chỉ cho phép set các field whitelisted
-    const allowed = ['text', 'type', 'choices', 'answer', 'tags', 'level', 'isPublic', 'metadata', 'subjectId', 'subject'];
+    const allowed = ['text', 'type', 'choices', 'answer', 'tags', 'level', 'isPublic', 'metadata', 'subjectId', 'subject', 'images'];
     const payload = {};
     for (const k of allowed) if (k in req.body) payload[k] = req.body[k];
 
@@ -137,16 +137,16 @@ async function getAllQuestions(req, res, next) {
     }
 
     const orgId = getOrgIdSoft(req);
-    
+
     // Lấy các tham số từ query
-    const { 
-      page = 1, 
-      limit = 20, 
-      subjectId, 
-      type, 
-      name, 
-      level, 
-      isPublic 
+    const {
+      page = 1,
+      limit = 20,
+      subjectId,
+      type,
+      name,
+      level,
+      isPublic
     } = req.query;
 
     // Parse boolean values
@@ -161,7 +161,7 @@ async function getAllQuestions(req, res, next) {
 
     // Build filter cho teacher
     const filter = {};
-    
+
     // Filter theo organization
     if (orgId && mongoose.isValidObjectId(orgId)) {
       filter.orgId = new mongoose.Types.ObjectId(orgId);
@@ -238,9 +238,9 @@ async function getQuestionById(req, res, next) {
       return res.status(400).json({ ok: false, message: 'invalid id' });
 
     const question = await Question.findById(id)
-      .populate('ownerId', 'name email') 
-      .populate('subjectId', 'name name_en name_jp'); 
-    
+      .populate('ownerId', 'name email')
+      .populate('subjectId', 'name name_en name_jp');
+
     res.json({ ok: true, data: question });
   } catch (e) { next(e); }
 }
@@ -271,8 +271,8 @@ async function create(req, res, next) {
     });
 
     if (existingQuestion) {
-      return res.status(409).json({ 
-        ok: false, 
+      return res.status(409).json({
+        ok: false,
         message: 'Question name already exists for this teacher',
         data: {
           existingQuestion: {
@@ -344,12 +344,12 @@ async function remove(req, res, next) {
 
 
 
-module.exports = { 
-  getAllQuestions, 
-  getQuestionById, 
-  create, 
-  update, 
-  patch, 
+module.exports = {
+  getAllQuestions,
+  getQuestionById,
+  create,
+  update,
+  patch,
   remove,
   validateByType // Export for use in import controller
 };

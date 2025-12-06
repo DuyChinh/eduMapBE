@@ -14,7 +14,7 @@ const uploadImage = async (req, res) => {
             return new Promise((resolve, reject) => {
                 const stream = cloudinary.uploader.upload_stream(
                     {
-                        folder: 'mindmaps',
+                        folder: 'questions',
                         allowed_formats: ['jpg', 'png', 'jpeg', 'webp'],
                     },
                     (error, result) => {
