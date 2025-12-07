@@ -13,5 +13,6 @@ router.get('/sessions', auth, aiController.getSessions);
 router.post('/sessions', auth, aiController.createSession);
 router.delete('/sessions/:sessionId', auth, aiController.deleteSession);
 router.patch('/sessions/:sessionId', auth, aiController.renameSession);
+router.put('/message/:messageId', auth, aiController.editMessage);
 
 module.exports = router;
