@@ -1,0 +1,65 @@
+<%- include('../partials/header', { title: title, currentPage: 'users', user: user }) %>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>User Details</h2>
+        <div>
+            <a href="/admin/users/<%= detailUser._id %>/edit" class="btn btn-primary me-2">
+                <i class="fas fa-edit"></i> Edit
+            </a>
+            <a href="/admin/users" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Users
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">User Information</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <strong>ID:</strong><br>
+                    <code><%= detailUser._id %></code>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Name:</strong><br>
+                    <%= detailUser.name || 'N/A' %>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Email:</strong><br>
+                    <%= detailUser.email || 'N/A' %>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Role:</strong><br>
+                    <span class="badge bg-<%= detailUser.role === 'admin' ? 'danger' : detailUser.role === 'teacher' ? 'primary' : 'success' %>">
+                        <%= detailUser.role === 'admin' ? 'Admin' : detailUser.role === 'teacher' ? 'Teacher' : 'Student' %>
+                    </span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Status:</strong><br>
+                    <span class="badge bg-<%= detailUser.status === 'active' ? 'success' : 'warning' %>">
+                        <%= detailUser.status === 'active' ? 'Active' : 'Suspended' %>
+                    </span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Organization:</strong><br>
+                    <%= detailUser.orgId ? (detailUser.orgId.name || 'N/A') : 'N/A' %>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Created At:</strong><br>
+                    <%= new Date(detailUser.createdAt).toLocaleString('en-US') %>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Updated At:</strong><br>
+                    <%= new Date(detailUser.updatedAt).toLocaleString('en-US') %>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<%- include('../partials/footer') %>
+

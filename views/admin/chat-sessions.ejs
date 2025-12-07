@@ -1,0 +1,195 @@
+<%- include('../partials/header', { title: 'Chat Sessions Management', currentPage: 'chat-sessions', user: user }) %>
+
+<div class="users-page">
+    <div class="page-header mb-3">
+        <div class="page-actions">
+            <button class="btn btn-primary" onclick="refreshSessions()">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Filters</h5>
+        </div>
+        <div class="card-body">
+            <form id="filterForm" onsubmit="filterSessions(event)">
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <label class="form-label">Search</label>
+                        <input type="text" name="search" id="searchFilter" class="form-control" placeholder="Title or last message...">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="clearFilters()">
+                            <i class="fas fa-times"></i> Clear
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Sessions Table -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Chat Sessions List (<span id="totalSessions"><%= sessions.length || 0 %></span>)</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>User</th>
+                            <th>Title</th>
+                            <th>Last Message</th>
+                            <th>Created At</th>
+                            <th>Updated At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (sessions && sessions.length > 0) { %>
+                            <% sessions.forEach(session => { %>
+                                <tr>
+                                    <td><code><%= session._id.toString().substring(0, 8) %>...</code></td>
+                                    <td>
+                                        <% if (session.userId) { %>
+                                            <%= session.userId.name || session.userId.email || 'N/A' %>
+                                        <% } else { %>
+                                            N/A
+                                        <% } %>
+                                    </td>
+                                    <td><%= session.title || 'New Chat' %></td>
+                                    <td><%= (session.lastMessage || '').substring(0, 50) %><%= (session.lastMessage && session.lastMessage.length > 50) ? '...' : '' %></td>
+                                    <td><%= new Date(session.createdAt).toLocaleString('en-US') %></td>
+                                    <td><%= new Date(session.updatedAt).toLocaleString('en-US') %></td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="/admin/chat-sessions/<%= session._id %>" class="btn btn-sm btn-info" title="View Details">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="/admin/chat-sessions/<%= session._id %>/edit" class="btn btn-sm btn-primary" title="Edit">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <button class="btn btn-sm btn-danger" onclick="deleteSession('<%= session._id %>', '<%= session.title || 'Session' %>')" title="Delete">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        <% } else { %>
+                            <tr>
+                                <td colspan="7" class="text-center">No data available</td>
+                            </tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Bootstrap Pagination -->
+            <% if (pagination && pagination.pages > 1) { %>
+                <nav aria-label="Page navigation" class="mt-3">
+                    <ul class="pagination justify-content-center">
+                        <% if (pagination.page > 1) { %>
+                            <li class="page-item">
+                                <a class="page-link" href="javascript:void(0)" onclick="goToPage(<%= pagination.page - 1 %>)">
+                                    <i class="fas fa-chevron-left"></i> Previous
+                                </a>
+                            </li>
+                        <% } %>
+                        <% 
+                            let startPage = Math.max(1, pagination.page - 2);
+                            let endPage = Math.min(pagination.pages, pagination.page + 2);
+                            for (let i = startPage; i <= endPage; i++) { 
+                        %>
+                            <li class="page-item <%= i === pagination.page ? 'active' : '' %>">
+                                <a class="page-link" href="javascript:void(0)" onclick="goToPage(<%= i %>)"><%= i %></a>
+                            </li>
+                        <% } %>
+                        <% if (pagination.page < pagination.pages) { %>
+                            <li class="page-item">
+                                <a class="page-link" href="javascript:void(0)" onclick="goToPage(<%= pagination.page + 1 %>)">
+                                    Next <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </li>
+                        <% } %>
+                    </ul>
+                </nav>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentPage = <%= pagination?.page || 1 %>;
+    let currentFilters = {};
+
+    function filterSessions(e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        currentFilters = { search: formData.get('search') || '' };
+        currentPage = 1;
+        loadSessions();
+    }
+
+    function clearFilters() {
+        document.getElementById('searchFilter').value = '';
+        currentFilters = {};
+        currentPage = 1;
+        loadSessions();
+    }
+
+    function goToPage(page) {
+        currentPage = page;
+        loadSessions();
+    }
+
+    function loadSessions() {
+        const params = new URLSearchParams({ page: currentPage, ...currentFilters });
+        window.location.href = `/admin/chat-sessions?${params.toString()}`;
+    }
+
+    function refreshSessions() {
+        loadSessions();
+    }
+
+
+    function deleteSession(sessionId, sessionTitle) {
+        if (!confirm(`Are you sure you want to delete session "${sessionTitle}"? All related chat history will also be deleted.`)) return;
+        fetch(`/v1/api/admin/chat-sessions/${sessionId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.ok) {
+                showNotification('Session deleted successfully!', 'success');
+                loadSessions();
+            } else {
+                showNotification('Error: ' + data.message, 'danger');
+            }
+        })
+        .catch(err => {
+            console.error('Error deleting session:', err);
+            showNotification('Error deleting session', 'danger');
+        });
+    }
+
+    function getToken() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'admin_token') return value;
+        }
+        return '';
+    }
+</script>
+
+<%- include('../partials/footer') %>

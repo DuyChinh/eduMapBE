@@ -1,0 +1,189 @@
+<%- include('../partials/header', { title: title, currentPage: 'classes', user: user }) %>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Class Details</h2>
+        <div>
+            <a href="/admin/classes/<%= classDoc._id %>/edit" class="btn btn-primary me-2">
+                <i class="fas fa-edit"></i> Edit
+            </a>
+            <button class="btn btn-danger me-2" onclick="deleteClass('<%= classDoc._id %>', '<%= classDoc.name %>')">
+                <i class="fas fa-trash"></i> Delete
+            </button>
+            <a href="/admin/classes" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Classes
+            </a>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Class Information</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <strong>ID:</strong><br>
+                    <code><%= classDoc._id %></code>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Name:</strong><br>
+                    <%= classDoc.name || 'N/A' %>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Code:</strong><br>
+                    <code><%= classDoc.code || 'N/A' %></code>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Organization:</strong><br>
+                    <%= classDoc.orgId ? (classDoc.orgId.name || 'N/A') : 'N/A' %>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Teacher:</strong><br>
+                    <%= classDoc.teacherId ? (classDoc.teacherId.name || 'N/A') : 'N/A' %>
+                    <% if (classDoc.teacherId && classDoc.teacherId.email) { %>
+                        <br><small class="text-muted"><%= classDoc.teacherId.email %></small>
+                    <% } %>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Number of Students:</strong><br>
+                    <%= classDoc.studentIds ? classDoc.studentIds.length : 0 %>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Created At:</strong><br>
+                    <%= new Date(classDoc.createdAt).toLocaleString('en-US') %>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Updated At:</strong><br>
+                    <%= new Date(classDoc.updatedAt).toLocaleString('en-US') %>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings -->
+    <% if (classDoc.settings) { %>
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Settings</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <strong>Allow Late Submission:</strong><br>
+                    <span class="badge bg-<%= classDoc.settings.allowLateSubmission ? 'success' : 'secondary' %>">
+                        <%= classDoc.settings.allowLateSubmission ? 'Yes' : 'No' %>
+                    </span>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <strong>Max Attempts:</strong><br>
+                    <%= classDoc.settings.maxAttempts || 1 %>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <strong>Proctoring Enabled:</strong><br>
+                    <span class="badge bg-<%= classDoc.settings.proctoringEnabled ? 'success' : 'secondary' %>">
+                        <%= classDoc.settings.proctoringEnabled ? 'Yes' : 'No' %>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <% } %>
+
+    <!-- Metadata -->
+    <% if (classDoc.metadata && (classDoc.metadata.subject || classDoc.metadata.semester || classDoc.metadata.academicYear)) { %>
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Metadata</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <% if (classDoc.metadata.subject) { %>
+                <div class="col-md-4 mb-3">
+                    <strong>Subject:</strong><br>
+                    <%= classDoc.metadata.subject %>
+                </div>
+                <% } %>
+                <% if (classDoc.metadata.semester) { %>
+                <div class="col-md-4 mb-3">
+                    <strong>Semester:</strong><br>
+                    <%= classDoc.metadata.semester %>
+                </div>
+                <% } %>
+                <% if (classDoc.metadata.academicYear) { %>
+                <div class="col-md-4 mb-3">
+                    <strong>Academic Year:</strong><br>
+                    <%= classDoc.metadata.academicYear %>
+                </div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+    <% } %>
+
+    <!-- Students List -->
+    <% if (classDoc.studentIds && classDoc.studentIds.length > 0) { %>
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Students (<%= classDoc.studentIds.length %>)</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% classDoc.studentIds.forEach(student => { %>
+                            <tr>
+                                <td><%= student.name || 'N/A' %></td>
+                                <td><%= student.email || 'N/A' %></td>
+                            </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <% } %>
+</div>
+
+<script>
+    function deleteClass(classId, className) {
+        if (!confirm(`Are you sure you want to delete class "${className}"?`)) return;
+        fetch(`/v1/api/admin/classes/${classId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.ok) {
+                showNotification('Class deleted successfully!', 'success');
+                setTimeout(() => {
+                    window.location.href = '/admin/classes';
+                }, 800);
+            } else {
+                showNotification('Error: ' + data.message, 'danger');
+            }
+        })
+        .catch(err => {
+            console.error('Error deleting class:', err);
+            showNotification('Error deleting class', 'danger');
+        });
+    }
+
+    function getToken() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'admin_token') return value;
+        }
+        return '';
+    }
+</script>
+
+<%- include('../partials/footer') %>
+
