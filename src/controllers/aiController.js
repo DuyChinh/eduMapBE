@@ -322,11 +322,106 @@ const renameSession = async (req, res, next) => {
     }
 };
 
+/**
+ * Edit a user message and regenerate response
+ * PUT /v1/api/ai/message/:messageId
+ * This creates a new message at the end (like sending a new message)
+ */
+const editMessage = async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+        const { messageId } = req.params;
+        const { message } = req.body;
+
+        if (!message) {
+            return res.status(400).json({
+                ok: false,
+                message: 'Message is required'
+            });
+        }
+
+        // 1. Find the original message to get sessionId
+        const targetMessage = await ChatHistory.findOne({ _id: messageId, userId });
+        if (!targetMessage) {
+            return res.status(404).json({
+                ok: false,
+                message: 'Message not found'
+            });
+        }
+
+        if (targetMessage.sender !== 'user') {
+            return res.status(400).json({
+                ok: false,
+                message: 'Can only edit user messages'
+            });
+        }
+
+        const sessionId = targetMessage.sessionId;
+
+        // 2. Create new user message at the end (like sending a new message)
+        const newMessage = await ChatHistory.create({
+            userId,
+            sessionId,
+            sender: 'user',
+            message: message,
+            attachments: [] // New message, no attachments
+        });
+
+        // 3. Fetch recent history for context (last 20 messages)
+        const recentHistory = await ChatHistory.find({
+            userId,
+            sessionId
+        })
+            .sort({ createdAt: -1 })
+            .limit(20);
+
+        // Format history for Gemini
+        const formattedHistory = recentHistory.reverse().map(msg => ({
+            role: msg.sender === 'user' ? 'user' : 'model',
+            parts: [{ text: msg.message }]
+        }));
+
+        // Remove the last message (the one we just added) to use it as the prompt
+        formattedHistory.pop();
+
+        // 4. Generate new AI response
+        const response = await aiService.generateResponse(message, [], formattedHistory);
+
+        // 5. Save bot response
+        const botMessage = await ChatHistory.create({
+            userId,
+            sessionId,
+            sender: 'bot',
+            message: response
+        });
+
+        // 6. Update session's last message
+        await ChatSession.findByIdAndUpdate(sessionId, {
+            lastMessage: message
+        });
+
+        res.json({
+            ok: true,
+            data: {
+                response,
+                sessionId,
+                userMessage: newMessage,
+                botMessage
+            }
+        });
+
+    } catch (error) {
+        console.error('Error editing message:', error);
+        next(error);
+    }
+};
+
 module.exports = {
     chat,
     getHistory,
     getSessions,
     createSession,
     deleteSession,
-    renameSession
+    renameSession,
+    editMessage
 };
