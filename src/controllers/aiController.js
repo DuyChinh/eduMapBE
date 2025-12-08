@@ -22,7 +22,8 @@ const chat = async (req, res, next) => {
 
         let currentSessionId = sessionId;
         let session;
-        const sessionTitle = message ? (message.substring(0, 30) + (message.length > 30 ? '...' : '')) : (files.length > 0 ? 'File Upload' : 'New Chat');
+        // Use full message as title, but limit to reasonable length (500 chars) to avoid extremely long titles
+        const sessionTitle = message ? (message.length > 500 ? message.substring(0, 500) : message) : (files.length > 0 ? 'File Upload' : 'New Chat');
 
         // Create new session if no sessionId provided or if it doesn't exist
         if (!currentSessionId) {
@@ -194,11 +195,35 @@ const getSessions = async (req, res, next) => {
         const userId = req.user.id;
 
         const sessions = await ChatSession.find({ userId })
-            .sort({ updatedAt: -1 }); // Newest first
+            .sort({ pinned: -1, updatedAt: -1 }); // Pinned first, then newest first
+
+        // For sessions with truncated titles (ending with "..."), get full title from first message
+        const sessionsWithFullTitles = await Promise.all(sessions.map(async (session) => {
+            const sessionObj = session.toObject();
+            
+            // Check if title is truncated (ends with "...")
+            if (sessionObj.title && sessionObj.title.endsWith('...')) {
+                // Get first user message from this session
+                const firstMessage = await ChatHistory.findOne({
+                    userId,
+                    sessionId: session._id,
+                    sender: 'user'
+                }).sort({ createdAt: 1 });
+                
+                // If found, use the full message as title (limit to 500 chars)
+                if (firstMessage && firstMessage.message) {
+                    sessionObj.title = firstMessage.message.length > 500 
+                        ? firstMessage.message.substring(0, 500) 
+                        : firstMessage.message;
+                }
+            }
+            
+            return sessionObj;
+        }));
 
         res.json({
             ok: true,
-            data: sessions
+            data: sessionsWithFullTitles
         });
     } catch (error) {
         console.error('Error getting chat sessions:', error);
@@ -416,12 +441,166 @@ const editMessage = async (req, res, next) => {
     }
 };
 
+/**
+ * Search chat sessions and messages
+ * GET /v1/api/ai/sessions/search?q=searchTerm
+ */
+const searchSessions = async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+        const { q } = req.query;
+
+        if (!q || q.trim() === '') {
+            return res.json({
+                ok: true,
+                data: []
+            });
+        }
+
+        const searchTerm = q.trim();
+        const searchRegex = new RegExp(searchTerm, 'i'); // Case-insensitive search
+
+        // Search in session titles
+        const sessionsByTitle = await ChatSession.find({
+            userId,
+            title: searchRegex
+        }).sort({ updatedAt: -1 });
+
+        // Search in messages
+        const messages = await ChatHistory.find({
+            userId,
+            message: searchRegex
+        })
+            .select('sessionId message createdAt')
+            .sort({ createdAt: -1 });
+
+        // Get unique session IDs from messages
+        const messageSessionIds = [...new Set(messages.map(msg => msg.sessionId.toString()))];
+        
+        // Fetch full session details for messages
+        const sessionsFromMessages = await ChatSession.find({
+            _id: { $in: messageSessionIds },
+            userId
+        });
+
+        // Group messages by session and get unique sessions
+        const sessionMap = new Map();
+        
+        // Add sessions found by title
+        sessionsByTitle.forEach(session => {
+            const sessionObj = session.toObject();
+            sessionMap.set(session._id.toString(), {
+                session: sessionObj,
+                matchType: 'title',
+                preview: sessionObj.lastMessage || ''
+            });
+        });
+
+        // Add sessions found by message content
+        sessionsFromMessages.forEach(session => {
+            const sessionId = session._id.toString();
+            if (!sessionMap.has(sessionId)) {
+                // Find the first matching message for preview
+                const matchingMsg = messages.find(msg => msg.sessionId.toString() === sessionId);
+                const sessionObj = session.toObject();
+                sessionMap.set(sessionId, {
+                    session: sessionObj,
+                    matchType: 'content',
+                    preview: matchingMsg ? matchingMsg.message.substring(0, 150) : ''
+                });
+            }
+        });
+
+        // Convert map to array and format response
+        const results = Array.from(sessionMap.values()).map(item => {
+            const session = item.session;
+            // Ensure dates are properly formatted
+            const createdAt = session.createdAt instanceof Date 
+                ? session.createdAt.toISOString() 
+                : (session.createdAt ? new Date(session.createdAt).toISOString() : new Date().toISOString());
+            
+            const updatedAt = session.updatedAt instanceof Date 
+                ? session.updatedAt.toISOString() 
+                : (session.updatedAt ? new Date(session.updatedAt).toISOString() : new Date().toISOString());
+            
+            return {
+                _id: session._id,
+                title: session.title || 'New Chat',
+                lastMessage: session.lastMessage || '',
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                preview: item.preview,
+                matchType: item.matchType
+            };
+        });
+
+        // Sort by createdAt descending (newest first)
+        results.sort((a, b) => {
+            const dateA = new Date(a.createdAt);
+            const dateB = new Date(b.createdAt);
+            return dateB - dateA; // Descending order
+        });
+
+        res.json({
+            ok: true,
+            data: results
+        });
+    } catch (error) {
+        console.error('Error searching sessions:', error);
+        next(error);
+    }
+};
+
+/**
+ * Toggle pin status of a chat session
+ * PATCH /v1/api/ai/sessions/:sessionId/toggle-pin
+ */
+const togglePinSession = async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+        const { sessionId } = req.params;
+
+        // Validate sessionId
+        const mongoose = require('mongoose');
+        if (!mongoose.Types.ObjectId.isValid(sessionId)) {
+            return res.status(400).json({
+                ok: false,
+                message: 'Invalid session ID'
+            });
+        }
+
+        // Find and verify session ownership
+        const session = await ChatSession.findOne({ _id: sessionId, userId });
+        if (!session) {
+            return res.status(404).json({
+                ok: false,
+                message: 'Session not found'
+            });
+        }
+
+        // Toggle pin status
+        session.pinned = !session.pinned;
+        await session.save();
+
+        res.json({
+            ok: true,
+            message: `Session ${session.pinned ? 'pinned' : 'unpinned'} successfully`,
+            data: session
+        });
+    } catch (error) {
+        console.error('Error toggling pin session:', error);
+        next(error);
+    }
+};
+
 module.exports = {
     chat,
     getHistory,
     getSessions,
+    searchSessions,
     createSession,
     deleteSession,
     renameSession,
-    editMessage
+    editMessage,
+    togglePinSession
 };
