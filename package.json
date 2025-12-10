@@ -33,7 +33,11 @@
     "nodemailer": "^7.0.9",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
+    "pdf-poppler": "^0.2.1",
+    "pdf2json": "^3.0.5",
+    "sharp": "^0.34.5",
     "streamifier": "^0.1.1",
+    "tesseract.js": "^5.0.5",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
