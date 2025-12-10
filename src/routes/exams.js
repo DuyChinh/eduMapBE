@@ -2,7 +2,13 @@ const express = require('express');
 const router = express.Router();
 const examController = require('../controllers/examController');
 const examStatsController = require('../controllers/examStatsController');
+const pdfExamController = require('../controllers/pdfExamController');
 const auth = require('../middlewares/auth');
+const upload = require('../middlewares/upload');
+
+// PDF Exam Upload - Must be before /:id routes
+router.post('/upload-pdf', auth, upload.single('pdf'), pdfExamController.uploadAndParse);
+router.post('/create-from-pdf', auth, pdfExamController.createExamFromPDF);
 
 // Exam CRUD operations
 router.post('/', auth, examController.createExam);
