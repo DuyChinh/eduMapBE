@@ -4,6 +4,39 @@ const Exam = require('../models/Exam');
 const Subject = require('../models/Subject');
 
 /**
+ * Generates a unique share code for exams
+ * @returns {Promise<string>} - Unique 8-character alphanumeric code
+ */
+async function generateUniqueShareCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let shareCode;
+  let isUnique = false;
+  let attempts = 0;
+  
+  while (!isUnique && attempts < 20) {
+    // Generate 8-character code
+    shareCode = '';
+    for (let i = 0; i < 8; i++) {
+      shareCode += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    
+    // Check if code already exists
+    const existing = await Exam.findOne({ shareCode });
+    if (!existing) {
+      isUnique = true;
+    }
+    attempts++;
+  }
+  
+  if (!isUnique) {
+    // Fallback: use timestamp-based code
+    shareCode = Date.now().toString(36).toUpperCase().slice(-8);
+  }
+  
+  return shareCode;
+}
+
+/**
  * Upload và parse PDF exam
  * POST /v1/api/exams/upload-pdf
  */
@@ -87,7 +120,15 @@ exports.createExamFromPDF = async (req, res, next) => {
       gradeId,
       duration,
       totalMarks,
-      questions: parsedQuestions
+      questions: parsedQuestions,
+      examPurpose,
+      isAllowUser,
+      maxAttempts,
+      viewMark,
+      viewExamAndAnswer,
+      status,
+      startTime,
+      endTime
     } = req.body;
 
     // Validation
@@ -144,7 +185,7 @@ exports.createExamFromPDF = async (req, res, next) => {
         subjectId: subjectId,
         level: pq.level || 1,
         tags: pq.tags || [],
-        createdBy: req.user._id,
+        ownerId: req.user._id || req.user.id,
         orgId: req.user.orgId || null,
         isPublic: false
       });
@@ -160,7 +201,14 @@ exports.createExamFromPDF = async (req, res, next) => {
 
     console.log(`Created ${createdQuestions.length} questions in database`);
 
-    // Step 2: Create Exam
+    // Step 2: Generate shareCode if status is published
+    const examStatus = status || 'published';
+    let shareCode = null;
+    if (examStatus === 'published') {
+      shareCode = await generateUniqueShareCode();
+    }
+
+    // Step 3: Create Exam
     const exam = new Exam({
       name: examName,
       description: examDescription || `Đề thi từ PDF - ${examName}`,
@@ -169,13 +217,17 @@ exports.createExamFromPDF = async (req, res, next) => {
       subjectId: subjectId,
       gradeId: gradeId || null,
       questions: createdQuestions,
-      createdBy: req.user._id,
+      ownerId: req.user._id || req.user.id,
       orgId: req.user.orgId || null,
-      examPurpose: 'exam',
-      isAllowUser: 'all',
-      viewMark: 0,
-      viewExamAndAnswer: 0,
-      status: 'draft' // Start as draft
+      examPurpose: examPurpose || 'exam',
+      isAllowUser: isAllowUser || 'everyone', // Must be 'everyone', 'class', or 'student'
+      maxAttempts: maxAttempts || 1,
+      viewMark: viewMark !== undefined ? viewMark : 1,
+      viewExamAndAnswer: viewExamAndAnswer !== undefined ? viewExamAndAnswer : 1,
+      status: examStatus,
+      shareCode: shareCode,
+      startTime: startTime ? new Date(startTime) : undefined,
+      endTime: endTime ? new Date(endTime) : undefined
     });
 
     const savedExam = await exam.save();

@@ -321,8 +321,8 @@ class PDFParserService {
       let currentQuestion = null;
       let currentAnswers = [];
       
-      // Regex patterns - More flexible to match "Câu1" or "Câu 1"
-      const questionPattern = /^(?:Câu|Cau)\s*(\d+)[:.)\s-]*/i;
+      // Regex patterns - Support both Vietnamese (Câu) and English (Question) formats
+      const questionPattern = /^(?:Câu|Cau|Question)\s*(\d+)[:.)\s-]*/i;
       const answerPattern = /^([A-D])[\.\):\-\s]|^\s*([A-D])[\.\)]/i;
       
       sortedTexts.forEach((textItem, index) => {
@@ -443,10 +443,10 @@ class PDFParserService {
       const lines = this.groupTextsByLine(texts);
       console.log(`\n=== Page ${page.pageNumber} - Grouped into ${lines.length} lines ===`);
       
-      // Step 2: Merge each line into complete text
+      // Step 2: Merge each line into complete text with proper spacing
       const mergedLines = lines.map(line => {
         const sortedByX = line.sort((a, b) => a.x - b.x);
-        const merged = sortedByX.map(t => t.text).join('');
+        const merged = this.mergeTextWithSpacing(sortedByX);
         return {
           text: merged,
           y: line[0].y,
@@ -468,7 +468,8 @@ class PDFParserService {
       let currentQuestion = null;
       let currentAnswers = [];
       
-      const questionPattern = /^(?:Câu|Cau)\s*(\d+)[:.)\s-]*/i;
+      // Support both Vietnamese (Câu) and English (Question) formats
+      const questionPattern = /^(?:Câu|Cau|Question)\s*(\d+)[:.)\s-]*/i;
       const answerPattern = /^([A-D])[\.\):\-\s]/i;
       
       mergedLines.forEach((line, index) => {
@@ -574,6 +575,70 @@ class PDFParserService {
         questions
       };
     });
+  }
+
+  /**
+   * Merge text items with proper spacing based on distance and patterns
+   * @param {Array} textItems - Array of text items sorted by x-coordinate
+   * @returns {string} - Merged text with proper spacing
+   */
+  mergeTextWithSpacing(textItems) {
+    if (textItems.length === 0) return '';
+    if (textItems.length === 1) return textItems[0].text;
+
+    let merged = textItems[0].text;
+
+    for (let i = 1; i < textItems.length; i++) {
+      const prev = textItems[i - 1];
+      const curr = textItems[i];
+      
+      // Calculate horizontal gap between text items
+      const prevEndX = prev.x + (prev.width || 0);
+      const currStartX = curr.x;
+      const gap = currStartX - prevEndX;
+      
+      // Get last character of previous text and first character of current text
+      const prevLastChar = prev.text.slice(-1);
+      const currFirstChar = curr.text.charAt(0);
+      
+      // Determine if space is needed
+      let needsSpace = false;
+      
+      // Always add space if gap is significant (more than 0.5 units)
+      if (gap > 0.5) {
+        needsSpace = true;
+      }
+      // Add space between letter and number, or number and letter
+      else if ((/[a-zA-ZÀ-ỹ]/.test(prevLastChar) && /[0-9]/.test(currFirstChar)) ||
+               (/[0-9]/.test(prevLastChar) && /[a-zA-ZÀ-ỹ]/.test(currFirstChar))) {
+        needsSpace = true;
+      }
+      // Add space between two letters (word boundary)
+      else if (/[a-zA-ZÀ-ỹ]/.test(prevLastChar) && /[a-zA-ZÀ-ỹ]/.test(currFirstChar) && gap > 0.1) {
+        needsSpace = true;
+      }
+      // Add space between punctuation and letter/number
+      else if (/[.,;:!?)]/.test(prevLastChar) && /[a-zA-ZÀ-ỹ0-9]/.test(currFirstChar)) {
+        needsSpace = true;
+      }
+      
+      merged += (needsSpace ? ' ' : '') + curr.text;
+    }
+
+    // Post-process: Add spaces between common patterns that might have been missed
+    // Fix patterns like "Chữsố" -> "Chữ số", "số375" -> "số 375"
+    merged = merged
+      // Add space between Vietnamese word and number: "Chữsố7" -> "Chữ số 7"
+      .replace(/([a-zA-ZÀ-ỹ]+)([0-9])/g, '$1 $2')
+      // Add space between number and Vietnamese word: "7trong" -> "7 trong"
+      .replace(/([0-9])([a-zA-ZÀ-ỹ]+)/g, '$1 $2')
+      // Add space between number and comma: "375,402" -> "375, 402" (but keep numbers together)
+      .replace(/([0-9]),([0-9])/g, '$1, $2')
+      // Clean up multiple spaces
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return merged;
   }
 
   /**
@@ -762,8 +827,8 @@ class PDFParserService {
       let currentQuestion = null;
       let currentAnswers = [];
       
-      // Regex patterns
-      const questionPattern = /^(?:Câu|Cau)\s*(\d+)[:.)\s-]*/i;
+      // Regex patterns - Support both Vietnamese (Câu) and English (Question) formats
+      const questionPattern = /^(?:Câu|Cau|Question)\s*(\d+)[:.)\s-]*/i;
       const answerPattern = /^([A-D])[\.\):\-\s]/i;
       
       lines.forEach((line, index) => {
