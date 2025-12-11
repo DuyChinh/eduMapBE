@@ -172,3 +172,4 @@ setInterval(() => {
 - Client nên implement timeout cho polling (ví dụ: dừng sau 2 phút)
 - Có thể mở rộng thêm WebSocket để push realtime thay vì polling
 
+
