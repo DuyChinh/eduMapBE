@@ -34,6 +34,11 @@ const chatHistorySchema = new mongoose.Schema({
     isError: {
         type: Boolean,
         default: false
+    },
+    status: {
+        type: String,
+        enum: ['pending', 'completed', 'error'],
+        default: 'completed'
     }
 }, { timestamps: true, collection: 'ai_chat_messages' });
 
