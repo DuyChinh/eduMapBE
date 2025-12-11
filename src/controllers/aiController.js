@@ -104,10 +104,77 @@ const chat = async (req, res, next) => {
             attachments: historyAttachments
         });
 
+        // Check if processing a PDF file (which takes longer)
+        const hasPdfFile = files.some(f => f.mimetype === 'application/pdf');
+        
+        if (hasPdfFile && aiAttachments.length > 0) {
+            // For PDF files: Return immediately with pending status
+            const pendingMessage = await ChatHistory.create({
+                userId,
+                sessionId: currentSessionId,
+                sender: 'bot',
+                message: '⏳ Đang xử lý file PDF của bạn... Vui lòng đợi trong giây lát.',
+                status: 'pending'
+            });
+
+            // Process AI in background
+            (async () => {
+                try {
+                    // Fetch recent history for context
+                    const recentHistory = await ChatHistory.find({
+                        userId,
+                        sessionId: currentSessionId,
+                        status: 'completed'
+                    })
+                        .sort({ createdAt: -1 })
+                        .limit(20);
+
+                    const formattedHistory = recentHistory.reverse().map(msg => ({
+                        role: msg.sender === 'user' ? 'user' : 'model',
+                        parts: [{ text: msg.message }]
+                    }));
+
+                    // Generate AI response
+                    const response = await aiService.generateResponse(message || '', aiAttachments, formattedHistory);
+
+                    // Update pending message with actual response
+                    await ChatHistory.findByIdAndUpdate(pendingMessage._id, {
+                        message: response,
+                        status: 'completed'
+                    });
+
+                    console.log(`✅ PDF processing completed for session ${currentSessionId}`);
+                } catch (error) {
+                    console.error('Error in background AI processing:', error);
+                    
+                    // Update message with error status
+                    await ChatHistory.findByIdAndUpdate(pendingMessage._id, {
+                        message: 'Xin lỗi, đã có lỗi xảy ra khi xử lý file PDF. Vui lòng thử lại.',
+                        status: 'error',
+                        isError: true
+                    });
+                }
+            })();
+
+            // Return immediately
+            return res.json({
+                ok: true,
+                data: {
+                    response: '⏳ Đang xử lý file PDF của bạn... Vui lòng đợi trong giây lát.',
+                    sessionId: currentSessionId,
+                    sessionTitle: session.title,
+                    status: 'pending',
+                    messageId: pendingMessage._id
+                }
+            });
+        }
+
+        // For non-PDF or no attachments: Process normally (synchronous)
         // Fetch recent history for context (last 20 messages)
         const recentHistory = await ChatHistory.find({
             userId,
-            sessionId: currentSessionId
+            sessionId: currentSessionId,
+            status: 'completed'
         })
             .sort({ createdAt: -1 })
             .limit(20);
@@ -126,7 +193,8 @@ const chat = async (req, res, next) => {
             userId,
             sessionId: currentSessionId,
             sender: 'bot',
-            message: response
+            message: response,
+            status: 'completed'
         });
 
         res.json({
@@ -134,7 +202,8 @@ const chat = async (req, res, next) => {
             data: {
                 response,
                 sessionId: currentSessionId,
-                sessionTitle: session.title
+                sessionTitle: session.title,
+                status: 'completed'
             }
         });
     } catch (error) {
@@ -163,6 +232,7 @@ const getHistory = async (req, res, next) => {
     try {
         const userId = req.user.id;
         const { sessionId } = req.params;
+        const { since } = req.query;
 
         // Validate sessionId
         const mongoose = require('mongoose');
@@ -173,7 +243,14 @@ const getHistory = async (req, res, next) => {
             });
         }
 
-        const history = await ChatHistory.find({ userId, sessionId })
+        const query = { userId, sessionId };
+        
+        // If 'since' timestamp provided, only get messages after that time
+        if (since) {
+            query.createdAt = { $gt: new Date(since) };
+        }
+
+        const history = await ChatHistory.find(query)
             .sort({ createdAt: 1 });
 
         res.json({
@@ -182,6 +259,50 @@ const getHistory = async (req, res, next) => {
         });
     } catch (error) {
         console.error('Error getting chat history:', error);
+        next(error);
+    }
+};
+
+/**
+ * Check message status (for polling)
+ * GET /v1/api/ai/message/:messageId/status
+ */
+const checkMessageStatus = async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+        const { messageId } = req.params;
+
+        // Validate messageId
+        const mongoose = require('mongoose');
+        if (!mongoose.Types.ObjectId.isValid(messageId)) {
+            return res.status(400).json({
+                ok: false,
+                message: 'Invalid message ID'
+            });
+        }
+
+        const message = await ChatHistory.findOne({ _id: messageId, userId });
+        
+        if (!message) {
+            return res.status(404).json({
+                ok: false,
+                message: 'Message not found'
+            });
+        }
+
+        res.json({
+            ok: true,
+            data: {
+                messageId: message._id,
+                status: message.status || 'completed',
+                message: message.message,
+                isError: message.isError,
+                createdAt: message.createdAt,
+                updatedAt: message.updatedAt
+            }
+        });
+    } catch (error) {
+        console.error('Error checking message status:', error);
         next(error);
     }
 };
@@ -596,6 +717,7 @@ const togglePinSession = async (req, res, next) => {
 module.exports = {
     chat,
     getHistory,
+    checkMessageStatus,
     getSessions,
     searchSessions,
     createSession,
