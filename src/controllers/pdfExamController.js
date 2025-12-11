@@ -68,8 +68,7 @@ exports.uploadAndParse = async (req, res, next) => {
 
     console.log(`Processing PDF: ${req.file.originalname}, size: ${req.file.size} bytes`);
 
-    // Parse PDF
-    const parsedData = await pdfParserService.parsePDF(req.file.buffer);
+    const parsedData = await pdfParserService.parsePDF(req.file.buffer, req.file.originalname);
 
     // Count total questions found
     const totalQuestions = parsedData.pages.reduce(
@@ -105,7 +104,21 @@ exports.uploadAndParse = async (req, res, next) => {
  */
 exports.createExamFromPDF = async (req, res, next) => {
   try {
-    // Check user role
+    console.log('=== Create Exam From PDF ===');
+    console.log('User:', {
+      _id: req.user?._id,
+      id: req.user?.id,
+      role: req.user?.role,
+      orgId: req.user?.orgId
+    });
+
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({
+        ok: false,
+        message: 'User authentication failed. Please login again.'
+      });
+    }
+
     if (!['teacher', 'admin'].includes(req.user?.role)) {
       return res.status(403).json({
         ok: false,
@@ -160,34 +173,43 @@ exports.createExamFromPDF = async (req, res, next) => {
     const marksPerQuestion = totalMarks / parsedQuestions.length;
 
     for (const pq of parsedQuestions) {
-      // Validate question has required fields
-      if (!pq.questionText || !pq.answers || pq.answers.length === 0) {
-        console.warn(`Skipping invalid question: ${JSON.stringify(pq)}`);
+      if (!pq.questionText) {
+        console.warn(`Skipping question without text: ${JSON.stringify(pq)}`);
         continue;
       }
 
-      // Find correct answer (default to first one if not specified)
-      const correctAnswer = pq.correctAnswer || pq.answers[0].key;
+      const isMultipleChoice = pq.answers && pq.answers.length > 0;
+      const questionType = isMultipleChoice ? 'mcq' : 'essay';
+      const correctAnswer = isMultipleChoice 
+        ? (pq.correctAnswer || pq.answers[0].key)
+        : '';
 
-      // Create question document
-      const question = new Question({
+      const questionData = {
         name: `Câu ${pq.questionNumber || createdQuestions.length + 1}`,
         text: pq.questionText,
-        type: 'mcq',
-        choices: pq.answers.map(ans => ({
+        type: questionType,
+        choices: isMultipleChoice ? pq.answers.map(ans => ({
           key: ans.key,
           text: ans.text
-        })),
+        })) : [],
         answer: correctAnswer,
         explanation: pq.explanation || '',
         subjectId: subjectId,
         level: pq.level || 1,
         tags: pq.tags || [],
-        ownerId: req.user._id || req.user.id,
+        ownerId: req.user._id,
         orgId: req.user.orgId || null,
         isPublic: false
+      };
+
+      console.log(`Creating question ${createdQuestions.length + 1}:`, {
+        name: questionData.name,
+        type: questionData.type,
+        ownerId: questionData.ownerId,
+        ownerIdType: typeof questionData.ownerId
       });
 
+      const question = new Question(questionData);
       const savedQuestion = await question.save();
       createdQuestions.push({
         questionId: savedQuestion._id,

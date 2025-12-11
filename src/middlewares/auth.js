@@ -29,11 +29,10 @@ const authMiddleware = (req, res, next) => {
     if (!decoded.id && !decoded._id && !decoded.userId && !decoded.sub) {
       console.warn('Token verified but no user ID found in payload');
     } else {
-      // Normalize the user ID to always be in req.user.id regardless of original field name
-      if (decoded._id) decoded.id = decoded._id;
-      if (decoded.userId) decoded.id = decoded.userId;
-      if (decoded.sub) decoded.id = decoded.sub;
-      
+      // Normalize the user ID to always be in both req.user.id and req.user._id
+      const userId = decoded._id || decoded.id || decoded.userId || decoded.sub;
+      decoded.id = userId;
+      decoded._id = userId;
     }
     
     // Set user info in request

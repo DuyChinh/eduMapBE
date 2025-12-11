@@ -1,110 +1,55 @@
-
-> express-app@1.0.0 start
-> nodemon src/app.js
-
-[33m[nodemon] 3.1.10[39m
-[33m[nodemon] to restart at any time, enter `rs`[39m
-[33m[nodemon] watching path(s): *.*[39m
-[33m[nodemon] watching extensions: js,mjs,cjs,json[39m
-[32m[nodemon] starting `node src/app.js`[39m
-Cloudinary Config Debug:
-CLOUD_NAME: dv7w1z8si
-API_KEY: ***8653
-API_SECRET: ***
-(node:87042) [MONGOOSE] Warning: Duplicate schema index on {"code":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(node:23736) Warning: Accessing non-existent property 'response' of module exports inside circular dependency
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:87042) [MONGOOSE] Warning: Duplicate schema index on {"ownerId":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
-(node:87042) Warning: Accessing non-existent property 'response' of module exports inside circular dependency
 Server is running on port 3000
-[32m[nodemon] restarting due to changes...[39m
-[32m[nodemon] starting `node src/app.js`[39m
-Cloudinary Config Debug:
-CLOUD_NAME: dv7w1z8si
-API_KEY: ***8653
-API_SECRET: ***
-(node:87114) [MONGOOSE] Warning: Duplicate schema index on {"code":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:87114) [MONGOOSE] Warning: Duplicate schema index on {"ownerId":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
-(node:87114) Warning: Accessing non-existent property 'response' of module exports inside circular dependency
-Server is running on port 3000
-Processing PDF: Äá» kiá»m tra ToÃ¡n 8 TN + TL.pdf, size: 177585 bytes
-Starting PDF parsing... { bufferSize: 177585, bufferType: 'object' }
-Step 1: Parsing PDF with pdf2json...
-Calling pdfParser.parseBuffer...
-Warning: Setting up fake worker.
-PDF data structure: { hasPages: true, hasFormImage: false, pagesCount: 2 }
-Page 1: Found 199 text items
-Page 2: Found 144 text items
-Successfully parsed 2 pages with pdf2json
-Step 1 complete: Found 2 pages
-Step 2: Converting pages to images...
-Step 2 complete: Generated 2 images
-Step 3: Extracting questions...
-Step 3 complete: Found 0 questions
-Successfully parsed 2 pages with 0 questions
-Successfully parsed PDF: 0 questions found across 2 pages
-Processing PDF: Äá» kiá»m tra ToÃ¡n 8 TN + TL.pdf, size: 177585 bytes
-Starting PDF parsing... { bufferSize: 177585, bufferType: 'object' }
-Step 1: Parsing PDF with pdf2json...
-Calling pdfParser.parseBuffer...
-Warning: Setting up fake worker.
-PDF data structure: { hasPages: true, hasFormImage: false, pagesCount: 2 }
-Page 1: Found 199 text items
-Page 2: Found 144 text items
-Successfully parsed 2 pages with pdf2json
-Step 1 complete: Found 2 pages
-Step 2: Converting pages to images...
-Step 2 complete: Generated 2 images
-Step 3: Extracting questions...
-Step 3 complete: Found 0 questions
-Successfully parsed 2 pages with 0 questions
-Successfully parsed PDF: 0 questions found across 2 pages
-[31m[nodemon] app crashed - waiting for file changes before starting...[39m
-[32m[nodemon] restarting due to changes...[39m
-[32m[nodemon] starting `node src/app.js`[39m
-Cloudinary Config Debug:
-CLOUD_NAME: dv7w1z8si
-API_KEY: ***8653
-API_SECRET: ***
-(node:87808) [MONGOOSE] Warning: Duplicate schema index on {"code":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:87808) [MONGOOSE] Warning: Duplicate schema index on {"ownerId":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
-(node:87808) Warning: Accessing non-existent property 'response' of module exports inside circular dependency
-Server is running on port 3000
-[32m[nodemon] restarting due to changes...[39m
-[32m[nodemon] starting `node src/app.js`[39m
-Cloudinary Config Debug:
-CLOUD_NAME: dv7w1z8si
-API_KEY: ***8653
-API_SECRET: ***
-(node:87863) [MONGOOSE] Warning: Duplicate schema index on {"code":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:87863) [MONGOOSE] Warning: Duplicate schema index on {"ownerId":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
-(node:87863) Warning: Accessing non-existent property 'response' of module exports inside circular dependency
-node:events:495
-      throw er; // Unhandled 'error' event
-      ^
-
-Error: listen EADDRINUSE: address already in use :::3000
-    at Server.setupListenHandle [as _listen2] (node:net:1811:16)
-    at listenInCluster (node:net:1859:12)
-    at Server.listen (node:net:1947:7)
-    at Function.listen (/home/chinhdd/Documents/eduMapBE/node_modules/express/lib/application.js:635:24)
-    at Object.<anonymous> (/home/chinhdd/Documents/eduMapBE/src/app.js:51:5)
-    at Module._compile (node:internal/modules/cjs/loader:1356:14)
-    at Module._extensions..js (node:internal/modules/cjs/loader:1414:10)
-    at Module.load (node:internal/modules/cjs/loader:1197:32)
-    at Module._load (node:internal/modules/cjs/loader:1013:12)
-    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:128:12)
-Emitted 'error' event on Server instance at:
-    at emitErrorNT (node:net:1838:8)
-    at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
-  code: 'EADDRINUSE',
-  errno: -98,
-  syscall: 'listen',
-  address: '::',
-  port: 3000
+=== Create Exam From PDF ===
+User: {
+  _id: '692a5dfb61e28682c0e36a06',
+  id: '692a5dfb61e28682c0e36a06',
+  role: 'teacher',
+  orgId: undefined
 }
-
-Node.js v18.19.1
-[31m[nodemon] app crashed - waiting for file changes before starting...[39m
+Creating exam from PDF: ex1210, 7 questions
+Creating question 1: {
+  name: 'Câu 1',
+  type: 'mcq',
+  ownerId: '692a5dfb61e28682c0e36a06',
+  ownerIdType: 'string'
+}
+Creating question 2: {
+  name: 'Câu 2',
+  type: 'mcq',
+  ownerId: '692a5dfb61e28682c0e36a06',
+  ownerIdType: 'string'
+}
+Creating question 3: {
+  name: 'Câu 3',
+  type: 'mcq',
+  ownerId: '692a5dfb61e28682c0e36a06',
+  ownerIdType: 'string'
+}
+Creating question 4: {
+  name: 'Câu 4',
+  type: 'mcq',
+  ownerId: '692a5dfb61e28682c0e36a06',
+  ownerIdType: 'string'
+}
+Creating question 5: {
+  name: 'Câu 5',
+  type: 'essay',
+  ownerId: '692a5dfb61e28682c0e36a06',
+  ownerIdType: 'string'
+}
+Creating question 6: {
+  name: 'Câu 6',
+  type: 'essay',
+  ownerId: '692a5dfb61e28682c0e36a06',
+  ownerIdType: 'string'
+}
+Creating question 7: {
+  name: 'Câu 7',
+  type: 'essay',
+  ownerId: '692a5dfb61e28682c0e36a06',
+  ownerIdType: 'string'
+}
+Created 7 questions in database
+Successfully created exam: 693a353a6dc311e29077536e
