@@ -1,0 +1,195 @@
+<%- include('../partials/header', { title: title, currentPage: 'mindmaps', user: user }) %>
+
+<div class="mindmap-detail-page">
+    <div class="page-header mb-3">
+        <div class="page-actions">
+            <a href="/admin/mindmaps" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to List
+            </a>
+            <a href="/admin/mindmaps/<%= mindmap._id %>/edit" class="btn btn-primary">
+                <i class="fas fa-edit"></i> Edit
+            </a>
+            <button class="btn btn-danger" onclick="deleteMindmap('<%= mindmap._id %>')">
+                <i class="fas fa-trash"></i> Delete
+            </button>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Basic Info -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Basic Information</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-borderless">
+                        <tr>
+                            <th width="30%">ID:</th>
+                            <td><code><%= mindmap._id %></code></td>
+                        </tr>
+                        <tr>
+                            <th>Title:</th>
+                            <td><%= mindmap.title || 'Untitled' %></td>
+                        </tr>
+                        <tr>
+                            <th>Description:</th>
+                            <td><%= mindmap.desc || 'No description' %></td>
+                        </tr>
+                        <tr>
+                            <th>Status:</th>
+                            <td>
+                                <% if (mindmap.status) { %>
+                                    <span class="badge bg-success">Active</span>
+                                <% } else { %>
+                                    <span class="badge bg-secondary">Inactive</span>
+                                <% } %>
+                                <% if (mindmap.deleted_at) { %>
+                                    <span class="badge bg-danger ms-1">Deleted</span>
+                                <% } %>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Favorite:</th>
+                            <td>
+                                <% if (mindmap.favorite) { %>
+                                    <i class="fas fa-star text-warning"></i> Yes
+                                <% } else { %>
+                                    <i class="far fa-star text-muted"></i> No
+                                <% } %>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- User & Timestamps -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-user"></i> User & Timestamps</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-borderless">
+                        <tr>
+                            <th width="30%">User ID:</th>
+                            <td>
+                                <% if (mindmap.user_id) { %>
+                                    <a href="/admin/users/<%= mindmap.user_id %>">
+                                        <code><%= mindmap.user_id %></code>
+                                    </a>
+                                <% } else { %>
+                                    <span class="text-muted">N/A</span>
+                                <% } %>
+                            </td>
+                        </tr>
+                        <% if (mindmap.user) { %>
+                        <tr>
+                            <th>User Name:</th>
+                            <td><%= mindmap.user.name || 'N/A' %></td>
+                        </tr>
+                        <tr>
+                            <th>User Email:</th>
+                            <td><%= mindmap.user.email || 'N/A' %></td>
+                        </tr>
+                        <% } %>
+                        <tr>
+                            <th>Created At:</th>
+                            <td><%= mindmap.created_at ? new Date(mindmap.created_at).toLocaleString() : 'N/A' %></td>
+                        </tr>
+                        <tr>
+                            <th>Updated At:</th>
+                            <td><%= mindmap.updated_at ? new Date(mindmap.updated_at).toLocaleString() : 'N/A' %></td>
+                        </tr>
+                        <% if (mindmap.deleted_at) { %>
+                        <tr>
+                            <th>Deleted At:</th>
+                            <td><span class="text-danger"><%= new Date(mindmap.deleted_at).toLocaleString() %></span></td>
+                        </tr>
+                        <% } %>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mindmap Image -->
+    <% if (mindmap.img) { %>
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-image"></i> Mindmap Image</h5>
+        </div>
+        <div class="card-body text-center">
+            <img src="<%= mindmap.img %>" alt="Mindmap Image" class="img-fluid" style="max-height: 400px;">
+        </div>
+    </div>
+    <% } %>
+
+    <!-- Mindmap Data Preview -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fas fa-code"></i> Mindmap Data (JSON)</h5>
+            <button class="btn btn-sm btn-outline-secondary" onclick="toggleDataView()">
+                <i class="fas fa-eye" id="toggleIcon"></i> Toggle View
+            </button>
+        </div>
+        <div class="card-body">
+            <div id="dataPreview" style="display: none;">
+                <pre class="bg-light p-3 rounded" style="max-height: 500px; overflow: auto;"><code><%= JSON.stringify(mindmap.data, null, 2) %></code></pre>
+            </div>
+            <div id="dataCollapsed">
+                <p class="text-muted mb-0">
+                    <i class="fas fa-info-circle"></i> 
+                    Mindmap data is hidden by default. Click "Toggle View" to show the raw JSON data.
+                    <% if (mindmap.data && mindmap.data.nodeData) { %>
+                        <br><strong>Root Node:</strong> <%= mindmap.data.nodeData.topic || 'N/A' %>
+                    <% } %>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let dataVisible = false;
+
+    function toggleDataView() {
+        dataVisible = !dataVisible;
+        document.getElementById('dataPreview').style.display = dataVisible ? 'block' : 'none';
+        document.getElementById('dataCollapsed').style.display = dataVisible ? 'none' : 'block';
+        document.getElementById('toggleIcon').className = dataVisible ? 'fas fa-eye-slash' : 'fas fa-eye';
+    }
+
+    function deleteMindmap(mindmapId) {
+        if (!confirm('Are you sure you want to delete this mindmap? This action cannot be undone!')) return;
+        fetch(`/v1/api/admin/mindmaps/${mindmapId}?permanent=true`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.ok) {
+                showNotification('Mindmap deleted successfully!', 'success');
+                setTimeout(() => window.location.href = '/admin/mindmaps', 800);
+            } else {
+                showNotification('Error: ' + data.message, 'danger');
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            showNotification('Error deleting mindmap', 'danger');
+        });
+    }
+
+    function getToken() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'admin_token') return value;
+        }
+        return '';
+    }
+</script>
+
+<%- include('../partials/footer') %>
