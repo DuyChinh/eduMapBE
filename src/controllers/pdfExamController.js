@@ -35,8 +35,7 @@ exports.uploadAndParse = async (req, res, next) => {
 
     console.log(`Processing PDF: ${req.file.originalname}, size: ${req.file.size} bytes`);
 
-    // Parse PDF
-    const parsedData = await pdfParserService.parsePDF(req.file.buffer);
+    const parsedData = await pdfParserService.parsePDF(req.file.buffer, req.file.originalname);
 
     // Count total questions found
     const totalQuestions = parsedData.pages.reduce(
