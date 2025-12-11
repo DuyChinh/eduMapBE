@@ -12,8 +12,10 @@ const MindmapSchema = new mongoose.Schema(
 
     status: { type: Boolean, default: true },
 
-    nodes: [{ type: mongoose.Schema.Types.Mixed }],
-    edges: [{ type: mongoose.Schema.Types.Mixed }],
+    // Stores the entire MindElixir data object
+    data: { type: mongoose.Schema.Types.Mixed },
+
+
 
     favorite: { type: Boolean, default: false },
 

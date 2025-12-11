@@ -1,69 +1,55 @@
-Cloudinary Config Debug:
-CLOUD_NAME: dv7w1z8si
-API_KEY: ***8653
-API_SECRET: ***
-(node:17025) [MONGOOSE] Warning: Duplicate schema index on {"code":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(node:23736) Warning: Accessing non-existent property 'response' of module exports inside circular dependency
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:17025) [MONGOOSE] Warning: Duplicate schema index on {"ownerId":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
-(node:17025) Warning: Accessing non-existent property 'response' of module exports inside circular dependency
 Server is running on port 3000
-Processing PDF: Äá» kiá»m tra ToÃ¡n 8 TN + TL.pdf, size: 177585 bytes
-Processing PDF: Äá» kiá»m tra ToÃ¡n 8 TN + TL.pdf, size: 177585 bytes
-Step 1: Using AI to extract questions from PDF...
-Sending PDF to AI for analysis...
-AI Response received, length: 2471
-AI extracted 10 questions successfully
-Step 1 complete: AI detected 10 questions
-Step 2: Creating placeholder images for pages...
-Step 2 complete: Generated 2 images
-Step 3: Organizing questions by page...
-Step 3 complete: Organized into 2 pages
-Successfully parsed PDF: 10 questions found across 2 pages
-Processing PDF: Äá» kiá»m tra ToÃ¡n 8 TN + TL.pdf, size: 177585 bytes
-Processing PDF: Äá» kiá»m tra ToÃ¡n 8 TN + TL.pdf, size: 177585 bytes
-Step 1: Using AI to extract questions from PDF...
-Sending PDF to AI for analysis...
-AI Response received, length: 2424
-AI extracted 10 questions successfully
-Step 1 complete: AI detected 10 questions
-Step 2: Creating placeholder images for pages...
-Step 2 complete: Generated 2 images
-Step 3: Organizing questions by page...
-Step 3 complete: Organized into 2 pages
-Successfully parsed PDF: 10 questions found across 2 pages
-Processing PDF: Äá» kiá»m tra ToÃ¡n 8 TN + TL.pdf, size: 177585 bytes
-Processing PDF: Äá» kiá»m tra ToÃ¡n 8 TN + TL.pdf, size: 177585 bytes
-Step 1: Using AI to extract questions from PDF...
-Sending PDF to AI for analysis...
-AI Response received, length: 2441
-AI extracted 10 questions successfully
-Step 1 complete: AI detected 10 questions
-Step 2: Creating placeholder images for pages...
-Step 2 complete: Generated 2 images
-Step 3: Organizing questions by page...
-Step 3 complete: Organized into 2 pages
-Successfully parsed PDF: 10 questions found across 2 pages
-Processing PDF: Äá» kiá»m tra ToÃ¡n 8 TN + TL.pdf, size: 177585 bytes
-Processing PDF: Äá» kiá»m tra ToÃ¡n 8 TN + TL.pdf, size: 177585 bytes
-Step 1: Using AI to extract questions from PDF...
-Sending PDF to AI for analysis...
-AI Response received, length: 2463
-AI extracted 10 questions successfully
-Step 1 complete: AI detected 10 questions
-Step 2: Creating placeholder images for pages...
-Step 2 complete: Generated 2 images
-Step 3: Organizing questions by page...
-Step 3 complete: Organized into 2 pages
-Successfully parsed PDF: 10 questions found across 2 pages
-Processing PDF: Äá» kiá»m tra ToÃ¡n 8 TN + TL.pdf, size: 177585 bytes
-Processing PDF: Äá» kiá»m tra ToÃ¡n 8 TN + TL.pdf, size: 177585 bytes
-Step 1: Using AI to extract questions from PDF...
-Sending PDF to AI for analysis...
-AI Response received, length: 2088
-AI extracted 7 questions successfully
-Step 1 complete: AI detected 7 questions
-Step 2: Creating placeholder images for pages...
-Step 2 complete: Generated 2 images
-Step 3: Organizing questions by page...
-Step 3 complete: Organized into 2 pages
-Successfully parsed PDF: 7 questions found across 2 pages
+=== Create Exam From PDF ===
+User: {
+  _id: '692a5dfb61e28682c0e36a06',
+  id: '692a5dfb61e28682c0e36a06',
+  role: 'teacher',
+  orgId: undefined
+}
+Creating exam from PDF: ex1210, 7 questions
+Creating question 1: {
+  name: 'Câu 1',
+  type: 'mcq',
+  ownerId: '692a5dfb61e28682c0e36a06',
+  ownerIdType: 'string'
+}
+Creating question 2: {
+  name: 'Câu 2',
+  type: 'mcq',
+  ownerId: '692a5dfb61e28682c0e36a06',
+  ownerIdType: 'string'
+}
+Creating question 3: {
+  name: 'Câu 3',
+  type: 'mcq',
+  ownerId: '692a5dfb61e28682c0e36a06',
+  ownerIdType: 'string'
+}
+Creating question 4: {
+  name: 'Câu 4',
+  type: 'mcq',
+  ownerId: '692a5dfb61e28682c0e36a06',
+  ownerIdType: 'string'
+}
+Creating question 5: {
+  name: 'Câu 5',
+  type: 'essay',
+  ownerId: '692a5dfb61e28682c0e36a06',
+  ownerIdType: 'string'
+}
+Creating question 6: {
+  name: 'Câu 6',
+  type: 'essay',
+  ownerId: '692a5dfb61e28682c0e36a06',
+  ownerIdType: 'string'
+}
+Creating question 7: {
+  name: 'Câu 7',
+  type: 'essay',
+  ownerId: '692a5dfb61e28682c0e36a06',
+  ownerIdType: 'string'
+}
+Created 7 questions in database
+Successfully created exam: 693a353a6dc311e29077536e

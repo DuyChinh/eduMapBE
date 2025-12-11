@@ -26,17 +26,17 @@ function validateByType(body) {
     if (!Array.isArray(body.choices) || body.choices.length < 2) {
       errors.push('choices must have at least 2 items for mcq');
     }
-    
+
     // Check if choices is array of strings (new format) or array of objects (old format)
     const isNewFormat = body.choices.every(choice => typeof choice === 'string');
     const isOldFormat = body.choices.every(choice => choice && typeof choice === 'object' && choice.key && choice.text);
-    
+
     if (!isNewFormat && !isOldFormat) {
       errors.push('choices must be array of strings or array of objects with key and text');
     }
-    
+
     if (body.answer == null) errors.push('answer is required');
-    
+
     if (isNewFormat) {
       // New format: answer is index (number)
       const answerIndex = Number(body.answer);
@@ -107,7 +107,7 @@ async function patch(req, res, next) {
       return res.status(403).json({ ok: false, message: 'Only owner can modify this question' });
 
     // chỉ cho phép set các field whitelisted
-    const allowed = ['text', 'type', 'choices', 'answer', 'tags', 'level', 'isPublic', 'metadata', 'subjectId', 'subject'];
+    const allowed = ['text', 'type', 'choices', 'answer', 'tags', 'level', 'isPublic', 'metadata', 'subjectId', 'subject', 'images'];
     const payload = {};
     for (const k of allowed) if (k in req.body) payload[k] = req.body[k];
 
@@ -137,16 +137,16 @@ async function getAllQuestions(req, res, next) {
     }
 
     const orgId = getOrgIdSoft(req);
-    
+
     // Lấy các tham số từ query
-    const { 
-      page = 1, 
-      limit = 20, 
-      subjectId, 
-      type, 
-      name, 
-      level, 
-      isPublic 
+    const {
+      page = 1,
+      limit = 20,
+      subjectId,
+      type,
+      name,
+      level,
+      isPublic
     } = req.query;
 
     // Parse boolean values
@@ -161,7 +161,7 @@ async function getAllQuestions(req, res, next) {
 
     // Build filter cho teacher
     const filter = {};
-    
+
     // Filter theo organization
     if (orgId && mongoose.isValidObjectId(orgId)) {
       filter.orgId = new mongoose.Types.ObjectId(orgId);
@@ -204,8 +204,7 @@ async function getAllQuestions(req, res, next) {
     const nLimit = Number(limit) || 20;
     const skip = (nPage - 1) * nLimit;
 
-    // Sort theo ngày tạo gần nhất lên đầu
-    const sort = { createdAt: -1 };
+    const sort = { updatedAt: -1 };
 
     // Query database
     const [items, total] = await Promise.all([
@@ -238,9 +237,9 @@ async function getQuestionById(req, res, next) {
       return res.status(400).json({ ok: false, message: 'invalid id' });
 
     const question = await Question.findById(id)
-      .populate('ownerId', 'name email') 
-      .populate('subjectId', 'name name_en name_jp'); 
-    
+      .populate('ownerId', 'name email')
+      .populate('subjectId', 'name name_en name_jp');
+
     res.json({ ok: true, data: question });
   } catch (e) { next(e); }
 }
@@ -271,8 +270,8 @@ async function create(req, res, next) {
     });
 
     if (existingQuestion) {
-      return res.status(409).json({ 
-        ok: false, 
+      return res.status(409).json({
+        ok: false,
         message: 'Question name already exists for this teacher',
         data: {
           existingQuestion: {
@@ -344,12 +343,134 @@ async function remove(req, res, next) {
 
 
 
-module.exports = { 
-  getAllQuestions, 
-  getQuestionById, 
-  create, 
-  update, 
-  patch, 
+
+async function batchRename(req, res, next) {
+  try {
+    const { questionIds, baseName } = req.body;
+
+    if (!Array.isArray(questionIds) || questionIds.length === 0) {
+      return res.status(400).json({ ok: false, message: 'questionIds must be a non-empty array' });
+    }
+    if (!baseName || typeof baseName !== 'string') {
+      return res.status(400).json({ ok: false, message: 'baseName is required and must be a string' });
+    }
+
+    // Verify ownership/role
+    if (!['teacher', 'admin'].includes(req.user?.role)) {
+      return res.status(403).json({ ok: false, message: 'Forbidden' });
+    }
+
+    const orgId = getOrgIdSoft(req);
+    const results = {
+      success: 0,
+      failed: 0,
+      errors: []
+    };
+
+    // Fetch valid questions
+    const validIds = questionIds.filter(id => mongoose.isValidObjectId(id));
+    const questions = await Question.find({ _id: { $in: validIds } });
+
+    // Sort questions by updatedAt DESC
+    questions.sort((a, b) => {
+      // Compare updatedAt
+      const dateA = new Date(a.updatedAt || a.createdAt).getTime();
+      const dateB = new Date(b.updatedAt || b.createdAt).getTime();
+
+      if (dateB !== dateA) return dateB - dateA;
+
+      // If same date, use user selection order
+      const indexA = questionIds.indexOf(String(a._id));
+      const indexB = questionIds.indexOf(String(b._id));
+      return indexA - indexB;
+    });
+
+    // Serial Rename in Reverse Order
+    for (let i = questions.length - 1; i >= 0; i--) {
+      const existing = questions[i];
+      const id = existing.id;
+
+      if (!isOwner(req.user, existing)) {
+        results.failed++;
+        results.errors.push({ id, name: existing.name, error: 'Not authorized to rename' });
+        continue;
+      }
+
+      // If single item TOTAL, use baseName as is. If multiple, use baseName-index.
+      const isSingleMode = questions.length === 1;
+      const newName = isSingleMode ? baseName : `${baseName}-${i + 1}`;
+
+      try {
+        const queryBase = {
+          ownerId: new mongoose.Types.ObjectId(req.user.id),
+          ...(orgId ? { orgId: new mongoose.Types.ObjectId(orgId) } : {}),
+        };
+
+        // Check duplicate for newName
+        const duplicate = await Question.findOne({
+          ...queryBase,
+          name: newName,
+          _id: { $ne: existing._id }
+        });
+
+        if (duplicate) {
+          results.failed++;
+          results.errors.push({ id, name: existing.name, error: `The name "${newName}" is already taken` });
+          continue;
+        }
+
+        if (isSingleMode) {
+          const escapedName = newName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const variantConflict = await Question.findOne({
+            ...queryBase,
+            name: { $regex: new RegExp(`^${escapedName}-\\d+$`) },
+            _id: { $ne: existing._id }
+          });
+
+          if (variantConflict) {
+            results.failed++;
+            results.errors.push({ id, name: existing.name, error: `Cannot use name "${newName}" because a related numbered series already exists (e.g. "${variantConflict.name}")` });
+            continue;
+          }
+        }
+
+        // Perform Update
+        existing.name = newName;
+        await existing.save();
+        results.success++;
+
+      } catch (err) {
+        results.failed++;
+        results.errors.push({ id, error: err.message });
+      }
+    }
+
+    // Report missing IDs
+    const foundIds = questions.map(q => String(q._id));
+    const missingIds = questionIds.filter(id => !foundIds.includes(id) && mongoose.isValidObjectId(id));
+    missingIds.forEach(id => {
+      results.failed++;
+      results.errors.push({ id, error: 'Question not found' });
+    });
+
+    res.json({
+      ok: true,
+      message: `Renamed ${results.success} questions. ${results.failed} failed.`,
+      results
+    });
+
+  } catch (e) {
+    next(e);
+  }
+}
+
+module.exports = {
+  getAllQuestions,
+  getQuestionById,
+  create,
+  update,
+  patch,
   remove,
+  batchRename,
   validateByType // Export for use in import controller
 };
