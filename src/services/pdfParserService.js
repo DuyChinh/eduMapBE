@@ -46,7 +46,7 @@ class PDFParserService {
     try {
       const base64Pdf = pdfBuffer.toString('base64');
       
-      const prompt = `Đọc file PDF này và export câu hỏi theo format JSON sau:
+      const prompt = `Đọc file PDF này và export câu hỏi theo format JSON sau, lưu ý giữ nguyên định dạng mathjax nếu có:
 
 Format mong muốn cho mỗi câu hỏi:
 {
