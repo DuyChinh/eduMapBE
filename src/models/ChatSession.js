@@ -12,6 +12,10 @@ const chatSessionSchema = new mongoose.Schema({
     },
     lastMessage: {
         type: String
+    },
+    pinned: {
+        type: Boolean,
+        default: false
     }
 }, { timestamps: true, collection: 'ai_chat_sessions' });
 

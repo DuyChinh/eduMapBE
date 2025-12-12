@@ -8,6 +8,7 @@ const Question = require('../models/Question');
 const ChatSession = require('../models/ChatSession');
 const ChatHistory = require('../models/ChatHistory');
 const ProctorLog = require('../models/ProctorLog');
+const Mindmap = require('../models/Mindmap');
 
 /**
  * Get dashboard statistics
@@ -1066,6 +1067,180 @@ async function deleteProctorLog(logId) {
   return { message: 'Proctor log deleted successfully' };
 }
 
+// ============== MINDMAP MANAGEMENT ==============
+
+/**
+ * Get all mindmaps with pagination and filters
+ * @param {Object} options - Query options
+ * @returns {Object} - Mindmaps list with pagination
+ */
+async function getMindmaps(options = {}) {
+  const { userId, search, status, favorite, page = 1, limit = 20, includeDeleted = false } = options;
+
+  const query = {};
+
+  // Filter by deleted status
+  if (!includeDeleted) {
+    query.deleted_at = null;
+  }
+
+  // Filter by user
+  if (userId) {
+    query.user_id = userId;
+  }
+
+  // Filter by status
+  if (status !== undefined) {
+    query.status = status === 'true' || status === true;
+  }
+
+  // Filter by favorite
+  if (favorite !== undefined) {
+    query.favorite = favorite === 'true' || favorite === true;
+  }
+
+  // Search by title or desc
+  if (search) {
+    query.$or = [
+      { title: { $regex: search, $options: 'i' } },
+      { desc: { $regex: search, $options: 'i' } }
+    ];
+  }
+
+  const skip = (page - 1) * limit;
+
+  const [mindmaps, total] = await Promise.all([
+    Mindmap.find(query)
+      .sort({ updated_at: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean(),
+    Mindmap.countDocuments(query)
+  ]);
+
+  // Populate user info for each mindmap
+  const mindmapsWithUser = await Promise.all(
+    mindmaps.map(async (mindmap) => {
+      let user = null;
+      if (mindmap.user_id) {
+        user = await User.findById(mindmap.user_id)
+          .select('name email avatar role')
+          .lean();
+      }
+      return {
+        ...mindmap,
+        user: user || { name: 'Unknown', email: 'N/A' }
+      };
+    })
+  );
+
+  return {
+    mindmaps: mindmapsWithUser,
+    pagination: {
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil(total / limit)
+    }
+  };
+}
+
+/**
+ * Get mindmap by ID
+ * @param {String} mindmapId - Mindmap ID
+ * @returns {Object} - Mindmap data
+ */
+async function getMindmapById(mindmapId) {
+  const mindmap = await Mindmap.findById(mindmapId).lean();
+
+  if (!mindmap) {
+    throw new Error('Mindmap not found');
+  }
+
+  // Get user info
+  let user = null;
+  if (mindmap.user_id) {
+    user = await User.findById(mindmap.user_id)
+      .select('name email avatar role')
+      .lean();
+  }
+
+  return {
+    ...mindmap,
+    user: user || { name: 'Unknown', email: 'N/A' }
+  };
+}
+
+/**
+ * Update mindmap
+ * @param {String} mindmapId - Mindmap ID
+ * @param {Object} updates - Update data
+ * @returns {Object} - Updated mindmap
+ */
+async function updateMindmap(mindmapId, updates) {
+  // Don't allow updating certain fields
+  const { _id, user_id, created_at, ...allowedUpdates } = updates;
+
+  const mindmap = await Mindmap.findByIdAndUpdate(
+    mindmapId,
+    { ...allowedUpdates, updated_at: new Date() },
+    { new: true }
+  ).lean();
+
+  if (!mindmap) {
+    throw new Error('Mindmap not found');
+  }
+
+  return mindmap;
+}
+
+/**
+ * Delete mindmap (soft delete)
+ * @param {String} mindmapId - Mindmap ID
+ * @param {Boolean} permanent - Permanently delete
+ * @returns {Object} - Deletion result
+ */
+async function deleteMindmap(mindmapId, permanent = false) {
+  if (permanent) {
+    const mindmap = await Mindmap.findByIdAndDelete(mindmapId);
+    if (!mindmap) {
+      throw new Error('Mindmap not found');
+    }
+    return { message: 'Mindmap permanently deleted' };
+  }
+
+  const mindmap = await Mindmap.findByIdAndUpdate(
+    mindmapId,
+    { deleted_at: new Date() },
+    { new: true }
+  );
+
+  if (!mindmap) {
+    throw new Error('Mindmap not found');
+  }
+
+  return { message: 'Mindmap deleted successfully' };
+}
+
+/**
+ * Restore deleted mindmap
+ * @param {String} mindmapId - Mindmap ID
+ * @returns {Object} - Restored mindmap
+ */
+async function restoreMindmap(mindmapId) {
+  const mindmap = await Mindmap.findByIdAndUpdate(
+    mindmapId,
+    { deleted_at: null },
+    { new: true }
+  ).lean();
+
+  if (!mindmap) {
+    throw new Error('Mindmap not found');
+  }
+
+  return mindmap;
+}
+
 module.exports = {
   getDashboardStats,
   getUsers,
@@ -1094,6 +1269,12 @@ module.exports = {
   deleteClass,
   getProctorLogs,
   getProctorLogById,
-  deleteProctorLog
+  deleteProctorLog,
+  // Mindmap management
+  getMindmaps,
+  getMindmapById,
+  updateMindmap,
+  deleteMindmap,
+  restoreMindmap
 };
 
