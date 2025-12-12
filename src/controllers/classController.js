@@ -2,13 +2,11 @@ const mongoose = require('mongoose');
 const service = require('../services/classService');
 const User = require('../models/User');
 
-// nên tạo getOrgIdSoft ở chỗ khác, import nó.
-//Viết inline:
 const getOrgIdSoft = (req) =>
   req.user?.orgId || req.user?.org?.id || req.body?.orgId || req.query?.orgId || null;
 
 const isTeacher = (u) => u && u.role === 'teacher';
-const isAdmin   = (u) => u && u.role === 'admin';
+const isAdmin = (u) => u && u.role === 'admin';
 const isStudent = (u) => u && u.role === 'student';
 const isTeacherOrAdmin = (u) => isTeacher(u) || isAdmin(u);
 
@@ -46,8 +44,8 @@ async function create(req, res, next) {
     });
 
     if (existingClass) {
-      return res.status(409).json({ 
-        ok: false, 
+      return res.status(409).json({
+        ok: false,
         message: 'Class name already exists for this teacher',
         data: {
           existingClass: {
@@ -119,15 +117,23 @@ async function getOne(req, res, next) {
     if (!doc) return res.status(404).json({ ok: false, message: 'Class not found' });
 
     // Quyền xem: teacher owner, admin, hoặc student đã tham gia
+    // Quyền xem: teacher owner, admin, hoặc student đã tham gia
     const isOwner = String(doc.teacherId) === String(req.user.id);
-    const isJoined = doc.studentIds.some(sid => String(sid) === String(req.user.id));
+    const isJoined = doc.studentIds.some(sid => {
+      // Handle both populated (object) and unpopulated (ObjectId/string) cases
+      if (sid && (sid._id || sid.id)) {
+        return String(sid._id || sid.id) === String(req.user.id);
+      }
+      return String(sid) === String(req.user.id);
+    });
+
     if (!(isOwner || isAdmin(req.user) || isJoined)) {
       return res.status(403).json({ ok: false, message: 'Forbidden' });
     }
 
     // Format response với joinedAt cho mỗi student
     const classData = doc.toObject ? doc.toObject() : doc;
-    
+
     // Tạo map từ studentJoins để dễ lookup
     const joinMap = new Map();
     if (classData.studentJoins && Array.isArray(classData.studentJoins)) {
@@ -156,7 +162,7 @@ async function getOne(req, res, next) {
       classData.studentIds.forEach(student => {
         let studentId = null;
         let studentData = null;
-        
+
         if (typeof student === 'object' && student._id) {
           // Populated student object
           studentId = String(student._id);
@@ -172,7 +178,7 @@ async function getOne(req, res, next) {
           studentId = String(student);
           studentData = null;
         }
-        
+
         if (studentData) {
           students.push({
             ...studentData,
@@ -181,7 +187,7 @@ async function getOne(req, res, next) {
         }
       });
     }
-    
+
     // Thêm students vào response
     classData.students = students;
 
@@ -214,7 +220,7 @@ async function mine(req, res, next) {
         ClassModel.find(filter).sort('-createdAt').skip(skip).limit(limit),
         ClassModel.countDocuments(filter),
       ]);
-      
+
       // Add joinedAt for current student from studentJoins array
       const userIdStr = String(req.user.id);
       const itemsWithJoinedAt = items.map(item => {
@@ -224,7 +230,7 @@ async function mine(req, res, next) {
           const joinInfo = classData.studentJoins.find(join => {
             const studentId = join.studentId;
             if (!studentId) return false;
-            const joinStudentId = typeof studentId === 'object' 
+            const joinStudentId = typeof studentId === 'object'
               ? String(studentId._id || studentId.id || studentId)
               : String(studentId);
             return joinStudentId === userIdStr;
@@ -235,7 +241,7 @@ async function mine(req, res, next) {
         }
         return classData;
       });
-      
+
       return res.json({ ok: true, items: itemsWithJoinedAt, total, page, limit, pages: Math.max(1, Math.ceil(total / limit)) });
     }
     // Admin: xem tất cả
@@ -340,12 +346,12 @@ async function addStudents(req, res, next) {
       return res.status(403).json({ ok: false, message: 'Forbidden' });
     }
     const id = req.params.id;
-    const { studentIds, studentEmails  } = req.body;
+    const { studentIds, studentEmails } = req.body;
     if (!mongoose.isValidObjectId(id)) {
       return res.status(400).json({ ok: false, message: 'invalid class id' });
     }
     if ((!Array.isArray(studentIds) || studentIds.length === 0) &&
-        (!Array.isArray(studentEmails) || studentEmails.length === 0)) {
+      (!Array.isArray(studentEmails) || studentEmails.length === 0)) {
       return res.status(400).json({ ok: false, message: 'studentIds or studentEmails must be provided' });
     }
 
@@ -382,7 +388,7 @@ async function removeStudents(req, res, next) {
       return res.status(400).json({ ok: false, message: 'invalid class id' });
     }
     if ((!Array.isArray(studentIds) || studentIds.length === 0) &&
-        (!Array.isArray(studentEmails) || studentEmails.length === 0)) {
+      (!Array.isArray(studentEmails) || studentEmails.length === 0)) {
       return res.status(400).json({ ok: false, message: 'studentIds or studentEmails must be provided' });
     }
 
@@ -414,9 +420,9 @@ async function search(req, res, next) {
     const { q, page = 1, limit = 20, sort = '-createdAt' } = req.query;
 
     if (!q || q.trim().length < 2) {
-      return res.status(400).json({ 
-        ok: false, 
-        message: 'Search query must be at least 2 characters' 
+      return res.status(400).json({
+        ok: false,
+        message: 'Search query must be at least 2 characters'
       });
     }
 
@@ -429,8 +435,8 @@ async function search(req, res, next) {
     });
 
     res.json({ ok: true, ...data });
-  } catch (e) { 
-    next(e); 
+  } catch (e) {
+    next(e);
   }
 }
 
