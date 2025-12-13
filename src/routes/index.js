@@ -13,6 +13,8 @@ const examResultsRoutes = require('./examResults');
 const aiRoutes = require('./ai');
 const mindmapRoutes = require('./mindmap');
 const uploadRoutes = require('./upload');
+const feedRoutes = require('./feed');
+
 
 const configureRoutes = (app) => {
     const v1 = express.Router();
@@ -30,7 +32,10 @@ const configureRoutes = (app) => {
     v1.use('/ai', aiRoutes);
     v1.use('/mindmaps', mindmapRoutes);
     v1.use('/upload', uploadRoutes);
-    
+    v1.use('/feed', feedRoutes);
+    v1.use('/notifications', require('./notifications'));
+
+
     // Admin API routes
     const adminRoutes = require('./admin');
     v1.use('/admin', adminRoutes);
