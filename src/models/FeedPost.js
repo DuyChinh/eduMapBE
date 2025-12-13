@@ -8,9 +8,21 @@ const CommentSchema = new mongoose.Schema({
     },
     content: {
         type: String,
-        required: true,
         trim: true
-    }
+    },
+    images: [{
+        type: String
+    }],
+    files: [{
+        name: String,
+        url: String,
+        type: { type: String }
+    }],
+    links: [{
+        title: String,
+        url: String,
+        description: String
+    }]
 }, {
     timestamps: true
 });
@@ -33,6 +45,16 @@ const FeedPostSchema = new mongoose.Schema({
     },
     images: [{
         type: String
+    }],
+    files: [{
+        name: String,
+        url: String,
+        type: { type: String }
+    }],
+    links: [{
+        title: String,
+        url: String,
+        description: String
     }],
     likes: [{
         type: mongoose.Schema.Types.ObjectId,

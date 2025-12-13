@@ -7,23 +7,23 @@ const { sanitizeUser } = require('../utils/userUtils');
 const authService = {
     async register(UserData) {
         const { name, email, password, role } = UserData;
-        
+
         // Validate password
         const passwordValidation = validatePassword(password);
         if (!passwordValidation.isValid) {
             throw new Error(`Password validation failed: ${passwordValidation.errors.join(', ')}`);
         }
-        
+
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             throw new Error('User already exists');
         }
         const hashedPassword = await bcrypt.hash(password, 10);
-        const user = await User.create({ 
+        const user = await User.create({
             orgId: null,
-            name, 
+            name,
             email,
-            password: hashedPassword, 
+            password: hashedPassword,
             role,
             status: 'active',
         });
@@ -40,7 +40,7 @@ const authService = {
         if (!isPasswordValid) {
             throw new Error('Email or password is incorrect');
         }
-        const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_ACCESS_EXPIRES });
+        const token = jwt.sign({ id: user.id || user._id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_ACCESS_EXPIRES });
         return { user: sanitizeUser(user), token };
     }
 }

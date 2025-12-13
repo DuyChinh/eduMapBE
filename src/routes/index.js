@@ -33,6 +33,7 @@ const configureRoutes = (app) => {
     v1.use('/mindmaps', mindmapRoutes);
     v1.use('/upload', uploadRoutes);
     v1.use('/feed', feedRoutes);
+    v1.use('/notifications', require('./notifications'));
 
 
     // Admin API routes
