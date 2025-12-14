@@ -18,6 +18,22 @@ const getPublicIdFromUrl = (url) => {
   }
 };
 
+const getAllImageUrls = (doc) => {
+  const urls = new Set();
+  if (doc.images && Array.isArray(doc.images)) {
+    doc.images.forEach(url => { if (typeof url === 'string') urls.add(url); });
+  }
+  if (doc.image && typeof doc.image === 'string') urls.add(doc.image);
+  if (doc.choices && Array.isArray(doc.choices)) {
+    doc.choices.forEach(c => {
+      if (c && typeof c === 'object' && c.image && typeof c.image === 'string') {
+        urls.add(c.image);
+      }
+    });
+  }
+  return urls;
+};
+
 const ALLOWED_TYPES = ['mcq', 'tf', 'short', 'essay'];
 
 const getOrgIdSoft = (req) =>
@@ -138,6 +154,20 @@ async function patch(req, res, next) {
     const merged = { ...existing.toObject(), ...payload };
     const errors = validateByType(merged);
     if (errors.length) return res.status(400).json({ ok: false, errors });
+
+    // Compare and delete removed images
+    const oldUrls = getAllImageUrls(existing.toObject());
+    const newUrls = getAllImageUrls(merged);
+    const urlsToDelete = [...oldUrls].filter(url => !newUrls.has(url));
+
+    if (urlsToDelete.length > 0) {
+      urlsToDelete.forEach(url => {
+        const publicId = getPublicIdFromUrl(url);
+        if (publicId) {
+          cloudinary.uploader.destroy(publicId).catch(err => console.error('Cloudinary destroy error:', err));
+        }
+      });
+    }
 
     const updated = await service.updatePartial({ id, payload, ownerIdEnforce: req.user.id });
     res.json({ ok: true, data: updated });
@@ -334,6 +364,20 @@ async function update(req, res, next) {
     const merged = { ...existing.toObject(), ...payload };
     const errors = validateByType(merged);
     if (errors.length) return res.status(400).json({ ok: false, errors });
+
+    // Compare and delete removed images
+    const oldUrls = getAllImageUrls(existing.toObject());
+    const newUrls = getAllImageUrls(merged);
+    const urlsToDelete = [...oldUrls].filter(url => !newUrls.has(url));
+
+    if (urlsToDelete.length > 0) {
+      urlsToDelete.forEach(url => {
+        const publicId = getPublicIdFromUrl(url);
+        if (publicId) {
+          cloudinary.uploader.destroy(publicId).catch(err => console.error('Cloudinary destroy error:', err));
+        }
+      });
+    }
 
     const updated = await service.update({ id, payload, ownerIdEnforce: req.user.id });
     res.json({ ok: true, data: updated });
