@@ -23,6 +23,15 @@ app.use(express.static('public'));
 app.use('/uploads', express.static('uploads'));
 app.use(passport.initialize());
 
+// Root route - Health check
+app.get('/', (req, res) => {
+    res.status(200).json({ 
+        message: 'Server is running successfully!',
+        version: 'v1',
+        status: 'healthy'
+    });
+});
+
 // Admin views routes (before API routes to avoid conflicts)
 const adminViewRoutes = require('./routes/adminViews');
 app.use('/admin', adminViewRoutes);

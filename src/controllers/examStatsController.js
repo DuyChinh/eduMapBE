@@ -42,7 +42,7 @@ async function getExamStatistics(req, res, next) {
     });
 
     const totalSubmissions = submissions.length;
-    
+
     if (totalSubmissions === 0) {
       return res.json({
         ok: true,
@@ -63,7 +63,7 @@ async function getExamStatistics(req, res, next) {
     const averageScore = totalScore / totalSubmissions;
     const highestScore = Math.max(...scores);
     const lowestScore = Math.min(...scores);
-    
+
     // Calculate pass rate (assuming 50% is passing)
     const passingScore = exam.totalMarks * 0.5;
     const passedCount = submissions.filter(s => s.score >= passingScore).length;
@@ -248,7 +248,7 @@ async function getExamSubmissions(req, res, next) {
     // Check for expired in_progress submissions and auto-submit them
     const submissionService = require('../services/submissionService');
     const inProgressSubmissions = submissions.filter(s => s.status === 'in_progress');
-    
+
     if (inProgressSubmissions.length > 0) {
       // Process in parallel
       await Promise.all(inProgressSubmissions.map(async (sub) => {
@@ -258,7 +258,7 @@ async function getExamSubmissions(req, res, next) {
           console.error(`Error auto-submitting submission ${sub._id}:`, err);
         }
       }));
-      
+
       // Re-fetch submissions to get updated statuses
       // Optimization: We could just update the objects in memory, but re-fetching ensures consistency
       submissions = await Submission.find({ examId })
@@ -287,7 +287,7 @@ async function getExamSubmissions(req, res, next) {
           }
         }
       });
-      
+
       // Convert map back to array
       submissions = Object.values(userSubmissionsMap);
     }
@@ -306,8 +306,8 @@ async function getExamSubmissions(req, res, next) {
       submissions = submissions.filter(sub => {
         const studentName = sub.userId?.name || '';
         const studentCode = sub.userId?.studentCode || '';
-        return studentName.toLowerCase().includes(searchTerm) || 
-               studentCode.toLowerCase().includes(searchTerm);
+        return studentName.toLowerCase().includes(searchTerm) ||
+          studentCode.toLowerCase().includes(searchTerm);
       });
     }
 
@@ -441,7 +441,9 @@ async function getStudentSubmissionDetail(req, res, next) {
         }
       }
       const answer = questionIdStr ? answersMap.get(questionIdStr) : null;
-      
+
+
+
       return {
         question: {
           _id: questionId,
@@ -450,7 +452,8 @@ async function getStudentSubmissionDetail(req, res, next) {
           type: examQuestion.questionId?.type,
           choices: examQuestion.questionId?.choices,
           correctAnswer: examQuestion.questionId?.answer || examQuestion.questionId?.correctAnswer,
-          explanation: examQuestion.questionId?.explanation
+          explanation: examQuestion.questionId?.explanation,
+          images: examQuestion.questionId?.images
         },
         selectedAnswer: answer ? answer.value : null,
         isCorrect: answer ? answer.isCorrect : false,
@@ -572,7 +575,7 @@ async function getSubmissionDetailById(req, res, next) {
         }
       }
       const answer = questionIdStr ? answersMap.get(questionIdStr) : null;
-      
+
       return {
         question: {
           _id: questionId,
@@ -581,7 +584,8 @@ async function getSubmissionDetailById(req, res, next) {
           type: examQuestion.questionId?.type,
           choices: examQuestion.questionId?.choices,
           correctAnswer: examQuestion.questionId?.answer || examQuestion.questionId?.correctAnswer,
-          explanation: examQuestion.questionId?.explanation
+          explanation: examQuestion.questionId?.explanation,
+          images: examQuestion.questionId?.images
         },
         selectedAnswer: answer ? answer.value : null,
         isCorrect: answer ? answer.isCorrect : false,
@@ -650,7 +654,7 @@ async function getSubmissionActivityLog(req, res, next) {
     }
 
     // Get the submission (can be in_progress, submitted, or graded)
-    
+
     let submission;
     if (req.query.submissionId) {
       submission = await Submission.findOne({
@@ -727,7 +731,7 @@ async function getOverallExamResults(req, res, next) {
 
     // Build query
     const query = { userId: user.id };
-    
+
     if (status) {
       query.status = status;
     }
@@ -760,9 +764,9 @@ async function getOverallExamResults(req, res, next) {
     const totalMaxScore = submissions.reduce((sum, sub) => sum + sub.maxScore, 0);
     const averageScore = totalMaxScore > 0 ? (totalScore / totalMaxScore) * 100 : 0;
     const totalTimeSpent = submissions.reduce((sum, sub) => sum + (sub.timeSpent || 0), 0);
-    
+
     // Calculate pass rate (50% threshold)
-    const passedCount = submissions.filter(sub => 
+    const passedCount = submissions.filter(sub =>
       sub.maxScore > 0 && (sub.score / sub.maxScore) >= 0.5
     ).length;
     const passRate = totalExams > 0 ? (passedCount / totalExams) * 100 : 0;
@@ -818,10 +822,10 @@ async function getSubjectAverageScores(req, res, next) {
 
     // Group by subject
     const subjectMap = {};
-    
+
     submissions.forEach(sub => {
       if (!sub.examId) return;
-      
+
       const subject = sub.examId.subjectCode || 'Unknown';
       if (!subjectMap[subject]) {
         subjectMap[subject] = {
@@ -833,7 +837,7 @@ async function getSubjectAverageScores(req, res, next) {
           scores: []
         };
       }
-      
+
       subjectMap[subject].totalScore += sub.score;
       subjectMap[subject].totalMaxScore += sub.maxScore;
       subjectMap[subject].examCount++;
@@ -848,7 +852,7 @@ async function getSubjectAverageScores(req, res, next) {
     const subjectAverages = Object.values(subjectMap).map(data => ({
       subject: data.subject,
       examCount: data.examCount,
-      averageScore: data.totalMaxScore > 0 
+      averageScore: data.totalMaxScore > 0
         ? Math.round((data.totalScore / data.totalMaxScore) * data.totalMaxScore / data.examCount * 10) / 10
         : 0,
       totalMarks: data.totalMaxScore / data.examCount,
@@ -942,7 +946,7 @@ async function getScoreDistribution(req, res, next) {
     // - If scores are equal: choose the one with lower timeSpent (faster)
     // - Otherwise: choose the one with higher score
     const userScores = [];
-    
+
     Object.values(userSubmissionsMap).forEach(userSubs => {
       let bestSub;
       if (userSubs.length === 1) {
@@ -964,7 +968,7 @@ async function getScoreDistribution(req, res, next) {
     // Calculate score ranges (always 10 ranges)
     const totalMarks = exam.totalMarks || 100;
     const rangeSize = Math.round(totalMarks / 10);
-    
+
     // Initialize 10 ranges
     const ranges = [];
     for (let i = 0; i < 10; i++) {
@@ -1058,9 +1062,9 @@ async function resetStudentAttempt(req, res, next) {
       .exec();
 
     if (!latestSubmission) {
-      return res.status(404).json({ 
-        ok: false, 
-        message: 'No submitted submission found for this student. Cannot reset attempt.' 
+      return res.status(404).json({
+        ok: false,
+        message: 'No submitted submission found for this student. Cannot reset attempt.'
       });
     }
 
@@ -1090,11 +1094,11 @@ async function resetStudentAttempt(req, res, next) {
         $set: { attemptNumber: 0 }
       }
     );
-    
+
     // Get the updated latest submission to get the new attemptNumber
     const updatedLatestSubmission = await Submission.findById(latestSubmission._id);
     const newAttemptNumber = updatedLatestSubmission.attemptNumber;
-    
+
     console.log(`Reset attempt: Reduced attemptNumber for ALL ${result.modifiedCount} submission(s) of student ${studentId} for exam ${examId}`);
 
     res.json({
