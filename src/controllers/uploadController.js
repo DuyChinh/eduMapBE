@@ -49,6 +49,27 @@ const uploadImage = async (req, res) => {
     }
 };
 
+const deleteImageInternal = async (public_id) => {
+    if (!public_id) throw new Error('public_id is required');
+    return cloudinary.uploader.destroy(public_id);
+};
+
+const getPublicIdFromUrl = (url) => {
+    if (!url) return null;
+    try {
+        const parts = url.split('/upload/');
+        if (parts.length < 2) return null;
+        let publicId = parts[1];
+        // Remove version if present
+        publicId = publicId.replace(/^v\d+\//, '');
+        // Remove extension
+        publicId = publicId.substring(0, publicId.lastIndexOf('.'));
+        return publicId;
+    } catch (e) {
+        return null;
+    }
+};
+
 const deleteImage = async (req, res) => {
     try {
         const { public_id } = req.body;
@@ -61,7 +82,7 @@ const deleteImage = async (req, res) => {
         }
 
         // Delete image from Cloudinary
-        const result = await cloudinary.uploader.destroy(public_id);
+        const result = await deleteImageInternal(public_id);
 
         if (result.result === 'ok' || result.result === 'not found') {
             return res.status(200).json({
@@ -85,5 +106,7 @@ const deleteImage = async (req, res) => {
 
 module.exports = {
     uploadImage,
-    deleteImage
+    deleteImage,
+    deleteImageInternal,
+    getPublicIdFromUrl
 };
