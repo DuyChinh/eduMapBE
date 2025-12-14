@@ -19,7 +19,7 @@ const upload = multer({
     ];
     const allowedExtensions = ['.csv', '.xlsx', '.xls'];
     const fileExtension = '.' + file.originalname.split('.').pop().toLowerCase();
-    
+
     if (allowedMimes.includes(file.mimetype) || allowedExtensions.includes(fileExtension)) {
       cb(null, true);
     } else {
@@ -34,6 +34,7 @@ router.get('/template', auth, questionImportExportController.downloadTemplate);
 router.post('/import', auth, upload.single('file'), questionImportExportController.importQuestions);
 
 router.get('/', auth, questionController.getAllQuestions);
+router.post('/batch-rename', auth, questionController.batchRename);
 router.get('/:id', auth, questionController.getQuestionById);
 router.post('/', auth, questionController.create);
 router.put('/:id', auth, questionController.update);

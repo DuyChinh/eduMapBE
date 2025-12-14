@@ -74,6 +74,9 @@ router.get('/classes/:classId', adminViewController.renderClassDetail);
 router.get('/classes/:classId/edit', adminViewController.renderClassEdit);
 router.get('/proctor-logs', adminViewController.renderProctorLogs);
 router.get('/proctor-logs/:logId', adminViewController.renderProctorLogDetail);
+router.get('/mindmaps', adminViewController.renderMindmaps);
+router.get('/mindmaps/:mindmapId', adminViewController.renderMindmapDetail);
+router.get('/mindmaps/:mindmapId/edit', adminViewController.renderMindmapEdit);
 
 module.exports = router;
 

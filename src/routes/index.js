@@ -11,6 +11,8 @@ const proctorRoutes = require('./proctor');
 const reportRoutes = require('./reports');
 const examResultsRoutes = require('./examResults');
 const aiRoutes = require('./ai');
+const mindmapRoutes = require('./mindmap');
+const uploadRoutes = require('./upload');
 
 const configureRoutes = (app) => {
     const v1 = express.Router();
@@ -26,6 +28,8 @@ const configureRoutes = (app) => {
     v1.use('/reports', reportRoutes);
     v1.use('/exam-results', examResultsRoutes);
     v1.use('/ai', aiRoutes);
+    v1.use('/mindmaps', mindmapRoutes);
+    v1.use('/upload', uploadRoutes);
     
     // Admin API routes
     const adminRoutes = require('./admin');
