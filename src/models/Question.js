@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const ChoiceSchema = new mongoose.Schema({
   key: { type: String, required: true },
-  text: { type: String, required: true },
+  text: { type: String }, // Made optional to support image-only options
   image: { type: String }
 }, { _id: false });
 

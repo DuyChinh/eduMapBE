@@ -1,6 +1,22 @@
 const mongoose = require('mongoose');
 const service = require('../services/questionService');
 const Question = require('../models/Question');
+const cloudinary = require('../config/cloudinary');
+
+const getPublicIdFromUrl = (url) => {
+  if (!url) return null;
+  try {
+    const parts = url.split('/upload/');
+    if (parts.length < 2) return null;
+    let publicId = parts[1];
+
+    publicId = publicId.replace(/^v\d+\//, '');
+    publicId = publicId.substring(0, publicId.lastIndexOf('.'));
+    return publicId;
+  } catch (e) {
+    return null;
+  }
+};
 
 const ALLOWED_TYPES = ['mcq', 'tf', 'short', 'essay'];
 
@@ -29,10 +45,11 @@ function validateByType(body) {
 
     // Check if choices is array of strings (new format) or array of objects (old format)
     const isNewFormat = body.choices.every(choice => typeof choice === 'string');
-    const isOldFormat = body.choices.every(choice => choice && typeof choice === 'object' && choice.key && choice.text);
+    // Allow text OR image (or both)
+    const isOldFormat = body.choices.every(choice => choice && typeof choice === 'object' && choice.key && (choice.text || choice.image));
 
     if (!isNewFormat && !isOldFormat) {
-      errors.push('choices must be array of strings or array of objects with key and text');
+      errors.push('choices must be array of strings or array of objects with key and (text or image)');
     }
 
     if (body.answer == null) errors.push('answer is required');
@@ -335,6 +352,31 @@ async function remove(req, res, next) {
     // CHỈ owner được xoá
     if (!isOwner(req.user, existing))
       return res.status(403).json({ ok: false, message: 'Only owner can delete this question' });
+
+    // Delete images from Cloudinary
+    try {
+      if (existing.images && existing.images.length > 0) {
+        for (const imgUrl of existing.images) {
+          const publicId = getPublicIdFromUrl(imgUrl);
+          if (publicId) {
+            await cloudinary.uploader.destroy(publicId).catch(err => console.error('Cloudinary destroy error:', err));
+          }
+        }
+      }
+
+      if (existing.choices && existing.choices.length > 0) {
+        for (const choice of existing.choices) {
+          if (choice.image && typeof choice.image === 'string') {
+            const publicId = getPublicIdFromUrl(choice.image);
+            if (publicId) {
+              await cloudinary.uploader.destroy(publicId).catch(err => console.error('Cloudinary destroy error:', err));
+            }
+          }
+        }
+      }
+    } catch (cleanupErr) {
+      console.error('Error cleaning up images:', cleanupErr);
+    }
 
     const deleted = await service.hardDelete({ id, ownerIdEnforce: req.user.id });
     res.json({ ok: true, message: 'Question deleted', data: deleted });
