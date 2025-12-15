@@ -2,6 +2,7 @@ const Mindmap = require('../models/Mindmap');
 const User = require('../models/User');
 const crypto = require('crypto');
 const { generateResponse } = require('../services/aiService');
+const { deleteImageInternal, getPublicIdFromUrl } = require('./uploadController');
 
 const mindmapController = {
     async create(req, res) {
@@ -64,7 +65,7 @@ const mindmapController = {
 
             // Check if user owns the mindmap or has been shared
             let mindmap = await Mindmap.findOne({ _id: id, user_id: userId, deleted_at: null });
-            
+
             if (!mindmap) {
                 // Check if shared with user
                 mindmap = await Mindmap.findOne({
@@ -83,7 +84,7 @@ const mindmapController = {
 
             // Get owner info
             const owner = await User.findById(mindmap.user_id).select('name email profile');
-            
+
             res.json({
                 success: true,
                 data: {
@@ -109,7 +110,7 @@ const mindmapController = {
 
             // Check ownership or edit permission
             let mindmap = await Mindmap.findOne({ _id: id, user_id: userId, deleted_at: null });
-            
+
             if (!mindmap) {
                 // Check if has edit permission
                 mindmap = await Mindmap.findOne({
@@ -233,14 +234,48 @@ const mindmapController = {
             const { id } = req.params;
             const userId = req.user.userId || req.user.id || req.user._id || req.user.sub;
 
-            const mindmap = await Mindmap.findOneAndDelete({ _id: id, user_id: userId });
+            // Find mindmap first to get data for cleanup
+            const mindmapToDelete = await Mindmap.findOne({ _id: id, user_id: userId });
 
-            if (!mindmap) {
+            if (!mindmapToDelete) {
                 return res.status(404).json({
                     success: false,
                     message: 'Mindmap not found'
                 });
             }
+
+            // Cleanup Cloudinary images used in mindmap nodes
+            try {
+                if (mindmapToDelete.data && mindmapToDelete.data.nodeData) {
+                    const nodes = [mindmapToDelete.data.nodeData];
+                    // Traverse all nodes using a stack
+                    const stack = [mindmapToDelete.data.nodeData];
+
+                    while (stack.length > 0) {
+                        const node = stack.pop();
+
+                        // Check if node has image
+                        if (node.image && node.image.url) {
+                            const publicId = getPublicIdFromUrl(node.image.url);
+                            if (publicId) {
+                                await deleteImageInternal(publicId).catch(err =>
+                                    console.error(`Failed to delete mindmap image ${publicId}:`, err)
+                                );
+                            }
+                        }
+
+                        // Add children to stack
+                        if (node.children && node.children.length > 0) {
+                            stack.push(...node.children);
+                        }
+                    }
+                }
+            } catch (cleanupError) {
+                console.error('Error cleaning up mindmap images:', cleanupError);
+                // Continue with deletion even if cleanup fails
+            }
+
+            const mindmap = await Mindmap.findOneAndDelete({ _id: id, user_id: userId });
 
             res.json({
                 success: true,
@@ -327,7 +362,7 @@ const mindmapController = {
 
             // Check if already shared
             const existingShare = mindmap.shared_with.find(s => s.user_id === targetUser._id.toString());
-            
+
             if (existingShare) {
                 // Update permission
                 existingShare.permission = permission;
@@ -415,12 +450,12 @@ const mindmapController = {
             } else {
                 mindmap.is_public = !mindmap.is_public;
             }
-            
+
             // Update permission if provided
             if (permission && ['view', 'edit'].includes(permission)) {
                 mindmap.public_permission = permission;
             }
-            
+
             if (mindmap.is_public && !mindmap.share_link) {
                 mindmap.share_link = crypto.randomBytes(16).toString('hex');
             }
@@ -449,10 +484,10 @@ const mindmapController = {
         try {
             const { shareLink } = req.params;
 
-            const mindmap = await Mindmap.findOne({ 
-                share_link: shareLink, 
-                is_public: true, 
-                deleted_at: null 
+            const mindmap = await Mindmap.findOne({
+                share_link: shareLink,
+                is_public: true,
+                deleted_at: null
             });
 
             if (!mindmap) {
@@ -491,10 +526,10 @@ const mindmapController = {
             const { shareLink } = req.params;
             const { data } = req.body;
 
-            const mindmap = await Mindmap.findOne({ 
-                share_link: shareLink, 
-                is_public: true, 
-                deleted_at: null 
+            const mindmap = await Mindmap.findOne({
+                share_link: shareLink,
+                is_public: true,
+                deleted_at: null
             });
 
             if (!mindmap) {
@@ -665,9 +700,9 @@ Lưu ý:
                 if (!jsonMatch) {
                     throw new Error('AI response không chứa JSON hợp lệ');
                 }
-                
+
                 mindmapData = JSON.parse(jsonMatch[0]);
-                
+
                 // Validate structure
                 if (!mindmapData.nodeData || !mindmapData.nodeData.id) {
                     throw new Error('Mindmap data không hợp lệ: thiếu nodeData');
