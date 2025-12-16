@@ -68,7 +68,7 @@ async function getAllExams(params) {
   // If there's a search query, also search in subject names
   if (q && typeof q === 'string' && q.trim()) {
     const searchRegex = new RegExp(q.trim(), 'i');
-    
+
     // Find subjects matching the search query
     const matchingSubjects = await Subject.find({
       $or: [
@@ -78,20 +78,20 @@ async function getAllExams(params) {
         { code: searchRegex }
       ]
     }).select('_id');
-    
+
     const matchingSubjectIds = matchingSubjects.map(s => s._id);
-    
+
     // Build $or condition for exam search
     const searchConditions = [
       { name: searchRegex },
       { description: searchRegex }
     ];
-    
+
     // If we found matching subjects, add subjectId filter
     if (matchingSubjectIds.length > 0) {
       searchConditions.push({ subjectId: { $in: matchingSubjectIds } });
     }
-    
+
     // If examFilter already has $or, merge it; otherwise create it
     if (examFilter.$or) {
       examFilter.$or = [...examFilter.$or, ...searchConditions];
@@ -145,7 +145,7 @@ async function getExamById({ id }) {
  * @returns {Object|null} - Exam data or null if not found
  */
 async function getExamByShareCode({ shareCode }) {
-  const exam = await Exam.findOne({ 
+  const exam = await Exam.findOne({
     shareCode: shareCode.toUpperCase(),
     status: 'published'
   })
@@ -196,27 +196,27 @@ async function createExam({ payload, user }) {
     error.status = 400;
     throw error;
   }
-  
+
   if (!payload.subjectId) {
     const error = new Error('subjectId is required when creating exam with questions');
     error.status = 400;
     throw error;
   }
-  
+
   const questionIds = payload.questions.map(q => q.questionId);
-  
+
   // Check if all questions exist and belong to the same subject
   const questions = await Question.find({
     _id: { $in: questionIds },
     subjectId: payload.subjectId
   });
-  
+
   if (questions.length !== questionIds.length) {
     const error = new Error('All questions must belong to the same subject');
     error.status = 400;
     throw error;
   }
-  
+
   // Auto-fill subjectCode from first question
   if (questions.length > 0) {
     payload.subjectCode = questions[0].subjectCode;
@@ -244,14 +244,14 @@ async function generateUniqueShareCode() {
   let shareCode;
   let isUnique = false;
   let attempts = 0;
-  
+
   while (!isUnique && attempts < 20) {
     // Generate 8-character code
     shareCode = '';
     for (let i = 0; i < 8; i++) {
       shareCode += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    
+
     // Check if code already exists
     const existing = await Exam.findOne({ shareCode });
     if (!existing) {
@@ -259,12 +259,12 @@ async function generateUniqueShareCode() {
     }
     attempts++;
   }
-  
+
   if (!isUnique) {
     // Fallback: use timestamp-based code
     shareCode = Date.now().toString(36).toUpperCase().slice(-8);
   }
-  
+
   return shareCode;
 }
 
@@ -278,7 +278,7 @@ async function generateUniqueShareCode() {
  */
 async function updateExamPartial({ id, payload, ownerIdEnforce }) {
   const examFilter = { _id: id };
-  
+
   // If updating status to published and no shareCode exists, generate one
   if (payload.status === 'published') {
     const existingExam = await Exam.findById(id);
@@ -286,7 +286,7 @@ async function updateExamPartial({ id, payload, ownerIdEnforce }) {
       payload.shareCode = await generateUniqueShareCode();
     }
   }
-  
+
   // If updating status from published to draft, remove shareCode
   if (payload.status === 'draft') {
     const existingExam = await Exam.findById(id);
@@ -303,7 +303,7 @@ async function updateExamPartial({ id, payload, ownerIdEnforce }) {
     { $set: payload },
     { new: true, runValidators: true }
   )
-  .exec();
+    .exec();
 }
 
 /**
@@ -319,8 +319,7 @@ async function deleteExam({ id, ownerIdEnforce }) {
     examFilter.ownerId = new mongoose.Types.ObjectId(ownerIdEnforce);
   }
 
-  return Exam.findOneAndDelete(examFilter)
-    .exec();
+  return Exam.findOneAndDelete(examFilter).exec();
 }
 
 /**
@@ -361,13 +360,13 @@ async function addQuestionsToExam({ examId, questionIds, ownerIdEnforce, subject
   if (subjectId && existingQuestions.length > 0) {
     const questionSubjects = existingQuestions.map(q => q.subjectId?.toString()).filter(Boolean);
     const uniqueSubjects = [...new Set(questionSubjects)];
-    
+
     if (uniqueSubjects.length > 1) {
       const error = new Error('All questions must belong to the same subject');
       error.status = 400;
       throw error;
     }
-    
+
     if (uniqueSubjects.length === 1 && uniqueSubjects[0] !== subjectId) {
       const error = new Error('Questions do not belong to the specified subject');
       error.status = 400;

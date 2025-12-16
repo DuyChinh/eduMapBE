@@ -106,7 +106,7 @@ const chat = async (req, res, next) => {
 
         // Check if processing a PDF file (which takes longer)
         const hasPdfFile = files.some(f => f.mimetype === 'application/pdf');
-        
+
         if (hasPdfFile && aiAttachments.length > 0) {
             // For PDF files: Return immediately with pending status
             const pendingMessage = await ChatHistory.create({
@@ -146,7 +146,7 @@ const chat = async (req, res, next) => {
                     console.log(`✅ PDF processing completed for session ${currentSessionId}`);
                 } catch (error) {
                     console.error('Error in background AI processing:', error);
-                    
+
                     // Update message with error status
                     await ChatHistory.findByIdAndUpdate(pendingMessage._id, {
                         message: 'Xin lỗi, đã có lỗi xảy ra khi xử lý file PDF. Vui lòng thử lại.',
@@ -244,7 +244,7 @@ const getHistory = async (req, res, next) => {
         }
 
         const query = { userId, sessionId };
-        
+
         // If 'since' timestamp provided, only get messages after that time
         if (since) {
             query.createdAt = { $gt: new Date(since) };
@@ -282,7 +282,7 @@ const checkMessageStatus = async (req, res, next) => {
         }
 
         const message = await ChatHistory.findOne({ _id: messageId, userId });
-        
+
         if (!message) {
             return res.status(404).json({
                 ok: false,
@@ -321,7 +321,7 @@ const getSessions = async (req, res, next) => {
         // For sessions with truncated titles (ending with "..."), get full title from first message
         const sessionsWithFullTitles = await Promise.all(sessions.map(async (session) => {
             const sessionObj = session.toObject();
-            
+
             // Check if title is truncated (ends with "...")
             if (sessionObj.title && sessionObj.title.endsWith('...')) {
                 // Get first user message from this session
@@ -330,15 +330,15 @@ const getSessions = async (req, res, next) => {
                     sessionId: session._id,
                     sender: 'user'
                 }).sort({ createdAt: 1 });
-                
+
                 // If found, use the full message as title (limit to 500 chars)
                 if (firstMessage && firstMessage.message) {
-                    sessionObj.title = firstMessage.message.length > 500 
-                        ? firstMessage.message.substring(0, 500) 
+                    sessionObj.title = firstMessage.message.length > 500
+                        ? firstMessage.message.substring(0, 500)
                         : firstMessage.message;
                 }
             }
-            
+
             return sessionObj;
         }));
 
@@ -376,6 +376,8 @@ const createSession = async (req, res, next) => {
     }
 };
 
+const { deleteImageInternal, getPublicIdFromUrl } = require('./uploadController');
+
 /**
  * Delete a chat session
  * DELETE /v1/api/ai/sessions/:sessionId
@@ -401,6 +403,32 @@ const deleteSession = async (req, res, next) => {
                 ok: false,
                 message: 'Session not found'
             });
+        }
+
+        // Cleanup Cloudinary files before deleting history
+        try {
+            const historyWithAttachments = await ChatHistory.find({
+                sessionId,
+                attachments: { $exists: true, $not: { $size: 0 } }
+            });
+
+            for (const msg of historyWithAttachments) {
+                if (msg.attachments && Array.isArray(msg.attachments)) {
+                    for (const attachment of msg.attachments) {
+                        if (attachment.url) {
+                            const publicId = getPublicIdFromUrl(attachment.url);
+                            if (publicId) {
+                                await deleteImageInternal(publicId).catch(err =>
+                                    console.error(`Failed to delete chat file ${publicId}:`, err)
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (cleanupError) {
+            console.error('Error cleaning up chat files:', cleanupError);
+            // Continue with deletion even if cleanup fails
         }
 
         // Delete session and associated history
@@ -597,7 +625,7 @@ const searchSessions = async (req, res, next) => {
 
         // Get unique session IDs from messages
         const messageSessionIds = [...new Set(messages.map(msg => msg.sessionId.toString()))];
-        
+
         // Fetch full session details for messages
         const sessionsFromMessages = await ChatSession.find({
             _id: { $in: messageSessionIds },
@@ -606,7 +634,7 @@ const searchSessions = async (req, res, next) => {
 
         // Group messages by session and get unique sessions
         const sessionMap = new Map();
-        
+
         // Add sessions found by title
         sessionsByTitle.forEach(session => {
             const sessionObj = session.toObject();
@@ -636,14 +664,14 @@ const searchSessions = async (req, res, next) => {
         const results = Array.from(sessionMap.values()).map(item => {
             const session = item.session;
             // Ensure dates are properly formatted
-            const createdAt = session.createdAt instanceof Date 
-                ? session.createdAt.toISOString() 
+            const createdAt = session.createdAt instanceof Date
+                ? session.createdAt.toISOString()
                 : (session.createdAt ? new Date(session.createdAt).toISOString() : new Date().toISOString());
-            
-            const updatedAt = session.updatedAt instanceof Date 
-                ? session.updatedAt.toISOString() 
+
+            const updatedAt = session.updatedAt instanceof Date
+                ? session.updatedAt.toISOString()
                 : (session.updatedAt ? new Date(session.updatedAt).toISOString() : new Date().toISOString());
-            
+
             return {
                 _id: session._id,
                 title: session.title || 'New Chat',
