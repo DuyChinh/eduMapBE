@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const { sanitizeUser, sanitizeUsers } = require('../utils/userUtils');
 const jwt = require('jsonwebtoken');
+const cloudinary = require('../config/cloudinary');
 
 const userController = {
     async getProfile(req, res){
@@ -82,18 +83,94 @@ const userController = {
     async updateProfile(req, res){
         try {
             const userId = req.user.userId || req.user.id || req.user._id || req.user.sub;
-            const user = await User.findByIdAndUpdate(userId, req.body, { new: true });
+            const user = await User.findById(userId);
+            
             if (!user) {
                 return res.status(404).json({ 
                     message: 'User not found' 
                 });
             }
+
+            // Check if avatar is being updated and old avatar is from Cloudinary
+            // Handle both nested object and dot notation formats
+            const newAvatar = req.body['profile.avatar'] || req.body.profile?.avatar;
+            const oldAvatar = user.profile?.avatar;
+            
+            if (newAvatar && oldAvatar) {
+                // Only delete if old avatar is from Cloudinary and different from new one
+                if (oldAvatar !== newAvatar && oldAvatar.includes('cloudinary.com')) {
+                    try {
+                        // Extract public_id from Cloudinary URL
+                        // URL format: https://res.cloudinary.com/[cloud]/image/upload/v[version]/[folder]/[public_id].[ext]
+                        const urlParts = oldAvatar.split('/');
+                        const fileWithExt = urlParts[urlParts.length - 1];
+                        const fileName = fileWithExt.split('.')[0];
+                        const folder = urlParts[urlParts.length - 2];
+                        const publicId = folder !== 'upload' ? `${folder}/${fileName}` : fileName;
+                        
+                        // Delete old image from Cloudinary
+                        await cloudinary.uploader.destroy(publicId);
+                        console.log(`Deleted old avatar from Cloudinary: ${publicId}`);
+                    } catch (deleteError) {
+                        console.error('Error deleting old avatar from Cloudinary:', deleteError);
+                        // Continue with update even if deletion fails
+                    }
+                }
+            }
+
+            // Build update object with dot notation for nested fields
+            const updateData = {};
+            
+            // Update simple fields
+            if (req.body.name) updateData.name = req.body.name;
+            if (req.body.email) updateData.email = req.body.email;
+            if (req.body.role) updateData.role = req.body.role;
+            if (req.body.status) updateData.status = req.body.status;
+            
+            // Update nested profile fields using dot notation
+            if (req.body['profile.avatar']) {
+                updateData['profile.avatar'] = req.body['profile.avatar'];
+            }
+            if (req.body['profile.phone']) {
+                updateData['profile.phone'] = req.body['profile.phone'];
+            }
+            if (req.body['profile.studentId']) {
+                updateData['profile.studentId'] = req.body['profile.studentId'];
+            }
+            if (req.body['profile.department']) {
+                updateData['profile.department'] = req.body['profile.department'];
+            }
+            
+            // If profile object is provided directly (for backward compatibility)
+            if (req.body.profile && typeof req.body.profile === 'object') {
+                if (req.body.profile.avatar !== undefined) {
+                    updateData['profile.avatar'] = req.body.profile.avatar;
+                }
+                if (req.body.profile.phone !== undefined) {
+                    updateData['profile.phone'] = req.body.profile.phone;
+                }
+                if (req.body.profile.studentId !== undefined) {
+                    updateData['profile.studentId'] = req.body.profile.studentId;
+                }
+                if (req.body.profile.department !== undefined) {
+                    updateData['profile.department'] = req.body.profile.department;
+                }
+            }
+
+            // Update user profile using dot notation to preserve other fields
+            const updatedUser = await User.findByIdAndUpdate(
+                userId, 
+                { $set: updateData },
+                { new: true, runValidators: true }
+            );
+
             res.json({
                 success: true,
                 message: 'Profile updated successfully',
-                data: sanitizeUser(user)
+                data: sanitizeUser(updatedUser)
             });
         } catch (error) {
+            console.error('Error updating profile:', error);
             res.status(500).json({ 
                 message: 'Server error: ' + error.message 
             });

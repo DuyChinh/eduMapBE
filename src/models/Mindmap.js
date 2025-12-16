@@ -15,7 +15,17 @@ const MindmapSchema = new mongoose.Schema(
     // Stores the entire MindElixir data object
     data: { type: mongoose.Schema.Types.Mixed },
 
-
+    // Share settings
+    shared_with: [{
+      user_id: { type: String, ref: "User" },
+      email: { type: String },
+      permission: { type: String, enum: ['view', 'edit'], default: 'view' },
+      shared_at: { type: Date, default: Date.now }
+    }],
+    
+    is_public: { type: Boolean, default: false },
+    share_link: { type: String, default: null },
+    public_permission: { type: String, enum: ['view', 'edit'], default: 'view' },
 
     favorite: { type: Boolean, default: false },
 

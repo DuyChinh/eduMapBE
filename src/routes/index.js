@@ -15,6 +15,7 @@ const mindmapRoutes = require('./mindmap');
 const uploadRoutes = require('./upload');
 const feedRoutes = require('./feed');
 
+const dashboardRoutes = require('./dashboard');
 
 const configureRoutes = (app) => {
     const v1 = express.Router();
@@ -36,6 +37,8 @@ const configureRoutes = (app) => {
     v1.use('/notifications', require('./notifications'));
 
 
+    v1.use('/dashboard', dashboardRoutes);
+    
     // Admin API routes
     const adminRoutes = require('./admin');
     v1.use('/admin', adminRoutes);
