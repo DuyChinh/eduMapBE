@@ -31,7 +31,7 @@ async function createExam(req, res, next) {
 
     const { 
       name, description, duration, totalMarks, questions, settings, 
-      startTime, endTime, timezone, subjectId, gradeId, fee, 
+      startTime, endTime, timezone, lateEntryGracePeriod, subjectId, gradeId, fee, 
       examPassword, autoMonitoring, studentVerification, eduMapOnly, 
       hideGroupTitles, sectionsStartFromQ1, hideLeaderboard, addTitleInfo, 
       preExamNotification, preExamNotificationText, examPurpose, 
@@ -186,6 +186,7 @@ async function createExam(req, res, next) {
       startTime: startTime ? new Date(startTime) : undefined,
       endTime: endTime ? new Date(endTime) : undefined,
       timezone: timezone || 'Asia/Ho_Chi_Minh',
+      lateEntryGracePeriod: lateEntryGracePeriod !== undefined && lateEntryGracePeriod !== null ? lateEntryGracePeriod : undefined,
       subjectId: subjectId || undefined,
       gradeId: gradeId || undefined,
       examPurpose: examPurpose || 'exam',

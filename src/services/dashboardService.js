@@ -204,16 +204,27 @@ async function getStudentDashboardStats(studentId) {
   const examIds = exams.map(e => e._id);
   const totalExams = exams.length;
 
-  // Get submissions
+  // Get ALL submissions of the student (not filtered by class)
+  // This ensures we count all completed exams, including those from previous classes or unpublished exams
+  const allSubmissions = await Submission.find({
+    userId: studentId,
+    status: { $in: ['submitted', 'graded', 'late'] }
+  }).select('examId score maxScore status submittedAt');
+
+  // Calculate statistics - count unique completed exams from all submissions
+  const completedExamIds = new Set(
+    allSubmissions.map(s => String(s.examId))
+  );
+  const completedExams = completedExamIds.size;
+
+  // Get submissions for current class exams (for upcoming exams calculation)
   const submissions = await Submission.find({
     userId: studentId,
     examId: { $in: examIds }
   }).select('examId score maxScore status submittedAt');
 
-  // Calculate statistics
-  const completedExams = submissions.filter(s => 
-    ['submitted', 'graded', 'late'].includes(s.status)
-  ).length;
+  // All completed submissions for statistics
+  const completedSubmissions = allSubmissions;
 
   // Get upcoming exams (not yet started or in progress)
   const now = new Date();
@@ -227,10 +238,6 @@ async function getStudentDashboardStats(studentId) {
   }).length;
 
   // Calculate average score
-  const completedSubmissions = submissions.filter(s => 
-    ['submitted', 'graded', 'late'].includes(s.status)
-  );
-  
   let averageScore = 0;
   let averagePercentage = 0;
   if (completedSubmissions.length > 0) {
