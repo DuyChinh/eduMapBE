@@ -79,34 +79,12 @@ async function getAllSubjects(req, res, next) {
       Subject.countDocuments(filter)
     ]);
     
-    // Transform name based on language preference
-    const itemsWithLocalizedName = items.map(item => {
-      const itemObj = item.toObject();
-      let localizedName = itemObj.name; // Default to Vietnamese
-      
-      switch (lang.toLowerCase()) {
-        case 'en':
-          localizedName = itemObj.name_en || itemObj.name;
-          break;
-        case 'jp':
-        case 'ja':
-          localizedName = itemObj.name_jp || itemObj.name;
-          break;
-        case 'vi':
-        default:
-          localizedName = itemObj.name;
-          break;
-      }
-      
-      return {
-        ...itemObj,
-        name: localizedName
-      };
-    });
+    // Return all translation fields so frontend can handle language switching
+    const itemsWithAllFields = items.map(item => item.toObject());
     
     res.json({ 
       ok: true, 
-      items: itemsWithLocalizedName,
+      items: itemsWithAllFields,
       total,
       page: nPage,
       limit: nLimit,
@@ -139,30 +117,12 @@ async function getSubjectById(req, res, next) {
       return res.status(404).json({ ok: false, message: 'Subject not found' });
     }
     
-    // Transform name based on language preference
+    // Return all translation fields so frontend can handle language switching
     const subjectObj = subject.toObject();
-    let localizedName = subjectObj.name; // Default to Vietnamese
-    
-    switch (lang.toLowerCase()) {
-      case 'en':
-        localizedName = subjectObj.name_en || subjectObj.name;
-        break;
-      case 'jp':
-      case 'ja':
-        localizedName = subjectObj.name_jp || subjectObj.name;
-        break;
-      case 'vi':
-      default:
-        localizedName = subjectObj.name;
-        break;
-    }
     
     res.json({ 
       ok: true, 
-      data: {
-        ...subjectObj,
-        name: localizedName
-      }
+      data: subjectObj
     });
   } catch (e) { 
     next(e); 
