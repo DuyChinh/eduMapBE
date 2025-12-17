@@ -194,9 +194,13 @@ async function getAllQuestions(req, res, next) {
       filter.isPublic = isPublicBool;
     }
 
-    // Filter theo name (search trong text)
+    // Filter theo name (search trong cả name và text)
     if (name && typeof name === 'string' && name.trim()) {
-      filter.text = { $regex: name.trim(), $options: 'i' };
+      const searchRegex = { $regex: name.trim(), $options: 'i' };
+      filter.$or = [
+        { name: searchRegex },
+        { text: searchRegex }
+      ];
     }
 
     // Pagination

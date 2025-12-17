@@ -63,6 +63,11 @@ const ExamSchema = new mongoose.Schema({
     type: String,
     default: 'Asia/Ho_Chi_Minh'
   },
+  lateEntryGracePeriod: {
+    type: Number, 
+    required: false,
+    min: 0
+  },
 
   // Subject
   subjectId: {
