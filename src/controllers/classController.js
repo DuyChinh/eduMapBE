@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const service = require('../services/classService');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 
 const getOrgIdSoft = (req) =>
   req.user?.orgId || req.user?.org?.id || req.body?.orgId || req.query?.orgId || null;
@@ -369,6 +370,24 @@ async function addStudents(req, res, next) {
       orgId
     });
 
+    // Notify added students
+    if (report && report.added && report.added.length > 0) {
+      try {
+        const notifications = report.added.map(studentId => ({
+          recipient: studentId,
+          sender: req.user.id || req.user.userId,
+          classId: id,
+          type: 'CLASS_ADDITION',
+          content: 'NOTIFICATION_CLASS_ADDITION',
+          relatedId: id,
+          onModel: 'Class'
+        }));
+        await Notification.insertMany(notifications);
+      } catch (err) {
+        console.error('Error creating class addition notifications:', err);
+      }
+    }
+
     return res.json({ ok: true, data: updatedClass, report });
   } catch (e) {
     if (e?.status) return res.status(e.status).json({ ok: false, message: e.message });
@@ -405,6 +424,24 @@ async function removeStudents(req, res, next) {
       ownerIdEnforce,
       orgId
     });
+
+    // Notify removed students
+    if (report && report.removed && report.removed.length > 0) {
+      try {
+        const notifications = report.removed.map(studentId => ({
+          recipient: studentId,
+          sender: req.user.id || req.user.userId,
+          classId: id,
+          type: 'CLASS_REMOVAL',
+          content: 'NOTIFICATION_CLASS_REMOVAL',
+          relatedId: id,
+          onModel: 'Class'
+        }));
+        await Notification.insertMany(notifications);
+      } catch (err) {
+        console.error('Error creating class removal notifications:', err);
+      }
+    }
 
     return res.json({ ok: true, data: updatedClass, report });
   } catch (e) {

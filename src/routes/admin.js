@@ -55,5 +55,12 @@ router.get('/proctor-logs', adminController.getProctorLogs);
 router.get('/proctor-logs/:logId', adminController.getProctorLogById);
 router.delete('/proctor-logs/:logId', adminController.deleteProctorLog);
 
+// Mindmaps routes
+router.get('/mindmaps', adminController.getMindmaps);
+router.get('/mindmaps/:mindmapId', adminController.getMindmapById);
+router.put('/mindmaps/:mindmapId', adminController.updateMindmap);
+router.delete('/mindmaps/:mindmapId', adminController.deleteMindmap);
+router.post('/mindmaps/:mindmapId/restore', adminController.restoreMindmap);
+
 module.exports = router;
 

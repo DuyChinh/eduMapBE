@@ -1041,6 +1041,98 @@ async function renderProctorLogDetail(req, res, next) {
   }
 }
 
+/**
+ * Render mindmaps management page
+ * GET /admin/mindmaps
+ */
+async function renderMindmaps(req, res, next) {
+  try {
+    const { search, userId, status, page = 1, limit = 20 } = req.query;
+    
+    const result = await adminService.getMindmaps({
+      search: search || '',
+      userId: userId || null,
+      status: status !== undefined ? status === 'true' : undefined,
+      includeDeleted: true,
+      page: parseInt(page),
+      limit: parseInt(limit)
+    });
+
+    res.render('admin/mindmaps', {
+      title: 'Mindmaps Management',
+      currentPage: 'mindmaps',
+      user: req.user,
+      mindmaps: result.mindmaps,
+      pagination: result.pagination
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Render mindmap detail page
+ * GET /admin/mindmaps/:mindmapId
+ */
+async function renderMindmapDetail(req, res, next) {
+  try {
+    const { mindmapId } = req.params;
+
+    const mindmap = await adminService.getMindmapById(mindmapId);
+
+    res.render('admin/mindmap-detail', {
+      title: `Mindmap: ${mindmap.title || mindmap._id}`,
+      currentPage: 'mindmaps',
+      user: req.user,
+      mindmap
+    });
+  } catch (error) {
+    if (error.message === 'Mindmap not found') {
+      return res.status(404).render('admin/error', {
+        title: 'Not Found',
+        user: req.user,
+        message: 'Mindmap not found'
+      });
+    }
+    next(error);
+  }
+}
+
+/**
+ * Render mindmap edit page
+ * GET /admin/mindmaps/:mindmapId/edit
+ */
+async function renderMindmapEdit(req, res, next) {
+  try {
+    const { mindmapId } = req.params;
+
+    const mindmap = await adminService.getMindmapById(mindmapId);
+    
+    // Get list of users for dropdown
+    const users = await User.find({ status: 'active' })
+      .select('name email')
+      .sort({ name: 1 })
+      .lean();
+
+    res.render('admin/mindmap-edit', {
+      title: `Edit Mindmap: ${mindmap.title || mindmap._id}`,
+      currentPage: 'mindmaps',
+      user: req.user,
+      mindmap,
+      users
+    });
+  } catch (error) {
+    if (error.message === 'Mindmap not found') {
+      return res.status(404).render('admin/error', {
+        title: 'Not Found',
+        user: req.user,
+        message: 'Mindmap not found'
+      });
+    }
+    next(error);
+  }
+}
+
 module.exports = {
   renderDashboard,
   renderUsers,
@@ -1069,6 +1161,9 @@ module.exports = {
   renderClassDetail,
   renderClassEdit,
   renderProctorLogs,
-  renderProctorLogDetail
+  renderProctorLogDetail,
+  renderMindmaps,
+  renderMindmapDetail,
+  renderMindmapEdit
 };
 

@@ -12,11 +12,28 @@ const uploadImage = async (req, res) => {
 
         const streamUpload = (req) => {
             return new Promise((resolve, reject) => {
+                const isImage = req.file.mimetype.startsWith('image/');
+                const options = {
+                    resource_type: isImage ? 'image' : 'raw'
+                };
+
+                if (isImage) {
+                    options.folder = 'questions';
+                    options.allowed_formats = ['jpg', 'png', 'jpeg', 'webp', 'gif'];
+                } else {
+                    const sanitize = (name) => name.replace(/[^a-zA-Z0-9.-]/g, '_');
+                    const ext = req.file.originalname.split('.').pop();
+                    const nameWithoutExt = req.file.originalname.substring(0, req.file.originalname.lastIndexOf('.'));
+
+                    // Strategy: Upload as RAW with NO extension to bypass 'Strict PDF' security
+                    options.folder = 'files';
+                    options.public_id = `${Date.now()}_${sanitize(nameWithoutExt)}`;
+                    options.resource_type = 'raw';
+                    options.type = 'upload';
+                }
+
                 const stream = cloudinary.uploader.upload_stream(
-                    {
-                        folder: 'questions',
-                        allowed_formats: ['jpg', 'png', 'jpeg', 'webp'],
-                    },
+                    options,
                     (error, result) => {
                         if (result) {
                             resolve(result);
@@ -49,6 +66,11 @@ const uploadImage = async (req, res) => {
     }
 };
 
+const deleteImageInternal = async (public_id) => {
+    if (!public_id) throw new Error('public_id is required');
+    return cloudinary.uploader.destroy(public_id);
+};
+
 const getPublicIdFromUrl = (url) => {
     if (!url) return null;
     try {
@@ -67,26 +89,41 @@ const getPublicIdFromUrl = (url) => {
 
 const deleteImage = async (req, res) => {
     try {
-        const { url } = req.body;
-        if (!url) {
-            return res.status(400).json({ success: false, message: 'URL is required' });
+        const { public_id } = req.body;
+
+        if (!public_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'public_id is required'
+            });
         }
 
-        const publicId = getPublicIdFromUrl(url);
-        if (!publicId) {
-            return res.status(400).json({ success: false, message: 'Invalid URL' });
+        // Delete image from Cloudinary
+        const result = await deleteImageInternal(public_id);
+
+        if (result.result === 'ok' || result.result === 'not found') {
+            return res.status(200).json({
+                success: true,
+                message: 'Image deleted successfully',
+                data: result
+            });
+        } else {
+            throw new Error('Failed to delete image');
         }
 
-        await cloudinary.uploader.destroy(publicId);
-
-        res.json({ success: true, message: 'Image deleted' });
     } catch (error) {
         console.error('Delete error:', error);
-        res.status(500).json({ success: false, message: 'Delete failed' });
+        res.status(500).json({
+            success: false,
+            message: 'Error deleting image',
+            error: error.message
+        });
     }
 };
 
 module.exports = {
     uploadImage,
-    deleteImage
+    deleteImage,
+    deleteImageInternal,
+    getPublicIdFromUrl
 };

@@ -147,6 +147,22 @@ async function startSubmission({ examId, user, orgId }) {
     throw { status: 403, message: 'Exam is no longer available' };
   }
 
+  // Check late entry grace period
+  if (exam.startTime && exam.lateEntryGracePeriod !== undefined) {
+    const gracePeriodMs = exam.lateEntryGracePeriod * 60 * 1000; // Convert minutes to milliseconds
+    const cutoffTime = new Date(exam.startTime.getTime() + gracePeriodMs);
+    
+    if (now > cutoffTime) {
+      const gracePeriodText = exam.lateEntryGracePeriod === 0 
+        ? 'immediately after the start time'
+        : `${exam.lateEntryGracePeriod} minute(s) after the start time`;
+      throw { 
+        status: 403, 
+        message: `Late entry not allowed. This exam blocks entry ${gracePeriodText}.` 
+      };
+    }
+  }
+
   // Check if user has access based on isAllowUser setting
   if (exam.isAllowUser === 'class') {
     if (!exam.allowedClassIds || exam.allowedClassIds.length === 0) {

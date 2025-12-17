@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const Question = require('../models/Question');
-const Subject  = require('../models/Subject');
+const Subject = require('../models/Subject');
 
 const toOID = (v) =>
   (v && mongoose.isValidObjectId(v)) ? new mongoose.Types.ObjectId(v) : undefined;
@@ -52,8 +52,8 @@ function buildFilter({ orgId, q, name, tags, type, level, isPublic, ownerId, pub
   if (owner) filter.ownerId = owner;
 
   if (!('isPublic' in (typeof isPublic === 'boolean' ? { isPublic } : {}))
-      && !owner
-      && publicOrOwnerUserId
+    && !owner
+    && publicOrOwnerUserId
   ) {
     const uid = toOID(publicOrOwnerUserId);
     if (uid) {
@@ -124,12 +124,12 @@ async function findByNameAndOwner({ name, ownerId, orgId }) {
     name: name.trim(),
     ownerId: new mongoose.Types.ObjectId(ownerId)
   };
-  
+
   // Nếu có orgId thì filter theo orgId
   if (orgId && mongoose.isValidObjectId(orgId)) {
     filter.orgId = new mongoose.Types.ObjectId(orgId);
   }
-  
+
   return Question.findOne(filter);
 }
 
@@ -137,10 +137,10 @@ async function create({ payload, user }) {
   const ownerId = user?.id || user?._id;
 
   let subjectId = payload.subjectId || payload.subject; // Hỗ trợ cả hai
-  
+
   if (!subjectId && payload.subjectCode) {
     const s = await Subject.findOne({
-    ...(user?.orgId ? { orgId: user.orgId } : {}),
+      ...(user?.orgId ? { orgId: user.orgId } : {}),
       code: String(payload.subjectCode).toUpperCase()
     }).select('_id code');
     if (!s) {
@@ -153,17 +153,17 @@ async function create({ payload, user }) {
   }
 
   const processedPayload = { ...payload };
-  
+
   if (payload.type === 'mcq' && Array.isArray(payload.choices)) {
     const isNewFormat = payload.choices.every(choice => typeof choice === 'string');
-    
+
     if (isNewFormat) {
       // Convert new format to old format
       processedPayload.choices = payload.choices.map((text, index) => ({
         key: String.fromCharCode(65 + index), // A, B, C, D...
         text: text
       }));
-      
+
       // Convert answer from index to key
       const answerIndex = Number(payload.answer);
       if (!isNaN(answerIndex) && answerIndex >= 0 && answerIndex < payload.choices.length) {

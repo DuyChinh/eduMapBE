@@ -974,6 +974,127 @@ async function deleteProctorLog(req, res, next) {
   }
 }
 
+// ============== MINDMAP MANAGEMENT ==============
+
+/**
+ * Get all mindmaps with pagination
+ * GET /v1/api/admin/mindmaps
+ */
+async function getMindmaps(req, res, next) {
+  try {
+    const { page, limit, search, userId, status, includeDeleted } = req.query;
+    const result = await adminService.getMindmaps({
+      page: parseInt(page) || 1,
+      limit: parseInt(limit) || 20,
+      search: search || '',
+      userId: userId || null,
+      status: status !== undefined ? status === 'true' : undefined,
+      includeDeleted: includeDeleted === 'true'
+    });
+    res.json({
+      ok: true,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Get mindmap by ID
+ * GET /v1/api/admin/mindmaps/:mindmapId
+ */
+async function getMindmapById(req, res, next) {
+  try {
+    const { mindmapId } = req.params;
+    const mindmap = await adminService.getMindmapById(mindmapId);
+    res.json({
+      ok: true,
+      data: mindmap
+    });
+  } catch (error) {
+    if (error.message === 'Mindmap not found') {
+      return res.status(404).json({
+        ok: false,
+        message: error.message
+      });
+    }
+    next(error);
+  }
+}
+
+/**
+ * Update mindmap
+ * PUT /v1/api/admin/mindmaps/:mindmapId
+ */
+async function updateMindmap(req, res, next) {
+  try {
+    const { mindmapId } = req.params;
+    const mindmap = await adminService.updateMindmap(mindmapId, req.body);
+    res.json({
+      ok: true,
+      data: mindmap,
+      message: 'Mindmap updated successfully'
+    });
+  } catch (error) {
+    if (error.message === 'Mindmap not found') {
+      return res.status(404).json({
+        ok: false,
+        message: error.message
+      });
+    }
+    next(error);
+  }
+}
+
+/**
+ * Delete mindmap
+ * DELETE /v1/api/admin/mindmaps/:mindmapId
+ */
+async function deleteMindmap(req, res, next) {
+  try {
+    const { mindmapId } = req.params;
+    const { permanent } = req.query;
+    const result = await adminService.deleteMindmap(mindmapId, permanent === 'true');
+    res.json({
+      ok: true,
+      message: result.message
+    });
+  } catch (error) {
+    if (error.message === 'Mindmap not found') {
+      return res.status(404).json({
+        ok: false,
+        message: error.message
+      });
+    }
+    next(error);
+  }
+}
+
+/**
+ * Restore deleted mindmap
+ * POST /v1/api/admin/mindmaps/:mindmapId/restore
+ */
+async function restoreMindmap(req, res, next) {
+  try {
+    const { mindmapId } = req.params;
+    const mindmap = await adminService.restoreMindmap(mindmapId);
+    res.json({
+      ok: true,
+      data: mindmap,
+      message: 'Mindmap restored successfully'
+    });
+  } catch (error) {
+    if (error.message === 'Mindmap not found') {
+      return res.status(404).json({
+        ok: false,
+        message: error.message
+      });
+    }
+    next(error);
+  }
+}
+
 module.exports = {
   getDashboard,
   getUsers,
@@ -1006,6 +1127,12 @@ module.exports = {
   deleteClass,
   getProctorLogs,
   getProctorLogById,
-  deleteProctorLog
+  deleteProctorLog,
+  // Mindmap management
+  getMindmaps,
+  getMindmapById,
+  updateMindmap,
+  deleteMindmap,
+  restoreMindmap
 };
 
