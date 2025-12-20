@@ -186,7 +186,7 @@ async function createExam(req, res, next) {
       startTime: startTime ? new Date(startTime) : undefined,
       endTime: endTime ? new Date(endTime) : undefined,
       timezone: timezone || 'Asia/Ho_Chi_Minh',
-      lateEntryGracePeriod: lateEntryGracePeriod !== undefined && lateEntryGracePeriod !== null ? lateEntryGracePeriod : undefined,
+      lateEntryGracePeriod: lateEntryGracePeriod !== undefined && lateEntryGracePeriod !== null ? lateEntryGracePeriod : -1,
       subjectId: subjectId || undefined,
       gradeId: gradeId || undefined,
       examPurpose: examPurpose || 'exam',

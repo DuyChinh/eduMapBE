@@ -147,8 +147,8 @@ async function startSubmission({ examId, user, orgId }) {
     throw { status: 403, message: 'Exam is no longer available' };
   }
 
-  // Check late entry grace period
-  if (exam.startTime && exam.lateEntryGracePeriod !== undefined) {
+  // Check late entry grace period (only if >= 0, -1 means no blocking)
+  if (exam.startTime && exam.lateEntryGracePeriod !== undefined && exam.lateEntryGracePeriod >= 0) {
     const gracePeriodMs = exam.lateEntryGracePeriod * 60 * 1000; // Convert minutes to milliseconds
     const cutoffTime = new Date(exam.startTime.getTime() + gracePeriodMs);
     
