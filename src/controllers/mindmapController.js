@@ -689,7 +689,6 @@ Lưu ý:
 - Root node luôn có id="root" và root=true
 - Chỉ trả về JSON, không thêm markdown code block hoặc text khác`;
 
-            console.log('Generating mindmap with AI...');
             const aiResponse = await generateResponse(aiPrompt);
 
             // Extract JSON from response
