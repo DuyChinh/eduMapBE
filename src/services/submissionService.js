@@ -631,6 +631,9 @@ async function getMySubmissions({ userId, filters = {} }) {
         _id: exam._id,
         name: exam.name,
         subject: getSubjectName(),
+        subject_vi: subject.name || '',
+        subject_en: subject.name_en || subject.name || '',
+        subject_jp: subject.name_jp || subject.name || '',
         subjectId: exam.subjectId?._id || exam.subjectId,
         description: exam.description,
         totalMarks: exam.totalMarks
