@@ -119,7 +119,9 @@ async function getOne(req, res, next) {
 
     // Quyền xem: teacher owner, admin, hoặc student đã tham gia
     // Quyền xem: teacher owner, admin, hoặc student đã tham gia
-    const isOwner = String(doc.teacherId) === String(req.user.id);
+    // Quyền xem: teacher owner, admin, hoặc student đã tham gia
+    const teacherId = doc.teacherId && (doc.teacherId._id || doc.teacherId.id || doc.teacherId);
+    const isOwner = String(teacherId) === String(req.user.id);
     const isJoined = doc.studentIds.some(sid => {
       // Handle both populated (object) and unpopulated (ObjectId/string) cases
       if (sid && (sid._id || sid.id)) {
