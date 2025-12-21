@@ -66,7 +66,7 @@ const ExamSchema = new mongoose.Schema({
   lateEntryGracePeriod: {
     type: Number, 
     required: false,
-    min: 0
+    default: -1
   },
 
   // Subject
