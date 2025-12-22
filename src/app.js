@@ -25,7 +25,7 @@ app.use(passport.initialize());
 
 // Root route - Health check
 app.get('/', (req, res) => {
-    res.status(200).json({ 
+    res.status(200).json({
         message: 'Server is running successfully!',
         version: 'v1',
         status: 'healthy'
@@ -47,9 +47,13 @@ app.use((err, req, res, next) => {
 });
 
 // Start the server
+// Start the server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
+
+// Set timeout to 5 minutes (300000 ms) to handle long AI processing
+server.setTimeout(300000);
 
 module.exports = app;
