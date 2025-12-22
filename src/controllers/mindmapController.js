@@ -378,6 +378,18 @@ const mindmapController = {
 
             await mindmap.save();
 
+            // Create notification for recipient
+            const Notification = require('../models/Notification');
+            await Notification.create({
+                recipient: targetUser._id,
+                sender: userId,
+                type: 'MINDMAP_SHARED',
+                content: 'MINDMAP_SHARED',
+                relatedId: mindmap._id,
+                onModel: 'Mindmap' // We need to update Notification model enum if 'Mindmap' is not in allowed values for relatedModel/onModel? 
+                                   // The model says: enum: ['FeedPost', 'Class']. We need to update that too.
+            });
+
             res.json({
                 success: true,
                 message: `Mindmap shared with ${email}`,

@@ -18,7 +18,7 @@ const NotificationSchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ['NEW_POST', 'NEW_COMMENT', 'CUSTOM', 'CLASS_REMOVAL', 'CLASS_ADDITION'],
+        enum: ['NEW_POST', 'NEW_COMMENT', 'CUSTOM', 'CLASS_REMOVAL', 'CLASS_ADDITION', 'EXAM_PUBLISHED', 'SUBMISSION_GRADED', 'LATE_SUBMISSION', 'MINDMAP_SHARED'],
         required: true
     },
     content: {
@@ -31,7 +31,7 @@ const NotificationSchema = new mongoose.Schema({
     },
     onModel: {
         type: String,
-        enum: ['FeedPost', 'Class'],
+        enum: ['FeedPost', 'Class', 'Mindmap', 'Exam', 'Submission'],
         default: 'FeedPost'
     },
     isRead: {

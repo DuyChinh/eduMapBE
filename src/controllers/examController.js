@@ -214,6 +214,41 @@ async function createExam(req, res, next) {
     };
 
     const createdExam = await examService.createExam({ payload, user: req.user });
+
+    // Send notifications if published and restricted to classes
+    if (createdExam.status === 'published' && createdExam.isAllowUser === 'class' && createdExam.allowedClassIds?.length > 0) {
+      try {
+        const Class = require('../models/Class');
+        const Notification = require('../models/Notification');
+        
+        // Find all students in these classes
+        const classes = await Class.find({ _id: { $in: createdExam.allowedClassIds } }).select('studentIds');
+        const studentIds = new Set();
+        classes.forEach(c => {
+          if (c.studentIds && Array.isArray(c.studentIds)) {
+            c.studentIds.forEach(id => studentIds.add(id.toString()));
+          }
+        });
+
+        // Create notifications for each student
+        const notifications = Array.from(studentIds).map(studentId => ({
+          recipient: studentId,
+          sender: req.user.userId || req.user.id,
+          type: 'EXAM_PUBLISHED',
+          content: 'EXAM_PUBLISHED',
+          relatedId: createdExam._id,
+          onModel: 'Exam'
+        }));
+
+        if (notifications.length > 0) {
+          await Notification.insertMany(notifications);
+        }
+      } catch (err) {
+        console.error('Error sending exam notifications:', err);
+        // Don't fail the request if notifications fail
+      }
+    }
+
     res.status(201).json({ ok: true, data: createdExam });
   } catch (e) {
     if (e?.status) {

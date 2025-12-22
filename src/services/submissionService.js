@@ -427,6 +427,25 @@ async function submitExam({ submissionId, user, isAutoSubmit = false }) {
     $inc: { 'stats.totalAttempts': 1 }
   });
 
+  await submission.save();
+
+  // Create LATE_SUBMISSION notification for teacher
+  if (isLate) {
+    try {
+      const Notification = require('../models/Notification');
+      await Notification.create({
+        recipient: exam.ownerId,
+        sender: user.id || user._id,
+        type: 'LATE_SUBMISSION',
+        content: 'LATE_SUBMISSION',
+        relatedId: submission._id,
+        onModel: 'Submission'
+      });
+    } catch (err) {
+      console.error('Error creating late submission notification:', err);
+    }
+  }
+
   return submission;
 }
 
