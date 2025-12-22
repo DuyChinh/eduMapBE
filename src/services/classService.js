@@ -100,8 +100,9 @@ async function list({ orgId, teacherId, teacherEmail, q, page = 1, limit = 10, s
 
 async function getById(id) {
   return ClassModel.findById(id)
-    .populate('studentIds', 'name email avatar studentCode')
-    .populate('studentJoins.studentId', 'name email avatar studentCode');
+    .populate('teacherId', 'name email profile')
+    .populate('studentIds', 'name email studentCode profile')
+    .populate('studentJoins.studentId', 'name email studentCode profile');
 }
 
 // Kiểm tra tên class trùng lặp của giáo viên

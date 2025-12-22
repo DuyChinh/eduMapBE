@@ -34,11 +34,20 @@ const UserSchema = new mongoose.Schema({
     enum: ['active', 'suspended'],
     default: 'active'
   },
+  dob: {
+    type: Date
+  },
+  phone: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
+  address: {
+    type: String
+  },
   profile: {
     avatar: String,
-    phone: String,
-    studentId: String,
-    department: String
+    studentId: String
   },
   preferences: {
     language: { type: String, default: 'vi' },

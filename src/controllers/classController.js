@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const service = require('../services/classService');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
+const FeedPost = require('../models/FeedPost');
 
 const getOrgIdSoft = (req) =>
   req.user?.orgId || req.user?.org?.id || req.body?.orgId || req.query?.orgId || null;
@@ -103,7 +104,18 @@ async function list(req, res, next) {
       sort,
     });
 
-    res.json({ ok: true, ...data });
+    // Populate latest feed post for each class
+    const itemsWithPost = await Promise.all(data.items.map(async (item) => {
+      const itemObj = item.toObject ? item.toObject() : item;
+      const latestPost = await FeedPost.findOne({ classId: itemObj._id })
+        .sort({ createdAt: -1 })
+        .select('content author createdAt')
+        .populate('author', 'name active')
+        .lean();
+      return { ...itemObj, latestPost };
+    }));
+
+    res.json({ ok: true, ...data, items: itemsWithPost });
   } catch (e) { next(e); }
 }
 
@@ -119,7 +131,9 @@ async function getOne(req, res, next) {
 
     // Quyền xem: teacher owner, admin, hoặc student đã tham gia
     // Quyền xem: teacher owner, admin, hoặc student đã tham gia
-    const isOwner = String(doc.teacherId) === String(req.user.id);
+    // Quyền xem: teacher owner, admin, hoặc student đã tham gia
+    const teacherId = doc.teacherId && (doc.teacherId._id || doc.teacherId.id || doc.teacherId);
+    const isOwner = String(teacherId) === String(req.user.id);
     const isJoined = doc.studentIds.some(sid => {
       // Handle both populated (object) and unpopulated (ObjectId/string) cases
       if (sid && (sid._id || sid.id)) {
@@ -203,7 +217,18 @@ async function mine(req, res, next) {
     const orgId = getOrgIdSoft(req);
     if (isTeacher(req.user)) {
       const data = await service.list({ orgId, teacherId: req.user.id, page: req.query.page, limit: req.query.limit });
-      return res.json({ ok: true, ...data });
+
+      // Populate latest feed post for each class
+      const itemsWithPost = await Promise.all(data.items.map(async (item) => {
+        const latestPost = await FeedPost.findOne({ classId: item._id })
+          .sort({ createdAt: -1 })
+          .select('content author createdAt')
+          .populate('author', 'name active')
+          .lean();
+        return { ...item, latestPost };
+      }));
+
+      return res.json({ ok: true, ...data, items: itemsWithPost });
     }
     if (isStudent(req.user)) {
       // Student dùng pipeline đơn giản
@@ -218,14 +243,16 @@ async function mine(req, res, next) {
 
       const ClassModel = require('../models/Class');
       const [items, total] = await Promise.all([
-        ClassModel.find(filter).sort('-createdAt').skip(skip).limit(limit),
+        ClassModel.find(filter).sort('-createdAt').skip(skip).limit(limit).lean(), // Added .lean()
         ClassModel.countDocuments(filter),
       ]);
 
-      // Add joinedAt for current student from studentJoins array
+      // Add joinedAt for current student from studentJoins array AND latestPost
       const userIdStr = String(req.user.id);
-      const itemsWithJoinedAt = items.map(item => {
-        const classData = item.toObject ? item.toObject() : item;
+
+      const itemsWithExtras = await Promise.all(items.map(async (item) => {
+        // 1. Join info
+        const classData = { ...item };
         // Find joinedAt from studentJoins array
         if (classData.studentJoins && Array.isArray(classData.studentJoins)) {
           const joinInfo = classData.studentJoins.find(join => {
@@ -240,14 +267,35 @@ async function mine(req, res, next) {
             classData.joinedAt = joinInfo.joinedAt;
           }
         }
-        return classData;
-      });
 
-      return res.json({ ok: true, items: itemsWithJoinedAt, total, page, limit, pages: Math.max(1, Math.ceil(total / limit)) });
+        // 2. Latest Post
+        const latestPost = await FeedPost.findOne({ classId: item._id })
+          .sort({ createdAt: -1 })
+          .select('content author createdAt')
+          .populate('author', 'name')
+          .lean();
+
+        classData.latestPost = latestPost;
+
+        return classData;
+      }));
+
+      return res.json({ ok: true, items: itemsWithExtras, total, page, limit, pages: Math.max(1, Math.ceil(total / limit)) });
     }
     // Admin: xem tất cả
     const data = await service.list({ orgId, page: req.query.page, limit: req.query.limit });
-    res.json({ ok: true, ...data });
+
+    // Populate latest feed post for each class
+    const itemsWithPost = await Promise.all(data.items.map(async (item) => {
+      const latestPost = await FeedPost.findOne({ classId: item._id })
+        .sort({ createdAt: -1 })
+        .select('content author createdAt')
+        .populate('author', 'name active')
+        .lean();
+      return { ...item, latestPost };
+    }));
+
+    res.json({ ok: true, ...data, items: itemsWithPost });
   } catch (e) { next(e); }
 }
 

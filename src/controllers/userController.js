@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const cloudinary = require('../config/cloudinary');
 
 const userController = {
-    async getProfile(req, res){
+    async getProfile(req, res) {
         try {
             // Check if req.user exists
             if (!req.user) {
@@ -12,27 +12,27 @@ const userController = {
                     message: 'Authentication required - user not in request'
                 });
             }
-            
+
             const userId = req.user.id || req.user._id || req.user.userId || req.user.sub;
-            
+
             if (!userId) {
                 console.log('No user ID found in token payload. Available fields:', Object.keys(req.user));
                 return res.status(401).json({
                     message: 'Authentication required - missing user ID'
                 });
             }
-            
+
             console.log('Attempting to find user with ID:', userId);
-            
+
             // Find user by ID from token
             const user = await User.findById(userId);
             if (!user) {
                 console.log('User not found in database with ID:', userId);
-                return res.status(404).json({ 
-                    message: 'User not found in database' 
+                return res.status(404).json({
+                    message: 'User not found in database'
                 });
             }
-            
+
             // Return formatted response according to API docs
             res.json({
                 success: true,
@@ -40,7 +40,7 @@ const userController = {
             });
         } catch (error) {
             console.error('Error in getProfile:', error);
-            res.status(500).json({ 
+            res.status(500).json({
                 message: 'Server error: ' + error.message
             });
         }
@@ -54,18 +54,18 @@ const userController = {
                 data: sanitizeUsers(users)
             });
         } catch (error) {
-            res.status(500).json({ 
-                message: 'Server error: ' + error.message 
+            res.status(500).json({
+                message: 'Server error: ' + error.message
             });
-        }           
+        }
     },
 
     async getUserById(req, res) {
         try {
             const user = await User.findById(req.params.id);
             if (!user) {
-                return res.status(404).json({ 
-                    message: 'User not found' 
+                return res.status(404).json({
+                    message: 'User not found'
                 });
             }
             res.json({
@@ -73,21 +73,21 @@ const userController = {
                 data: sanitizeUser(user)
             });
         } catch (error) {
-            res.status(500).json({ 
-                message: 'Server error: ' + error.message 
+            res.status(500).json({
+                message: 'Server error: ' + error.message
             });
         }
     },
 
     // Update user profile
-    async updateProfile(req, res){
+    async updateProfile(req, res) {
         try {
             const userId = req.user.userId || req.user.id || req.user._id || req.user.sub;
             const user = await User.findById(userId);
-            
+
             if (!user) {
-                return res.status(404).json({ 
-                    message: 'User not found' 
+                return res.status(404).json({
+                    message: 'User not found'
                 });
             }
 
@@ -95,7 +95,7 @@ const userController = {
             // Handle both nested object and dot notation formats
             const newAvatar = req.body['profile.avatar'] || req.body.profile?.avatar;
             const oldAvatar = user.profile?.avatar;
-            
+
             if (newAvatar && oldAvatar) {
                 // Only delete if old avatar is from Cloudinary and different from new one
                 if (oldAvatar !== newAvatar && oldAvatar.includes('cloudinary.com')) {
@@ -107,10 +107,9 @@ const userController = {
                         const fileName = fileWithExt.split('.')[0];
                         const folder = urlParts[urlParts.length - 2];
                         const publicId = folder !== 'upload' ? `${folder}/${fileName}` : fileName;
-                        
+
                         // Delete old image from Cloudinary
                         await cloudinary.uploader.destroy(publicId);
-                        console.log(`Deleted old avatar from Cloudinary: ${publicId}`);
                     } catch (deleteError) {
                         console.error('Error deleting old avatar from Cloudinary:', deleteError);
                         // Continue with update even if deletion fails
@@ -120,46 +119,45 @@ const userController = {
 
             // Build update object with dot notation for nested fields
             const updateData = {};
-            
+
             // Update simple fields
             if (req.body.name) updateData.name = req.body.name;
             if (req.body.email) updateData.email = req.body.email;
             if (req.body.role) updateData.role = req.body.role;
             if (req.body.status) updateData.status = req.body.status;
-            
+
+            // New fields
+            if (req.body.dob) updateData.dob = req.body.dob;
+            if (req.body.address) updateData.address = req.body.address;
+            if (req.body.phone) updateData.phone = req.body.phone;
+
+            // Backward compatibility for phone (if passed in profile.phone)
+            const legacyPhone = req.body['profile.phone'] || (req.body.profile && req.body.profile.phone);
+            if (legacyPhone && !updateData.phone) {
+                updateData.phone = legacyPhone;
+            }
+
             // Update nested profile fields using dot notation
             if (req.body['profile.avatar']) {
                 updateData['profile.avatar'] = req.body['profile.avatar'];
             }
-            if (req.body['profile.phone']) {
-                updateData['profile.phone'] = req.body['profile.phone'];
-            }
             if (req.body['profile.studentId']) {
                 updateData['profile.studentId'] = req.body['profile.studentId'];
             }
-            if (req.body['profile.department']) {
-                updateData['profile.department'] = req.body['profile.department'];
-            }
-            
+
             // If profile object is provided directly (for backward compatibility)
             if (req.body.profile && typeof req.body.profile === 'object') {
                 if (req.body.profile.avatar !== undefined) {
                     updateData['profile.avatar'] = req.body.profile.avatar;
                 }
-                if (req.body.profile.phone !== undefined) {
-                    updateData['profile.phone'] = req.body.profile.phone;
-                }
                 if (req.body.profile.studentId !== undefined) {
                     updateData['profile.studentId'] = req.body.profile.studentId;
-                }
-                if (req.body.profile.department !== undefined) {
-                    updateData['profile.department'] = req.body.profile.department;
                 }
             }
 
             // Update user profile using dot notation to preserve other fields
             const updatedUser = await User.findByIdAndUpdate(
-                userId, 
+                userId,
                 { $set: updateData },
                 { new: true, runValidators: true }
             );
@@ -171,24 +169,24 @@ const userController = {
             });
         } catch (error) {
             console.error('Error updating profile:', error);
-            res.status(500).json({ 
-                message: 'Server error: ' + error.message 
+            res.status(500).json({
+                message: 'Server error: ' + error.message
             });
         }
     },
 
-        // Delete user account
+    // Delete user account
     async deleteAccount(req, res) {
         try {
             const userId = req.user.userId || req.user.id || req.user._id || req.user.sub;
             await User.findByIdAndDelete(userId);
-            res.json({ 
+            res.json({
                 success: true,
-                message: 'User account deleted successfully' 
+                message: 'User account deleted successfully'
             });
         } catch (error) {
-            res.status(500).json({ 
-                message: 'Server error: ' + error.message 
+            res.status(500).json({
+                message: 'Server error: ' + error.message
             });
         }
     },
@@ -268,8 +266,8 @@ const userController = {
 
             // Find and update user
             const user = await User.findByIdAndUpdate(
-                id, 
-                { role }, 
+                id,
+                { role },
                 { new: true, runValidators: true }
             );
 

@@ -631,42 +631,50 @@ const mindmapController = {
             }
 
             // Create prompt for AI to generate mindmap structure
-            const aiPrompt = `Bạn là một chuyên gia tạo mindmap. Hãy tạo một mindmap dựa trên yêu cầu sau:
+            const aiPrompt = `You are an expert mindmap creator. Create a mindmap based on the following request:
 
 "${prompt}"
 
-Yêu cầu:
-1. Tạo một mindmap có cấu trúc phân cấp rõ ràng với root node và các child nodes
-2. Root node nên là chủ đề chính
-3. Tạo ít nhất 3-5 nhánh chính từ root node
-4. Mỗi nhánh chính có thể có 2-4 nhánh con
-5. Sử dụng tiếng Việt nếu prompt là tiếng Việt, tiếng Anh nếu prompt là tiếng Anh
+IMPORTANT LANGUAGE RULE: 
+- Detect the language of the user's prompt above
+- Generate ALL content in the SAME language as the user's prompt
+- If the prompt is in English, respond entirely in English
+- If the prompt is in Vietnamese, respond entirely in Vietnamese
+- If the prompt is in Japanese, respond entirely in Japanese
+- Do NOT mix languages
 
-Trả về JSON với format chính xác sau (KHÔNG thêm text giải thích, CHỈ trả về JSON):
+Requirements:
+1. Create a hierarchical mindmap structure with root node and child nodes
+2. Root node should be the main topic
+3. Create at least 3-5 main branches from root node
+4. Each main branch can have 2-4 sub-branches
+5. Use the SAME language as the user's prompt for all node topics
+
+Return JSON with the exact format below (NO explanatory text, ONLY return JSON):
 
 {
   "nodeData": {
     "id": "root",
-    "topic": "Tên chủ đề chính",
+    "topic": "Main topic name",
     "root": true,
     "children": [
       {
         "id": "node1",
-        "topic": "Nhánh 1",
+        "topic": "Branch 1",
         "children": [
           {
             "id": "node1-1",
-            "topic": "Nhánh con 1-1"
+            "topic": "Sub-branch 1-1"
           },
           {
             "id": "node1-2",
-            "topic": "Nhánh con 1-2"
+            "topic": "Sub-branch 1-2"
           }
         ]
       },
       {
         "id": "node2",
-        "topic": "Nhánh 2",
+        "topic": "Branch 2",
         "children": []
       }
     ]
@@ -696,12 +704,12 @@ Trả về JSON với format chính xác sau (KHÔNG thêm text giải thích, C
   }
 }
 
-Lưu ý:
-- Mỗi node phải có id duy nhất
-- Root node luôn có id="root" và root=true
-- Chỉ trả về JSON, không thêm markdown code block hoặc text khác`;
+Notes:
+- Each node must have a unique id
+- Root node always has id="root" and root=true
+- Only return JSON, do not add markdown code blocks or other text
+- REMEMBER: All topic text must be in the same language as the user's prompt`;
 
-            console.log('Generating mindmap with AI...');
             const aiResponse = await generateResponse(aiPrompt);
 
             // Extract JSON from response
