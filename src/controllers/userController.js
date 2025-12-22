@@ -110,7 +110,6 @@ const userController = {
 
                         // Delete old image from Cloudinary
                         await cloudinary.uploader.destroy(publicId);
-                        console.log(`Deleted old avatar from Cloudinary: ${publicId}`);
                     } catch (deleteError) {
                         console.error('Error deleting old avatar from Cloudinary:', deleteError);
                         // Continue with update even if deletion fails
