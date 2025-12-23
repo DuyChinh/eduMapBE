@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const examService = require('../services/examService');
+const auditLogService = require('../services/auditLogService');
 
 // User role validation helpers
 const isTeacher = (user) => user && user.role === 'teacher';
@@ -29,17 +30,17 @@ async function createExam(req, res, next) {
       return res.status(403).json({ ok: false, message: 'Forbidden' });
     }
 
-    const { 
-      name, description, duration, totalMarks, questions, settings, 
-      startTime, endTime, timezone, lateEntryGracePeriod, subjectId, gradeId, fee, 
-      examPassword, autoMonitoring, studentVerification, eduMapOnly, 
-      hideGroupTitles, sectionsStartFromQ1, hideLeaderboard, addTitleInfo, 
-      preExamNotification, preExamNotificationText, examPurpose, 
-      isAllowUser, allowedClassIds, availableFrom, availableUntil, shuffleQuestions, 
+    const {
+      name, description, duration, totalMarks, questions, settings,
+      startTime, endTime, timezone, lateEntryGracePeriod, subjectId, gradeId, fee,
+      examPassword, autoMonitoring, studentVerification, eduMapOnly,
+      hideGroupTitles, sectionsStartFromQ1, hideLeaderboard, addTitleInfo,
+      preExamNotification, preExamNotificationText, examPurpose,
+      isAllowUser, allowedClassIds, availableFrom, availableUntil, shuffleQuestions,
       shuffleChoices, maxAttempts, viewMark, viewExamAndAnswer,
       status // 'draft' or 'published'
     } = req.body;
-    
+
     // Input validation
     if (!name || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ ok: false, message: 'name is required and cannot be empty' });
@@ -102,11 +103,11 @@ async function createExam(req, res, next) {
     if (availableFrom && availableUntil) {
       const from = new Date(availableFrom);
       const until = new Date(availableUntil);
-      
+
       if (isNaN(from.getTime()) || isNaN(until.getTime())) {
         return res.status(400).json({ ok: false, message: 'Invalid availableFrom or availableUntil format' });
       }
-      
+
       if (from >= until) {
         return res.status(400).json({ ok: false, message: 'availableFrom must be before availableUntil' });
       }
@@ -121,15 +122,15 @@ async function createExam(req, res, next) {
     if (!questions || !Array.isArray(questions) || questions.length === 0) {
       return res.status(400).json({ ok: false, message: 'questions array is required and cannot be empty' });
     }
-    
+
     if (!subjectId) {
       return res.status(400).json({ ok: false, message: 'subjectId is required when creating exam with questions' });
     }
-    
+
     if (!mongoose.isValidObjectId(subjectId)) {
       return res.status(400).json({ ok: false, message: 'Invalid subjectId format' });
     }
-    
+
     // Validate each question
     for (const question of questions) {
       if (!question.questionId || !mongoose.isValidObjectId(question.questionId)) {
@@ -142,13 +143,13 @@ async function createExam(req, res, next) {
         return res.status(400).json({ ok: false, message: 'Question marks must be a non-negative number' });
       }
     }
-    
+
     // Validate total marks vs questions marks
     const totalQuestionMarks = questions.reduce((sum, q) => sum + (q.marks || 1), 0);
     if (totalQuestionMarks > totalMarks) {
-      return res.status(400).json({ 
-        ok: false, 
-        message: `Total question marks (${totalQuestionMarks}) cannot exceed exam total marks (${totalMarks})` 
+      return res.status(400).json({
+        ok: false,
+        message: `Total question marks (${totalQuestionMarks}) cannot exceed exam total marks (${totalMarks})`
       });
     }
 
@@ -156,15 +157,15 @@ async function createExam(req, res, next) {
     if (startTime && endTime) {
       const start = new Date(startTime);
       const end = new Date(endTime);
-      
+
       if (isNaN(start.getTime()) || isNaN(end.getTime())) {
         return res.status(400).json({ ok: false, message: 'Invalid startTime or endTime format' });
       }
-      
+
       if (start >= end) {
         return res.status(400).json({ ok: false, message: 'startTime must be before endTime' });
       }
-      
+
       const timeDiffMinutes = (end - start) / (1000 * 60);
       if (timeDiffMinutes < duration) {
         return res.status(400).json({ ok: false, message: 'Exam duration cannot exceed the time range' });
@@ -214,22 +215,60 @@ async function createExam(req, res, next) {
     };
 
     const createdExam = await examService.createExam({ payload, user: req.user });
+
+    // Send notifications if published and restricted to classes
+    if (createdExam.status === 'published' && createdExam.isAllowUser === 'class' && createdExam.allowedClassIds?.length > 0) {
+      try {
+        const Class = require('../models/Class');
+        const Notification = require('../models/Notification');
+
+        // Find all students in these classes
+        const classes = await Class.find({ _id: { $in: createdExam.allowedClassIds } }).select('studentIds');
+        const studentIds = new Set();
+        classes.forEach(c => {
+          if (c.studentIds && Array.isArray(c.studentIds)) {
+            c.studentIds.forEach(id => studentIds.add(id.toString()));
+          }
+        });
+
+        // Create notifications for each student
+        const notifications = Array.from(studentIds).map(studentId => ({
+          recipient: studentId,
+          sender: req.user.userId || req.user.id,
+          type: 'EXAM_PUBLISHED',
+          content: 'EXAM_PUBLISHED',
+          relatedId: createdExam._id,
+          onModel: 'Exam'
+        }));
+
+        if (notifications.length > 0) {
+          await Notification.insertMany(notifications);
+        }
+      } catch (err) {
+        console.error('Error sending exam notifications:', err);
+        // Don't fail the request if notifications fail
+      }
+    }
+
+    // Log audit for exam creation
+    await auditLogService.logCreate('exams', createdExam._id, { name: createdExam.name, status: createdExam.status }, req.user, req);
+
     res.status(201).json({ ok: true, data: createdExam });
   } catch (e) {
     if (e?.status) {
       return res.status(e.status).json({ ok: false, message: e.message });
     }
-    
+
     // Handle duplicate key error (unique constraint)
     if (e.code === 11000) {
       return res.status(400).json({ ok: false, message: 'An exam with this name already exists for this teacher' });
     }
-    
+
     // Handle validation errors
     if (e.name === 'ValidationError') {
       return res.status(400).json({ ok: false, message: e.message });
     }
-    
+
     next(e);
   }
 }
@@ -279,7 +318,7 @@ async function getExamById(req, res, next) {
     }
 
     const examData = await examService.getExamById({ id: examId });
-    
+
     if (!examData) {
       return res.status(404).json({ ok: false, message: 'Exam not found' });
     }
@@ -306,13 +345,13 @@ async function getExamById(req, res, next) {
 async function getExamByShareCode(req, res, next) {
   try {
     const { shareCode } = req.params;
-    
+
     if (!shareCode || shareCode.length !== 8) {
       return res.status(400).json({ ok: false, message: 'Invalid share code format' });
     }
 
     const examData = await examService.getExamByShareCode({ shareCode });
-    
+
     if (!examData) {
       return res.status(404).json({ ok: false, message: 'Exam not found or not available' });
     }
@@ -374,6 +413,9 @@ async function updateExam(req, res, next) {
       return res.status(403).json({ ok: false, message: 'Forbidden or exam not found' });
     }
 
+    // Log audit for exam update
+    await auditLogService.logUpdate('exams', updatedExam._id, { name: updatedExam.name }, req.user, req);
+
     res.json({ ok: true, data: updatedExam });
   } catch (error) {
     if (error?.status) {
@@ -405,10 +447,13 @@ async function deleteExam(req, res, next) {
     const ownerIdEnforce = isAdmin(req.user) ? undefined : req.user.id;
 
     const deletedExam = await examService.deleteExam({ id: examId, ownerIdEnforce });
-    
+
     if (!deletedExam) {
       return res.status(403).json({ ok: false, message: 'Forbidden or exam not found' });
     }
+
+    // Log audit for exam deletion
+    await auditLogService.logDelete('exams', deletedExam._id, { name: deletedExam.name }, req.user, req);
 
     res.json({ ok: true, message: 'Exam deleted successfully', data: deletedExam });
   } catch (error) {

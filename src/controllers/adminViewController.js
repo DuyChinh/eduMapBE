@@ -1175,17 +1175,50 @@ module.exports = {
  */
 async function renderAuditLogs(req, res, next) {
   try {
-    const { page = 1, limit = 50 } = req.query;
+    const { page = 1, limit = 50, action, collection, startDate, endDate, performedBy } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    const [logs, total] = await Promise.all([
-      AuditLog.find()
+    // Build filter query
+    const query = {};
+
+    if (action) {
+      query.action = action;
+    }
+
+    if (collection) {
+      query.collectionName = collection;
+    }
+
+    if (performedBy) {
+      query['performedBy.email'] = { $regex: performedBy, $options: 'i' };
+    }
+
+    if (startDate || endDate) {
+      query.timestamp = {};
+      if (startDate) {
+        query.timestamp.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        const endDateObj = new Date(endDate);
+        endDateObj.setHours(23, 59, 59, 999);
+        query.timestamp.$lte = endDateObj;
+      }
+    }
+
+    // Get unique collections and users for filter dropdowns
+    const [logs, total, collections, users] = await Promise.all([
+      AuditLog.find(query)
         .sort({ timestamp: -1 })
         .skip(skip)
         .limit(parseInt(limit))
-        .populate('performedBy.userId', 'name email role')
+        .populate('performedBy.userId', 'name email role profile')
         .lean(),
-      AuditLog.countDocuments()
+      AuditLog.countDocuments(query),
+      AuditLog.distinct('collectionName'),
+      User.find({ role: { $in: ['teacher', 'admin'] } })
+        .select('name email profile')
+        .sort({ name: 1 })
+        .lean()
     ]);
 
     res.render('admin/audit-logs', {
@@ -1193,6 +1226,15 @@ async function renderAuditLogs(req, res, next) {
       currentPage: 'audit-logs',
       user: req.user,
       logs,
+      collections,
+      users,
+      filters: {
+        action: action || '',
+        collection: collection || '',
+        startDate: startDate || '',
+        endDate: endDate || '',
+        performedBy: performedBy || ''
+      },
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),

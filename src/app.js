@@ -49,8 +49,36 @@ app.use((err, req, res, next) => {
 // Start the server
 // Only listen if executed directly
 if (require.main === module) {
+    const http = require('http');
+    const { Server } = require('socket.io');
+    const ChangeStreamService = require('./services/changeStreamService');
+
     const PORT = process.env.PORT || 3000;
-    app.listen(PORT, () => {
+    const server = http.createServer(app);
+
+    // Initialize Socket.io
+    const io = new Server(server, {
+        cors: {
+            origin: "*",
+            methods: ["GET", "POST"]
+        }
+    });
+
+    // Initialize Change Stream Service for audit logs
+    const changeStreamService = new ChangeStreamService(io);
+
+    // Wait for MongoDB connection before starting change streams
+    const mongoose = require('mongoose');
+    mongoose.connection.once('open', () => {
+        changeStreamService.init();
+    });
+
+    // If already connected
+    if (mongoose.connection.readyState === 1) {
+        changeStreamService.init();
+    }
+
+    server.listen(PORT, () => {
         console.log(`Server is running on port ${PORT}`);
     });
 }
