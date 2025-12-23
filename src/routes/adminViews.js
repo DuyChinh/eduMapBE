@@ -5,9 +5,9 @@ const authViewMiddleware = require('../middleware/authViewMiddleware');
 
 // Login page (no auth required)
 router.get('/login', (req, res) => {
-    res.render('admin/login', { 
+    res.render('admin/login', {
         title: 'Admin Login',
-        error: req.query.error 
+        error: req.query.error
     });
 });
 
@@ -15,11 +15,11 @@ router.get('/login', (req, res) => {
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        
+
         // Call auth service
         const authService = require('../services/authService');
         const result = await authService.login(email, password);
-        
+
         // Check if user is admin
         if (result.user && result.user.role === 'admin') {
             // Set cookie from server side
@@ -29,7 +29,7 @@ router.post('/login', async (req, res) => {
                 sameSite: 'Lax',
                 path: '/'
             });
-            
+
             // Redirect to dashboard
             return res.redirect('/admin');
         } else {
@@ -77,6 +77,7 @@ router.get('/proctor-logs/:logId', adminViewController.renderProctorLogDetail);
 router.get('/mindmaps', adminViewController.renderMindmaps);
 router.get('/mindmaps/:mindmapId', adminViewController.renderMindmapDetail);
 router.get('/mindmaps/:mindmapId/edit', adminViewController.renderMindmapEdit);
+router.get('/audit-logs', adminViewController.renderAuditLogs);
 
 module.exports = router;
 

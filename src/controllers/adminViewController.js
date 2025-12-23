@@ -2,6 +2,7 @@ const adminService = require('../services/adminService');
 const User = require('../models/User');
 const Exam = require('../models/Exam');
 const Submission = require('../models/Submission');
+const AuditLog = require('../models/AuditLog');
 
 /**
  * Render admin dashboard
@@ -31,7 +32,7 @@ async function renderDashboard(req, res, next) {
 async function renderUsers(req, res, next) {
   try {
     const { role, status, orgId, search, page = 1, limit = 20 } = req.query;
-    
+
     const result = await adminService.getUsers({
       role,
       status,
@@ -202,7 +203,7 @@ async function renderSubmissions(req, res, next) {
 async function renderChatSessions(req, res, next) {
   try {
     const { search, page = 1, limit = 20 } = req.query;
-    
+
     const result = await adminService.getChatSessions({
       search: search || '',
       page: parseInt(page),
@@ -228,7 +229,7 @@ async function renderChatSessions(req, res, next) {
 async function renderChatHistory(req, res, next) {
   try {
     const { search, sessionId, page = 1, limit = 20 } = req.query;
-    
+
     const result = await adminService.getChatHistory({
       search: search || '',
       sessionId: sessionId || null,
@@ -256,7 +257,7 @@ async function renderUserDetail(req, res, next) {
   try {
     const { userId } = req.params;
     const mongoose = require('mongoose');
-    
+
     if (!mongoose.isValidObjectId(userId)) {
       return res.status(400).render('admin/error', {
         title: 'Error',
@@ -298,7 +299,7 @@ async function renderOrganizationDetail(req, res, next) {
     const { orgId } = req.params;
     const mongoose = require('mongoose');
     const Organization = require('../models/Organization');
-    
+
     if (!mongoose.isValidObjectId(orgId)) {
       return res.status(400).render('admin/error', {
         title: 'Error',
@@ -337,7 +338,7 @@ async function renderExamDetail(req, res, next) {
   try {
     const { examId } = req.params;
     const mongoose = require('mongoose');
-    
+
     if (!mongoose.isValidObjectId(examId)) {
       return res.status(400).render('admin/error', {
         title: 'Error',
@@ -378,7 +379,7 @@ async function renderSubmissionDetail(req, res, next) {
   try {
     const { submissionId } = req.params;
     const mongoose = require('mongoose');
-    
+
     if (!mongoose.isValidObjectId(submissionId)) {
       return res.status(400).render('admin/error', {
         title: 'Error',
@@ -419,7 +420,7 @@ async function renderChatSessionDetail(req, res, next) {
   try {
     const { sessionId } = req.params;
     const mongoose = require('mongoose');
-    
+
     if (!mongoose.isValidObjectId(sessionId)) {
       return res.status(400).render('admin/error', {
         title: 'Error',
@@ -456,7 +457,7 @@ async function renderChatHistoryDetail(req, res, next) {
   try {
     const { historyId } = req.params;
     const mongoose = require('mongoose');
-    
+
     if (!mongoose.isValidObjectId(historyId)) {
       return res.status(400).render('admin/error', {
         title: 'Error',
@@ -492,7 +493,7 @@ async function renderChatHistoryDetail(req, res, next) {
 async function renderQuestions(req, res, next) {
   try {
     const { search, type, subjectId, page = 1, limit = 20 } = req.query;
-    
+
     const result = await adminService.getQuestions({
       search: search || '',
       type: type || null,
@@ -521,7 +522,7 @@ async function renderQuestionDetail(req, res, next) {
   try {
     const { questionId } = req.params;
     const mongoose = require('mongoose');
-    
+
     if (!mongoose.isValidObjectId(questionId)) {
       return res.status(400).render('admin/error', {
         title: 'Error',
@@ -558,7 +559,7 @@ async function renderUserEdit(req, res, next) {
   try {
     const { userId } = req.params;
     const mongoose = require('mongoose');
-    
+
     if (!mongoose.isValidObjectId(userId)) {
       return res.status(400).render('admin/error', {
         title: 'Error',
@@ -600,7 +601,7 @@ async function renderOrganizationEdit(req, res, next) {
     const { orgId } = req.params;
     const mongoose = require('mongoose');
     const Organization = require('../models/Organization');
-    
+
     if (!mongoose.isValidObjectId(orgId)) {
       return res.status(400).render('admin/error', {
         title: 'Error',
@@ -639,7 +640,7 @@ async function renderChatSessionEdit(req, res, next) {
   try {
     const { sessionId } = req.params;
     const mongoose = require('mongoose');
-    
+
     if (!mongoose.isValidObjectId(sessionId)) {
       return res.status(400).render('admin/error', {
         title: 'Error',
@@ -676,7 +677,7 @@ async function renderChatHistoryEdit(req, res, next) {
   try {
     const { historyId } = req.params;
     const mongoose = require('mongoose');
-    
+
     if (!mongoose.isValidObjectId(historyId)) {
       return res.status(400).render('admin/error', {
         title: 'Error',
@@ -713,7 +714,7 @@ async function renderQuestionEdit(req, res, next) {
   try {
     const { questionId } = req.params;
     const mongoose = require('mongoose');
-    
+
     if (!mongoose.isValidObjectId(questionId)) {
       return res.status(400).render('admin/error', {
         title: 'Error',
@@ -760,7 +761,7 @@ async function renderExamEdit(req, res, next) {
   try {
     const { examId } = req.params;
     const mongoose = require('mongoose');
-    
+
     if (!mongoose.isValidObjectId(examId)) {
       return res.status(400).render('admin/error', {
         title: 'Error',
@@ -783,7 +784,7 @@ async function renderExamEdit(req, res, next) {
     }
 
     // Get all users for owner selection (teachers and admins only)
-    const users = await User.find({ 
+    const users = await User.find({
       role: { $in: ['teacher', 'admin'] },
       status: 'active'
     })
@@ -811,7 +812,7 @@ async function renderSubmissionEdit(req, res, next) {
   try {
     const { submissionId } = req.params;
     const mongoose = require('mongoose');
-    
+
     if (!mongoose.isValidObjectId(submissionId)) {
       return res.status(400).render('admin/error', {
         title: 'Error',
@@ -851,7 +852,7 @@ async function renderSubmissionEdit(req, res, next) {
 async function renderClasses(req, res, next) {
   try {
     const { search, orgId, teacherId, page = 1, limit = 20 } = req.query;
-    
+
     const result = await adminService.getClasses({
       search: search || '',
       orgId: orgId || null,
@@ -880,7 +881,7 @@ async function renderClassDetail(req, res, next) {
   try {
     const { classId } = req.params;
     const mongoose = require('mongoose');
-    
+
     if (!mongoose.isValidObjectId(classId)) {
       return res.status(400).render('admin/error', {
         title: 'Error',
@@ -917,7 +918,7 @@ async function renderClassEdit(req, res, next) {
   try {
     const { classId } = req.params;
     const mongoose = require('mongoose');
-    
+
     if (!mongoose.isValidObjectId(classId)) {
       return res.status(400).render('admin/error', {
         title: 'Error',
@@ -927,7 +928,7 @@ async function renderClassEdit(req, res, next) {
     }
 
     const classDoc = await adminService.getClassById(classId);
-    
+
     // Get list of teachers and admins for owner dropdown
     const teachers = await User.find({
       role: { $in: ['teacher', 'admin'] },
@@ -981,7 +982,7 @@ async function renderClassEdit(req, res, next) {
 async function renderProctorLogs(req, res, next) {
   try {
     const { search, submissionId, userId, event, severity, page = 1, limit = 20 } = req.query;
-    
+
     const result = await adminService.getProctorLogs({
       search: search || '',
       submissionId: submissionId || null,
@@ -1012,7 +1013,7 @@ async function renderProctorLogDetail(req, res, next) {
   try {
     const { logId } = req.params;
     const mongoose = require('mongoose');
-    
+
     if (!mongoose.isValidObjectId(logId)) {
       return res.status(400).render('admin/error', {
         title: 'Error',
@@ -1048,7 +1049,7 @@ async function renderProctorLogDetail(req, res, next) {
 async function renderMindmaps(req, res, next) {
   try {
     const { search, userId, status, page = 1, limit = 20 } = req.query;
-    
+
     const result = await adminService.getMindmaps({
       search: search || '',
       userId: userId || null,
@@ -1107,7 +1108,7 @@ async function renderMindmapEdit(req, res, next) {
     const { mindmapId } = req.params;
 
     const mindmap = await adminService.getMindmapById(mindmapId);
-    
+
     // Get list of users for dropdown
     const users = await User.find({ status: 'active' })
       .select('name email')
@@ -1164,6 +1165,43 @@ module.exports = {
   renderProctorLogDetail,
   renderMindmaps,
   renderMindmapDetail,
-  renderMindmapEdit
+  renderMindmapEdit,
+  renderAuditLogs
 };
+
+/**
+ * Render audit logs page
+ * GET /admin/audit-logs
+ */
+async function renderAuditLogs(req, res, next) {
+  try {
+    const { page = 1, limit = 50 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [logs, total] = await Promise.all([
+      AuditLog.find()
+        .sort({ timestamp: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .populate('performedBy.userId', 'name email role')
+        .lean(),
+      AuditLog.countDocuments()
+    ]);
+
+    res.render('admin/audit-logs', {
+      title: 'Audit Logs',
+      currentPage: 'audit-logs',
+      user: req.user,
+      logs,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+}
 

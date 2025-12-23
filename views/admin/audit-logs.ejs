@@ -1,0 +1,267 @@
+<%- include('../partials/header') %>
+
+    <div class="container-fluid">
+        <div class="row mb-4">
+            <div class="col-12 d-flex justify-content-between align-items-center">
+                <h2 class="mb-0">System Audit Logs</h2>
+                <div class="d-flex align-items-center">
+                    <span id="connection-status" class="badge bg-secondary me-3">Connecting...</span>
+                    <button class="btn btn-outline-primary btn-sm" onclick="location.reload()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h6 class="card-title">Total Logs</h6>
+                        <h3 class="mb-0">
+                            <%= pagination.total %>
+                        </h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-9">
+                <div class="alert alert-info mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Realtime monitoring is active. New actions will appear here automatically.
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs Table -->
+        <div class="card shadow-sm">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" id="audit-table">
+                        <thead class="bg-light">
+                            <tr>
+                                <th>Time</th>
+                                <th>Action</th>
+                                <th>Collection</th>
+                                <th>Document ID</th>
+                                <th>Performed By</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="audit-table-body">
+                            <% if (logs && logs.length> 0) { %>
+                                <% logs.forEach(log=> { %>
+                                    <tr class="audit-row">
+                                        <td class="text-muted">
+                                            <small>
+                                                <%= new Date(log.timestamp).toLocaleString() %>
+                                            </small>
+                                        </td>
+                                        <td>
+                                            <% let badgeClass='bg-secondary' ; if (log.action==='CREATE' )
+                                                badgeClass='bg-success' ; if (log.action==='UPDATE' )
+                                                badgeClass='bg-warning text-dark' ; if (log.action==='DELETE' )
+                                                badgeClass='bg-danger' ; %>
+                                                <span class="badge <%= badgeClass %>">
+                                                    <%= log.action %>
+                                                </span>
+                                        </td>
+                                        <td class="fw-bold">
+                                            <%= log.collectionName %>
+                                        </td>
+                                        <td>
+                                            <code class="text-primary"><%= log.documentId %></code>
+                                        </td>
+                                        <td>
+                                            <% if (log.performedBy && log.performedBy.email && log.performedBy.email
+                                                !=='System / ChangeStream' ) { %>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="avatar-circle sm me-2 bg-primary text-white">
+                                                        <%= log.performedBy.email.charAt(0).toUpperCase() %>
+                                                    </div>
+                                                    <div>
+                                                        <div class="fw-bold">
+                                                            <%= log.performedBy.email %>
+                                                        </div>
+                                                        <small class="text-muted">
+                                                            <%= log.performedBy.role %>
+                                                        </small>
+                                                    </div>
+                                                </div>
+                                                <% } else { %>
+                                                    <span class="text-muted"><i class="fas fa-robot me-1"></i>
+                                                        System</span>
+                                                    <% } %>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-light" type="button" data-bs-toggle="collapse"
+                                                data-bs-target="#details-<%= log._id %>">
+                                                View Data
+                                            </button>
+                                            <div class="collapse mt-2" id="details-<%= log._id %>">
+                                                <pre class="bg-light p-2 rounded small mb-0"
+                                                    style="max-width: 300px; max-height: 200px; overflow: auto;"><%= JSON.stringify(log.documentData, null, 2) %></pre>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <% }); %>
+                                        <% } else { %>
+                                            <tr id="no-logs-row">
+                                                <td colspan="6" class="text-center py-5 text-muted">
+                                                    <i class="fas fa-history fa-3x mb-3"></i>
+                                                    <p>No audit logs found.</p>
+                                                </td>
+                                            </tr>
+                                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Pagination -->
+            <% if (pagination.pages> 1) { %>
+                <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+                    <small class="text-muted">Showing page <%= pagination.page %> of <%= pagination.pages %></small>
+                    <nav>
+                        <ul class="pagination mb-0">
+                            <% if (pagination.page> 1) { %>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=<%= pagination.page - 1 %>">Previous</a>
+                                </li>
+                                <% } %>
+
+                                    <% for(let i=1; i <=pagination.pages; i++) { %>
+                                        <li class="page-item <%= pagination.page === i ? 'active' : '' %>">
+                                            <a class="page-link" href="?page=<%= i %>">
+                                                <%= i %>
+                                            </a>
+                                        </li>
+                                        <% } %>
+
+                                            <% if (pagination.page < pagination.pages) { %>
+                                                <li class="page-item">
+                                                    <a class="page-link"
+                                                        href="?page=<%= pagination.page + 1 %>">Next</a>
+                                                </li>
+                                                <% } %>
+                        </ul>
+                    </nav>
+                </div>
+                <% } %>
+        </div>
+    </div>
+
+    <!-- Socket.io -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const statusSpan = document.getElementById('connection-status');
+        const tableBody = document.getElementById('audit-table-body');
+        const noLogsRow = document.getElementById('no-logs-row');
+
+        socket.on('connect', () => {
+            console.log('Connected to socket server');
+            statusSpan.textContent = 'Live';
+            statusSpan.className = 'badge bg-success me-3 shadow-sm animate-pulse';
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Disconnected from socket server');
+            statusSpan.textContent = 'Disconnected';
+            statusSpan.className = 'badge bg-danger me-3';
+        });
+
+        socket.on('db_change', (data) => {
+            console.log('New DB Change:', data);
+
+            // Remove "No logs" row if present
+            if (noLogsRow) noLogsRow.remove();
+
+            // Determine badge color
+            let badgeClass = 'bg-secondary';
+            if (data.action === 'CREATE') badgeClass = 'bg-success';
+            if (data.action === 'UPDATE') badgeClass = 'bg-warning text-dark';
+            if (data.action === 'DELETE') badgeClass = 'bg-danger';
+
+            // Create new row
+            const row = document.createElement('tr');
+            row.className = 'audit-row highlight-new'; // Add animation class if custom CSS
+            row.style.backgroundColor = '#f0f9ff'; // Light blue highlight
+            setTimeout(() => row.style.backgroundColor = '', 2000); // Fade out
+
+            // Format Performed By
+            let performedByHtml = '<span class="text-muted"><i class="fas fa-robot me-1"></i> System</span>';
+            if (data.performedBy && data.performedBy.email && data.performedBy.email !== 'System / ChangeStream') {
+                performedByHtml = `
+                <div class="d-flex align-items-center">
+                    <div class="avatar-circle sm me-2 bg-primary text-white">
+                        ${data.performedBy.email.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                        <div class="fw-bold">${data.performedBy.email}</div>
+                        <small class="text-muted">${data.performedBy.role}</small>
+                    </div>
+                </div>
+             `;
+            }
+
+            row.innerHTML = `
+            <td class="text-muted">
+                <small>${new Date(data.timestamp).toLocaleString()}</small>
+            </td>
+            <td>
+                <span class="badge ${badgeClass}">${data.action}</span>
+            </td>
+            <td class="fw-bold">${data.collectionName}</td>
+            <td>
+                <code class="text-primary">${data.documentId}</code>
+            </td>
+            <td>${performedByHtml}</td>
+            <td>
+                <button class="btn btn-sm btn-light" type="button" 
+                    data-bs-toggle="collapse" 
+                    data-bs-target="#details-${data.documentId}-${Date.now()}">
+                    View Data
+                </button>
+                <div class="collapse mt-2" id="details-${data.documentId}-${Date.now()}">
+                    <pre class="bg-light p-2 rounded small mb-0" style="max-width: 300px; max-height: 200px; overflow: auto;">${JSON.stringify(data.documentData, null, 2)}</pre>
+                </div>
+            </td>
+        `;
+
+            // Prepend logic
+            if (tableBody.firstChild) {
+                tableBody.insertBefore(row, tableBody.firstChild);
+            } else {
+                tableBody.appendChild(row);
+            }
+
+            // Limit rows to 50 for performance
+            if (tableBody.children.length > 50) {
+                tableBody.lastChild.remove();
+            }
+        });
+
+    </script>
+
+    <style>
+        .animate-pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+    </style>
+
+    <%- include('../partials/footer') %>
