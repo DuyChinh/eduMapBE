@@ -12,14 +12,14 @@ async function generateUniqueShareCode() {
   let shareCode;
   let isUnique = false;
   let attempts = 0;
-  
+
   while (!isUnique && attempts < 20) {
     // Generate 8-character code
     shareCode = '';
     for (let i = 0; i < 8; i++) {
       shareCode += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    
+
     // Check if code already exists
     const existing = await Exam.findOne({ shareCode });
     if (!existing) {
@@ -27,12 +27,12 @@ async function generateUniqueShareCode() {
     }
     attempts++;
   }
-  
+
   if (!isUnique) {
     // Fallback: use timestamp-based code
     shareCode = Date.now().toString(36).toUpperCase().slice(-8);
   }
-  
+
   return shareCode;
 }
 
@@ -66,7 +66,6 @@ exports.uploadAndParse = async (req, res, next) => {
       });
     }
 
-    console.log(`Processing PDF: ${req.file.originalname}, size: ${req.file.size} bytes`);
 
     const parsedData = await pdfParserService.parsePDF(req.file.buffer, req.file.originalname);
 
@@ -76,7 +75,6 @@ exports.uploadAndParse = async (req, res, next) => {
       0
     );
 
-    console.log(`Successfully parsed PDF: ${totalQuestions} questions found across ${parsedData.pages.length} pages`);
 
     return res.status(200).json({
       ok: true,
@@ -104,14 +102,6 @@ exports.uploadAndParse = async (req, res, next) => {
  */
 exports.createExamFromPDF = async (req, res, next) => {
   try {
-    console.log('=== Create Exam From PDF ===');
-    console.log('User:', {
-      _id: req.user?._id,
-      id: req.user?.id,
-      role: req.user?.role,
-      orgId: req.user?.orgId
-    });
-
     if (!req.user || !req.user._id) {
       return res.status(401).json({
         ok: false,
@@ -166,8 +156,6 @@ exports.createExamFromPDF = async (req, res, next) => {
       });
     }
 
-    console.log(`Creating exam from PDF: ${examName}, ${parsedQuestions.length} questions`);
-
     // Step 1: Create Questions in database
     const createdQuestions = [];
     const marksPerQuestion = totalMarks / parsedQuestions.length;
@@ -180,20 +168,22 @@ exports.createExamFromPDF = async (req, res, next) => {
 
       const isMultipleChoice = pq.answers && pq.answers.length > 0;
       const questionType = isMultipleChoice ? 'mcq' : 'essay';
-      const correctAnswer = isMultipleChoice 
+      const correctAnswer = isMultipleChoice
         ? (pq.correctAnswer || pq.answers[0].key)
         : '';
 
       const questionData = {
-        name: `Câu ${pq.questionNumber || createdQuestions.length + 1}`,
+        name: `${examName} - ${pq.questionNumber || createdQuestions.length + 1}`,
         text: pq.questionText,
         type: questionType,
         choices: isMultipleChoice ? pq.answers.map(ans => ({
           key: ans.key,
-          text: ans.text
+          text: ans.text,
+          image: ans.image // Save choice image
         })) : [],
         answer: correctAnswer,
         explanation: pq.explanation || '',
+        images: pq.images || (pq.image ? [pq.image] : []), // Save question images
         subjectId: subjectId,
         level: pq.level || 1,
         tags: pq.tags || [],
@@ -202,12 +192,6 @@ exports.createExamFromPDF = async (req, res, next) => {
         isPublic: false
       };
 
-      console.log(`Creating question ${createdQuestions.length + 1}:`, {
-        name: questionData.name,
-        type: questionData.type,
-        ownerId: questionData.ownerId,
-        ownerIdType: typeof questionData.ownerId
-      });
 
       const question = new Question(questionData);
       const savedQuestion = await question.save();
@@ -219,7 +203,6 @@ exports.createExamFromPDF = async (req, res, next) => {
       });
     }
 
-    console.log(`Created ${createdQuestions.length} questions in database`);
 
     // Step 2: Generate shareCode if status is published
     const examStatus = status || 'published';
@@ -250,7 +233,6 @@ exports.createExamFromPDF = async (req, res, next) => {
 
     const savedExam = await exam.save();
 
-    console.log(`Successfully created exam: ${savedExam._id}`);
 
     return res.status(201).json({
       ok: true,
