@@ -221,8 +221,12 @@ function showAuditLogDetail(logsData, index) {
         '</div>' +
         '<div class="col-md-6">' +
         '<div class="mb-4"><label class="text-muted small">TIMESTAMP</label><div>' + new Date(log.timestamp).toLocaleString() + '</div></div>' +
+        '</div>' +
+        '<div class="col-12">' +
         '<div class="mb-4"><label class="text-muted small">PERFORMED BY</label><div class="mt-2">' + performedByHtml + '</div></div>' +
-        (log.ipAddress ? '<div class="mb-4"><label class="text-muted small">IP ADDRESS</label><div>' + log.ipAddress + '</div></div>' : '') +
+        '</div>' +
+        '<div class="col-12">' +
+        (log.userAgent ? '<div class="mb-4"><label class="text-muted small">USER AGENT</label><div>' + log.userAgent + '</div></div>' : '') +
         '</div>' +
         '</div>' +
         '<hr>' +

@@ -220,12 +220,14 @@ async function mine(req, res, next) {
 
       // Populate latest feed post for each class
       const itemsWithPost = await Promise.all(data.items.map(async (item) => {
-        const latestPost = await FeedPost.findOne({ classId: item._id })
+        // Convert Mongoose document to plain object
+        const itemObj = item.toObject ? item.toObject() : item;
+        const latestPost = await FeedPost.findOne({ classId: itemObj._id })
           .sort({ createdAt: -1 })
           .select('content author createdAt')
           .populate('author', 'name active')
           .lean();
-        return { ...item, latestPost };
+        return { ...itemObj, latestPost };
       }));
 
       return res.json({ ok: true, ...data, items: itemsWithPost });
@@ -287,12 +289,14 @@ async function mine(req, res, next) {
 
     // Populate latest feed post for each class
     const itemsWithPost = await Promise.all(data.items.map(async (item) => {
-      const latestPost = await FeedPost.findOne({ classId: item._id })
+      // Convert Mongoose document to plain object
+      const itemObj = item.toObject ? item.toObject() : item;
+      const latestPost = await FeedPost.findOne({ classId: itemObj._id })
         .sort({ createdAt: -1 })
         .select('content author createdAt')
         .populate('author', 'name active')
         .lean();
-      return { ...item, latestPost };
+      return { ...itemObj, latestPost };
     }));
 
     res.json({ ok: true, ...data, items: itemsWithPost });
