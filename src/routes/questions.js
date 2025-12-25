@@ -15,15 +15,16 @@ const upload = multer({
     const allowedMimes = [
       'text/csv',
       'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/pdf'
     ];
-    const allowedExtensions = ['.csv', '.xlsx', '.xls'];
+    const allowedExtensions = ['.csv', '.xlsx', '.xls', '.pdf'];
     const fileExtension = '.' + file.originalname.split('.').pop().toLowerCase();
 
     if (allowedMimes.includes(file.mimetype) || allowedExtensions.includes(fileExtension)) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type. Only CSV and Excel files are allowed.'));
+      cb(new Error('Invalid file type. Only CSV, Excel, and PDF files are allowed.'));
     }
   }
 });
@@ -32,6 +33,10 @@ const upload = multer({
 router.get('/export', auth, questionImportExportController.exportQuestions);
 router.get('/template', auth, questionImportExportController.downloadTemplate);
 router.post('/import', auth, upload.single('file'), questionImportExportController.importQuestions);
+
+// PDF Upload routes
+router.post('/upload-pdf', auth, upload.single('file'), questionController.uploadPdfForParsing);
+router.post('/batch-create', auth, questionController.batchCreate);
 
 router.get('/', auth, questionController.getAllQuestions);
 router.post('/batch-rename', auth, questionController.batchRename);

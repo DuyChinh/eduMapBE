@@ -562,5 +562,129 @@ module.exports = {
   patch,
   remove,
   batchRename,
-  validateByType // Export for use in import controller
+  validateByType, // Export for use in import controller
+  batchCreate,
+  uploadPdfForParsing
 };
+
+/**
+ * Batch create questions (for creating from PDF)
+ * POST /v1/api/questions/batch-create
+ */
+async function batchCreate(req, res, next) {
+  try {
+    if (!['teacher', 'admin'].includes(req.user?.role)) {
+      return res.status(403).json({ ok: false, message: 'Forbidden' });
+    }
+
+    const { questions } = req.body;
+    if (!Array.isArray(questions) || questions.length === 0) {
+      return res.status(400).json({ ok: false, message: 'questions array is required and must be non-empty' });
+    }
+
+    const orgId = getOrgIdSoft(req);
+    const results = {
+      success: 0,
+      failed: 0,
+      errors: [],
+      data: []
+    };
+
+    // Process each question
+    for (let i = 0; i < questions.length; i++) {
+      const questionData = questions[i];
+      const index = i + 1;
+
+      try {
+        // Basic validation
+        if (!questionData.name || !questionData.text || !questionData.subjectId) {
+          results.failed++;
+          results.errors.push({ index, error: 'Missing required fields (name, text, subjectId)' });
+          continue;
+        }
+
+        // Check for duplicate name
+        const existingQuestion = await service.findByNameAndOwner({
+          name: questionData.name.trim(),
+          ownerId: req.user.id,
+          orgId
+        });
+
+        if (existingQuestion) {
+          // Auto-rename if duplicate: name-timestamp
+          questionData.name = `${questionData.name.trim()} (${Date.now()}-${Math.floor(Math.random() * 1000)})`;
+        }
+
+        // Validate structure
+        const errors = validateByType(questionData);
+        if (errors.length > 0) {
+          results.failed++;
+          results.errors.push({ index, name: questionData.name, error: errors.join('; ') });
+          continue;
+        }
+
+        // Create question
+        const doc = await service.create({ payload: questionData, user: req.user });
+        results.success++;
+        results.data.push(doc);
+
+      } catch (error) {
+        results.failed++;
+        results.errors.push({ index, name: questionData.name, error: error.message || 'Unknown error' });
+      }
+    }
+
+    res.json({
+      ok: true,
+      message: `Created ${results.success} questions. ${results.failed} failed.`,
+      results
+    });
+
+  } catch (e) {
+    next(e);
+  }
+}
+
+/**
+ * Upload PDF and parse questions using AI
+ * POST /v1/api/questions/upload-pdf
+ */
+const pdfParserService = require('../services/pdfParserService');
+
+async function uploadPdfForParsing(req, res, next) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ ok: false, message: 'No file uploaded' });
+    }
+
+    console.log(`Processing PDF via PDFParserService: ${req.file.originalname}`);
+
+    // Use pdfParserService to parse the PDF
+    // It returns structured data including pages and questions
+    const result = await pdfParserService.parsePDF(req.file.buffer, req.file.originalname);
+
+    // Transform result to match what frontend expects
+    // Frontend expects: { ok: true, data: { filename, totalQuestions, pages: [...] } }
+
+    // Calculate total questions
+    let totalQuestions = 0;
+    if (result.pages) {
+      result.pages.forEach(p => {
+        if (p.questions) totalQuestions += p.questions.length;
+      });
+    }
+
+    res.json({
+      ok: true,
+      data: {
+        filename: req.file.originalname,
+        totalQuestions: totalQuestions,
+        pages: result.pages
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in uploadPdfForParsing:', error);
+    next(error);
+  }
+}
