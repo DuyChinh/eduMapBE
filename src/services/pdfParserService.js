@@ -408,7 +408,7 @@ class PDFParserService {
         try {
           const promptInput = this.prompt + `\n\nNHIỆM VỤ PARTITION (${part.label}):\n${part.instruction}\n\nXử lý file PDF đính kèm.`;
           const attachments = [{ mimeType: 'application/pdf', data: pdfBuffer.toString('base64') }];
-          const aiResponse = await aiService.generateResponse(promptInput, attachments);
+          const aiResponse = await aiService.generateResponseFile(promptInput, attachments);
           const qs = this.parseAIResponse(aiResponse);
           results.push(qs);
         } catch (e) {
@@ -423,7 +423,7 @@ class PDFParserService {
       const totalLength = rawText.length;
       if (totalLength < CHUNK_SIZE * 1.2) {
         const promptInput = this.prompt + `\n\nNỘI DUNG VĂN BẢN PDF:\n${rawText}`;
-        const aiResponse = await aiService.generateResponse(promptInput, []);
+        const aiResponse = await aiService.generateResponseFile(promptInput, []);
         allQuestions = this.parseAIResponse(aiResponse);
       } else {
         const chunks = [];
@@ -434,7 +434,7 @@ class PDFParserService {
           await new Promise(r => setTimeout(r, idx * 1000));
           const promptInput = this.prompt + `\n\n(PHẦN ${idx + 1}/${chunks.length})\nNỘI DUNG:\n${chunk}`;
           try {
-            const resp = await aiService.generateResponse(promptInput, []);
+            const resp = await aiService.generateResponseFile(promptInput, []);
             return this.parseAIResponse(resp);
           } catch (e) {
             return [];
