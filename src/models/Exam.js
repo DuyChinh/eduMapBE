@@ -239,13 +239,13 @@ const ExamSchema = new mongoose.Schema({
     allowBack: { type: Boolean, default: true },
 
     // Submission settings
-    autoSubmit: { type: Boolean, default: false },
+    autoSubmit: { type: Boolean, default: true },
     confirmSubmit: { type: Boolean, default: true },
     allowLateSubmission: { type: Boolean, default: false },
 
     // Security settings
     preventCopy: { type: Boolean, default: false },
-    preventRightClick: { type: Boolean, default: false },
+    preventRightClick: { type: Boolean, default: true },
     fullscreenMode: { type: Boolean, default: false },
 
     // Notification settings
