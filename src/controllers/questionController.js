@@ -192,6 +192,7 @@ async function getAllQuestions(req, res, next) {
       subjectId,
       type,
       name,
+      q, // Also accept 'q' as search parameter
       level,
       isPublic
     } = req.query;
@@ -241,9 +242,10 @@ async function getAllQuestions(req, res, next) {
       filter.isPublic = isPublicBool;
     }
 
-    // Filter theo name (search trong cả name và text)
-    if (name && typeof name === 'string' && name.trim()) {
-      const searchRegex = { $regex: name.trim(), $options: 'i' };
+    // Filter theo name hoặc q (search trong cả name và text)
+    const searchTerm = q || name; // Use 'q' first, fallback to 'name'
+    if (searchTerm && typeof searchTerm === 'string' && searchTerm.trim()) {
+      const searchRegex = { $regex: searchTerm.trim(), $options: 'i' };
       filter.$or = [
         { name: searchRegex },
         { text: searchRegex }
