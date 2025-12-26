@@ -12,7 +12,8 @@
     "migrate:down": "migrate-mongo down",
     "migrate:status": "migrate-mongo status",
     "seed": "node src/scripts/seed.js",
-    "seed:clean": "node src/scripts/seed.js --clean"
+    "seed:clean": "node src/scripts/seed.js --clean",
+    "build": "echo 'No build required for Node.js backend'"
   },
   "dependencies": {
     "@google/genai": "^1.0.0",
