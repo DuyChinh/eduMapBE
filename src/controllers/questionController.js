@@ -659,14 +659,9 @@ async function uploadPdfForParsing(req, res, next) {
 
     console.log(`Processing PDF via PDFParserService: ${req.file.originalname}`);
 
-    // Use pdfParserService to parse the PDF
-    // It returns structured data including pages and questions
     const result = await pdfParserService.parsePDF(req.file.buffer, req.file.originalname);
 
-    // Transform result to match what frontend expects
-    // Frontend expects: { ok: true, data: { filename, totalQuestions, pages: [...] } }
 
-    // Calculate total questions
     let totalQuestions = 0;
     if (result.pages) {
       result.pages.forEach(p => {

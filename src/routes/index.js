@@ -35,10 +35,11 @@ const configureRoutes = (app) => {
     v1.use('/upload', uploadRoutes);
     v1.use('/feed', feedRoutes);
     v1.use('/notifications', require('./notifications'));
+    v1.use('/payment', require('./paymentRoutes'));
 
 
     v1.use('/dashboard', dashboardRoutes);
-    
+
     // Admin API routes
     const adminRoutes = require('./admin');
     v1.use('/admin', adminRoutes);
