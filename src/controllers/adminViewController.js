@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Exam = require('../models/Exam');
 const Submission = require('../models/Submission');
 const AuditLog = require('../models/AuditLog');
+const Payment = require('../models/Payment');
 
 /**
  * Render admin dashboard
@@ -1166,8 +1167,59 @@ module.exports = {
   renderMindmaps,
   renderMindmapDetail,
   renderMindmapEdit,
+  renderPayments,
   renderAuditLogs
 };
+
+/**
+ * Render payments management page
+ * GET /admin/payments
+ */
+async function renderPayments(req, res, next) {
+  try {
+    const { page = 1, limit = 20, status, search } = req.query;
+    const query = {};
+
+    if (status) {
+      query.status = status;
+    }
+
+    if (search) {
+      query.$or = [
+        { txnRef: { $regex: search, $options: 'i' } },
+        { orderInfo: { $regex: search, $options: 'i' } },
+        { vnpTransactionNo: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [payments, total] = await Promise.all([
+      Payment.find(query)
+        .populate('userId', 'name email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      Payment.countDocuments(query)
+    ]);
+
+    res.render('admin/payments', {
+      title: 'Payments Management',
+      currentPage: 'payments',
+      user: req.user,
+      payments,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+}
 
 /**
  * Render audit logs page

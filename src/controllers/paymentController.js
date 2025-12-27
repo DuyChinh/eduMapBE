@@ -1,5 +1,5 @@
 const vnpayService = require('../services/vnpayService');
-const PaymentTransaction = require('../models/PaymentTransaction');
+const Payment = require('../models/Payment');
 
 const paymentController = {
     createPaymentUrl: async (req, res) => {
@@ -27,7 +27,7 @@ const paymentController = {
 
             if (userId) {
                 try {
-                    const newTransaction = await PaymentTransaction.create({
+                    const newTransaction = await Payment.create({
                         userId,
                         amount,
                         orderInfo,
@@ -139,7 +139,7 @@ const paymentController = {
             }
 
             if (txnRef) {
-                await PaymentTransaction.findOneAndUpdate(
+                await Payment.findOneAndUpdate(
                     { txnRef: txnRef },
                     transactionUpdate,
                     { new: true, upsert: false }
@@ -159,17 +159,40 @@ const paymentController = {
 
             // Verify checksum
             const isVerified = vnpayService.verifyReturnUrl(vnp_Params);
-            console.log('Verification Result:', isVerified);
-            console.log('Response Code:', vnp_Params['vnp_ResponseCode']);
+            const txnRef = vnp_Params['vnp_TxnRef'];
 
             if (isVerified) {
                 if (vnp_Params['vnp_ResponseCode'] === '00') {
                     // Success
+                    await Payment.findOneAndUpdate(
+                        { txnRef: txnRef },
+                        { 
+                            status: 'SUCCESS',
+                            vnpTransactionNo: vnp_Params['vnp_TransactionNo'],
+                            vnpBankCode: vnp_Params['vnp_BankCode'],
+                            vnpCardType: vnp_Params['vnp_CardType'],
+                            vnpPayDate: vnp_Params['vnp_PayDate'],
+                            vnpResponseCode: vnp_Params['vnp_ResponseCode'],
+                            statusDescription: 'Giao dịch thành công'
+                        },
+                        { new: true }
+                    );
+
                     console.log('Payment Successful. Redirecting to success page.');
                     const frontendUrl = `http://localhost:5173/payment/result?status=success&code=${vnp_Params['vnp_ResponseCode']}`;
                     return res.redirect(frontendUrl);
                 } else {
                     // Failed
+                    await PaymentTransaction.findOneAndUpdate(
+                        { txnRef: txnRef },
+                        { 
+                            status: 'FAILED',
+                            vnpResponseCode: vnp_Params['vnp_ResponseCode'],
+                            statusDescription: 'Giao dịch thất bại'
+                        },
+                        { new: true }
+                    );
+
                     console.log('Payment Failed/Cancelled via Response Code.');
                     const frontendUrl = `http://localhost:5173/payment/result?status=failed&code=${vnp_Params['vnp_ResponseCode']}`;
                     return res.redirect(frontendUrl);
@@ -194,9 +217,34 @@ const paymentController = {
             const isVerified = vnpayService.verifyIpn(vnp_Params);
 
             if (isVerified) {
-                const orderId = vnp_Params['vnp_TxnRef'];
+                const txnRef = vnp_Params['vnp_TxnRef'];
                 const rspCode = vnp_Params['vnp_ResponseCode'];
-                const amount = vnp_Params['vnp_Amount'];
+                
+                if (rspCode === '00') {
+                    await Payment.findOneAndUpdate(
+                        { txnRef: txnRef },
+                        { 
+                            status: 'SUCCESS',
+                            vnpTransactionNo: vnp_Params['vnp_TransactionNo'],
+                            vnpBankCode: vnp_Params['vnp_BankCode'],
+                            vnpCardType: vnp_Params['vnp_CardType'],
+                            vnpPayDate: vnp_Params['vnp_PayDate'],
+                            vnpResponseCode: rspCode,
+                            statusDescription: 'Giao dịch thành công'
+                        },
+                        { new: true }
+                    );
+                } else {
+                    await Payment.findOneAndUpdate(
+                        { txnRef: txnRef },
+                        { 
+                            status: 'FAILED',
+                            vnpResponseCode: rspCode,
+                            statusDescription: 'Giao dịch thất bại'
+                        },
+                        { new: true }
+                    );
+                }
 
                 res.status(200).json({ RspCode: '00', Message: 'Confirm Success' });
             } else {
