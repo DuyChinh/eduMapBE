@@ -435,6 +435,13 @@ async function addStudents(req, res, next) {
           onModel: 'Class'
         }));
         await Notification.insertMany(notifications);
+        
+        // Emit real-time notifications via Socket.IO
+        const socketService = require('../services/socketService');
+        socketService.emitNotificationToMany(
+          report.added.map(id => id.toString()),
+          { type: 'CLASS_ADDITION', classId: id }
+        );
       } catch (err) {
         console.error('Error creating class addition notifications:', err);
       }
@@ -490,6 +497,13 @@ async function removeStudents(req, res, next) {
           onModel: 'Class'
         }));
         await Notification.insertMany(notifications);
+        
+        // Emit real-time notifications via Socket.IO
+        const socketService = require('../services/socketService');
+        socketService.emitNotificationToMany(
+          report.removed.map(id => id.toString()),
+          { type: 'CLASS_REMOVAL', classId: id }
+        );
       } catch (err) {
         console.error('Error creating class removal notifications:', err);
       }

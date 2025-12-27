@@ -105,6 +105,13 @@ const feedController = {
                             onModel: 'FeedPost'
                         }));
                         await Notification.insertMany(notifications);
+                        
+                        // Emit real-time notifications via Socket.IO
+                        const socketService = require('../services/socketService');
+                        socketService.emitNotificationToMany(
+                            uniqueRecipients.map(id => id.toString()),
+                            { type: 'NEW_POST', classId, postId: newPost._id }
+                        );
                     }
                 }
             } catch (error) {
@@ -323,6 +330,13 @@ const feedController = {
                         onModel: 'FeedPost'
                     }));
                     await Notification.insertMany(notifications);
+                    
+                    // Emit real-time notifications via Socket.IO
+                    const socketService = require('../services/socketService');
+                    socketService.emitNotificationToMany(
+                        uniqueRecipients,
+                        { type: 'NEW_COMMENT', classId: post.classId, postId }
+                    );
                 }
             } catch (error) {
                 console.error('Error creating notification:', error);
