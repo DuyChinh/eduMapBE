@@ -403,6 +403,26 @@ async function remove(req, res, next) {
     if (!isOwner(req.user, existing))
       return res.status(403).json({ ok: false, message: 'Only owner can delete this question' });
 
+    // Check if question is used in any exams
+    const Exam = require('../models/Exam');
+    const examsUsingQuestion = await Exam.find({
+      'questions.questionId': id
+    }).select('name _id').lean();
+
+    if (examsUsingQuestion && examsUsingQuestion.length > 0) {
+      // Question is being used in exams, return error with exam list
+      return res.status(400).json({
+        ok: false,
+        message: 'Question is being used in exams',
+        data: {
+          exams: examsUsingQuestion.map(exam => ({
+            id: exam._id,
+            name: exam.name
+          }))
+        }
+      });
+    }
+
     // Delete images from Cloudinary
     try {
       if (existing.images && existing.images.length > 0) {
