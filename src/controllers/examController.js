@@ -243,6 +243,13 @@ async function createExam(req, res, next) {
 
         if (notifications.length > 0) {
           await Notification.insertMany(notifications);
+          
+          // Emit real-time notifications via Socket.IO
+          const socketService = require('../services/socketService');
+          socketService.emitNotificationToMany(
+            Array.from(studentIds),
+            { type: 'EXAM_PUBLISHED', examId: createdExam._id }
+          );
         }
       } catch (err) {
         console.error('Error sending exam notifications:', err);

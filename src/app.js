@@ -52,6 +52,8 @@ if (require.main === module) {
     const http = require('http');
     const { Server } = require('socket.io');
     const ChangeStreamService = require('./services/changeStreamService');
+    const socketService = require('./services/socketService');
+    const jwt = require('jsonwebtoken');
 
     const PORT = process.env.PORT || 3000;
     const server = http.createServer(app);
@@ -64,8 +66,44 @@ if (require.main === module) {
         }
     });
 
+    // Set io instance in socketService for use in controllers
+    socketService.setIO(io);
+
     // Initialize Change Stream Service for audit logs
     const changeStreamService = new ChangeStreamService(io);
+
+    // Socket.IO connection handling
+    io.on('connection', (socket) => {
+        // Handle user authentication
+        socket.on('authenticate', (data) => {
+            try {
+                const { token } = data;
+                if (!token) {
+                    socket.emit('auth_error', { message: 'No token provided' });
+                    return;
+                }
+                
+                // Verify JWT token
+                const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                const userId = decoded.id || decoded.userId;
+                
+                if (userId) {
+                    socket.userId = userId;
+                    socketService.registerUserSocket(userId, socket.id);
+                    socket.emit('authenticated', { success: true, userId });
+                }
+            } catch (error) {
+                socket.emit('auth_error', { message: 'Invalid token' });
+            }
+        });
+        
+        // Handle disconnect
+        socket.on('disconnect', () => {
+            if (socket.userId) {
+                socketService.unregisterUserSocket(socket.userId, socket.id);
+            }
+        });
+    });
 
     // Wait for MongoDB connection before starting change streams
     const mongoose = require('mongoose');
