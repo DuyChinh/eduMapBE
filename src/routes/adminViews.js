@@ -79,5 +79,8 @@ router.get('/mindmaps/:mindmapId', adminViewController.renderMindmapDetail);
 router.get('/mindmaps/:mindmapId/edit', adminViewController.renderMindmapEdit);
 router.get('/audit-logs', adminViewController.renderAuditLogs);
 
+// Payments
+router.get('/payments', adminViewController.renderPayments);
+
 module.exports = router;
 
