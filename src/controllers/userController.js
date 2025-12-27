@@ -22,7 +22,7 @@ const userController = {
                 });
             }
 
-            console.log('Attempting to find user with ID:', userId);
+
 
             // Find user by ID from token
             const user = await User.findById(userId);

@@ -12,35 +12,31 @@ const authMiddleware = (req, res, next) => {
 
     // Get token from header
     const authHeader = req.header('Authorization')
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         message: 'Access denied. No token provided or invalid format.'
       });
     }
 
-    // Extract token from header (remove "Bearer " prefix)
     const token = authHeader.substring(7);
 
-    // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Check if we have some form of user identifier in the token
+
     if (!decoded.id && !decoded._id && !decoded.userId && !decoded.sub) {
       console.warn('Token verified but no user ID found in payload');
     } else {
-      // Normalize the user ID to always be in both req.user.id and req.user._id
       const userId = decoded._id || decoded.id || decoded.userId || decoded.sub;
       decoded.id = userId;
       decoded._id = userId;
     }
-    
+
     // Set user info in request
     req.user = decoded;
     next();
   } catch (error) {
     console.error('Auth middleware error:', error.message);
-    
+
     // Provide more specific error messages
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
@@ -51,7 +47,7 @@ const authMiddleware = (req, res, next) => {
         message: 'Token has expired'
       });
     }
-    
+
     res.status(401).json({
       message: 'Authentication failed: ' + error.message
     });
