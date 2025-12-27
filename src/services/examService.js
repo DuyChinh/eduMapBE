@@ -110,12 +110,30 @@ async function getAllExams(params) {
       .populate('subjectId', 'name name_en name_jp code')
       .sort(sort)
       .skip(skipCount)
-      .limit(pageLimit),
+      .limit(pageLimit)
+      .lean(),
     Exam.countDocuments(examFilter)
   ]);
 
+  // Get submission counts for all exams
+  const Submission = require('../models/Submission');
+  const examIds = exams.map(e => e._id);
+  const submissionCounts = await Submission.aggregate([
+    { $match: { examId: { $in: examIds } } },
+    { $group: { _id: '$examId', count: { $sum: 1 } } }
+  ]);
+
+  // Create a map of examId to submission count
+  const countMap = new Map(submissionCounts.map(s => [s._id.toString(), s.count]));
+
+  // Add submissionCount to each exam
+  const examsWithCounts = exams.map(exam => ({
+    ...exam,
+    submissionCount: countMap.get(exam._id.toString()) || 0
+  }));
+
   return {
-    items: exams,
+    items: examsWithCounts,
     total: totalCount,
     page: currentPage,
     limit: pageLimit,
