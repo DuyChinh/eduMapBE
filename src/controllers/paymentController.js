@@ -11,10 +11,17 @@ const paymentController = {
                 return res.status(400).json({ message: 'Amount and Order Info are required' });
             }
 
-            const moment = require('moment');
             process.env.TZ = 'Asia/Ho_Chi_Minh';
             const date = new Date();
-            const txnRef = moment(date).format('DDHHmmss');
+            // Format: DDHHmmss (day + hours + minutes + seconds)
+            const formatTxnRef = (d) => {
+                const day = String(d.getDate()).padStart(2, '0');
+                const hours = String(d.getHours()).padStart(2, '0');
+                const minutes = String(d.getMinutes()).padStart(2, '0');
+                const seconds = String(d.getSeconds()).padStart(2, '0');
+                return `${day}${hours}${minutes}${seconds}`;
+            };
+            const txnRef = formatTxnRef(date);
 
             const paymentUrl = vnpayService.createPaymentUrl(req, amount, orderInfo, orderType, txnRef);
 
@@ -51,9 +58,19 @@ const paymentController = {
 
             const isVerified = vnpayService.verifyReturnUrl(vnp_Params);
 
-            const moment = require('moment');
             const vnpPayDate = vnp_Params['vnp_PayDate'];
-            const formattedPayDate = vnpPayDate ? moment(vnpPayDate, 'YYYYMMDDHHmmss').format('YYYY-MM-DD HH:mm:ss') : vnpPayDate;
+            // Format from YYYYMMDDHHmmss to YYYY-MM-DD HH:mm:ss
+            const formatPayDate = (dateStr) => {
+                if (!dateStr || dateStr.length !== 14) return dateStr;
+                const year = dateStr.substring(0, 4);
+                const month = dateStr.substring(4, 6);
+                const day = dateStr.substring(6, 8);
+                const hours = dateStr.substring(8, 10);
+                const minutes = dateStr.substring(10, 12);
+                const seconds = dateStr.substring(12, 14);
+                return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+            };
+            const formattedPayDate = vnpPayDate ? formatPayDate(vnpPayDate) : vnpPayDate;
 
             const RESPONSE_MAP = {
                 '00': 'Giao dịch thành công',

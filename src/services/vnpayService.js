@@ -1,14 +1,23 @@
 const vnpayConfig = require('../config/vnpay');
 const crypto = require('crypto');
 const querystring = require('qs');
-const moment = require('moment');
 
 class VnpayService {
     createPaymentUrl(req, amount, orderInfo, orderType = 'other', txnRef = null) {
         process.env.TZ = 'Asia/Ho_Chi_Minh';
 
         let date = new Date();
-        let createDate = moment(date).format('YYYYMMDDHHmmss');
+        // Format: YYYYMMDDHHmmss
+        const formatDate = (d) => {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const hours = String(d.getHours()).padStart(2, '0');
+            const minutes = String(d.getMinutes()).padStart(2, '0');
+            const seconds = String(d.getSeconds()).padStart(2, '0');
+            return `${year}${month}${day}${hours}${minutes}${seconds}`;
+        };
+        let createDate = formatDate(date);
 
         let ipAddr = req.headers['x-forwarded-for'] ||
             req.connection.remoteAddress ||
@@ -30,7 +39,15 @@ class VnpayService {
         vnp_Params['vnp_TmnCode'] = tmnCode;
         vnp_Params['vnp_Locale'] = 'vn';
         vnp_Params['vnp_CurrCode'] = 'VND';
-        vnp_Params['vnp_TxnRef'] = txnRef || moment(date).format('DDHHmmss');
+        // Format: DDHHmmss (day + hours + minutes + seconds)
+        const formatTxnRef = (d) => {
+            const day = String(d.getDate()).padStart(2, '0');
+            const hours = String(d.getHours()).padStart(2, '0');
+            const minutes = String(d.getMinutes()).padStart(2, '0');
+            const seconds = String(d.getSeconds()).padStart(2, '0');
+            return `${day}${hours}${minutes}${seconds}`;
+        };
+        vnp_Params['vnp_TxnRef'] = txnRef || formatTxnRef(date);
         vnp_Params['vnp_OrderInfo'] = orderInfo;
         vnp_Params['vnp_OrderType'] = orderType;
         vnp_Params['vnp_Amount'] = amount * 100;
