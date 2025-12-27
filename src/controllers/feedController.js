@@ -113,6 +113,13 @@ const feedController = {
                             { type: 'NEW_POST', classId, postId: newPost._id }
                         );
                     }
+                    
+                    // Emit feed update to class room for real-time refresh
+                    const socketService = require('../services/socketService');
+                    socketService.emitFeedUpdate(classId.toString(), { 
+                        type: 'NEW_POST', 
+                        postId: newPost._id.toString() 
+                    });
                 }
             } catch (error) {
                 console.error('Error creating notifications:', error);
@@ -338,6 +345,14 @@ const feedController = {
                         { type: 'NEW_COMMENT', classId: post.classId, postId }
                     );
                 }
+                
+                // Emit feed update to class room for real-time refresh
+                const socketService = require('../services/socketService');
+                socketService.emitFeedUpdate(post.classId.toString(), { 
+                    type: 'NEW_COMMENT', 
+                    postId: postId.toString(),
+                    commentId: addedComment._id.toString()
+                });
             } catch (error) {
                 console.error('Error creating notification:', error);
             }

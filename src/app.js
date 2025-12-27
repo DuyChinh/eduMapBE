@@ -97,6 +97,40 @@ if (require.main === module) {
             }
         });
         
+        // Handle joining a class room for feed updates
+        socket.on('join_class', (data) => {
+            const { classId } = data;
+            if (classId) {
+                socket.join(`class_${classId}`);
+            }
+        });
+        
+        // Handle leaving a class room
+        socket.on('leave_class', (data) => {
+            const { classId } = data;
+            if (classId) {
+                socket.leave(`class_${classId}`);
+            }
+        });
+        
+        // Handle typing event
+        socket.on('typing', (data) => {
+            const { classId, postId, user } = data;
+            if (classId) {
+                // Broadcast to everyone in the room except the sender
+                socket.to(`class_${classId}`).emit('typing', { classId, postId, user });
+            }
+        });
+
+        // Handle stop typing event
+        socket.on('stop_typing', (data) => {
+            const { classId, postId, user } = data;
+            if (classId) {
+                // Broadcast to everyone in the room except the sender
+                socket.to(`class_${classId}`).emit('stop_typing', { classId, postId, user });
+            }
+        });
+        
         // Handle disconnect
         socket.on('disconnect', () => {
             if (socket.userId) {

@@ -90,6 +90,16 @@ function broadcastNotification(notification) {
     io.emit('NEW_NOTIFICATION', notification);
 }
 
+/**
+ * Emit feed update to a specific class room
+ * @param {string} classId - Class ID
+ * @param {Object} data - Feed update data (type: 'NEW_POST' | 'NEW_COMMENT' | 'POST_UPDATED' | 'POST_DELETED')
+ */
+function emitFeedUpdate(classId, data) {
+    if (!io || !classId) return;
+    io.to(`class_${classId}`).emit('FEED_UPDATE', data);
+}
+
 module.exports = {
     setIO,
     getIO,
@@ -97,5 +107,6 @@ module.exports = {
     unregisterUserSocket,
     emitNotification,
     emitNotificationToMany,
-    broadcastNotification
+    broadcastNotification,
+    emitFeedUpdate
 };
