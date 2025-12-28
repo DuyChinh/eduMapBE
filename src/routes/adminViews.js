@@ -23,7 +23,7 @@ router.post('/login', async (req, res) => {
         // Check if user is admin
         if (result.user && result.user.role === 'admin') {
             // Set cookie from server side
-            res.cookie('admin_token', result.token, {
+            res.cookie('admin_token', result.accessToken, {
                 maxAge: 24 * 60 * 60 * 1000, // 24 hours
                 httpOnly: false, // Allow JavaScript to read it
                 sameSite: 'Lax',
