@@ -40,8 +40,26 @@ const authService = {
         if (!isPasswordValid) {
             throw new Error('Email or password is incorrect');
         }
-        const token = jwt.sign({ id: user.id || user._id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_ACCESS_EXPIRES });
-        return { user: sanitizeUser(user), token };
+        
+        // Tạo Access Token (ngắn hạn - 1h)
+        const accessToken = jwt.sign(
+            { id: user.id || user._id, email: user.email, role: user.role }, 
+            process.env.JWT_SECRET, 
+            { expiresIn: process.env.JWT_ACCESS_EXPIRES || '1h' }
+        );
+        
+        // Tạo Refresh Token (dài hạn - 7d)
+        const refreshToken = jwt.sign(
+            { id: user.id || user._id, type: 'refresh' }, 
+            process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET, 
+            { expiresIn: process.env.JWT_REFRESH_EXPIRES || '7d' }
+        );
+        
+        return { 
+            user: sanitizeUser(user), 
+            accessToken,
+            refreshToken 
+        };
     }
 }
 

@@ -3,7 +3,7 @@ const User = require('../models/User');
 const Exam = require('../models/Exam');
 const Submission = require('../models/Submission');
 const AuditLog = require('../models/AuditLog');
-const PaymentTransaction = require('../models/PaymentTransaction');
+const Payment = require('../models/Payment');
 
 /**
  * Render admin dashboard
@@ -1195,13 +1195,13 @@ async function renderPayments(req, res, next) {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const [payments, total] = await Promise.all([
-      PaymentTransaction.find(query)
+      Payment.find(query)
         .populate('userId', 'name email')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit))
         .lean(),
-      PaymentTransaction.countDocuments(query)
+      Payment.countDocuments(query)
     ]);
 
     res.render('admin/payments', {

@@ -73,10 +73,23 @@ const authController = {
             email: req.user.email,
             role: req.user.role
         };
-        const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_ACCESS_EXPIRES });
+        
+        // Tạo Access Token (ngắn hạn - 1h)
+        const accessToken = jwt.sign(
+            payload, 
+            process.env.JWT_SECRET, 
+            { expiresIn: process.env.JWT_ACCESS_EXPIRES || '1h' }
+        );
+        
+        // Tạo Refresh Token (dài hạn - 7d)
+        const refreshToken = jwt.sign(
+            { id: req.user.id, type: 'refresh' }, 
+            process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET, 
+            { expiresIn: process.env.JWT_REFRESH_EXPIRES || '7d' }
+        );
         
         const redirectUrl = process.env.FE_REDIRECT_URL || 'http://localhost:5173/auth/callback';
-        res.redirect(redirectUrl + '?token=' + token);
+        res.redirect(redirectUrl + '?accessToken=' + accessToken + '&refreshToken=' + refreshToken);
     },
 
     async forgotPassword(req, res) {
@@ -235,6 +248,75 @@ const authController = {
             console.error('Error in resetPassword:', error);
             res.status(500).json({
                 message: 'Server error: ' + error.message
+            });
+        }
+    },
+
+    async refreshToken(req, res) {
+        try {
+            const { refreshToken } = req.body;
+            
+            if (!refreshToken) {
+                return res.status(400).json({ 
+                    success: false,
+                    message: 'Refresh token is required' 
+                });
+            }
+            
+            // Verify refresh token
+            const decoded = jwt.verify(
+                refreshToken, 
+                process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET
+            );
+            
+            if (decoded.type !== 'refresh') {
+                return res.status(401).json({ 
+                    success: false,
+                    message: 'Invalid refresh token' 
+                });
+            }
+            
+            // Lấy user từ database
+            const user = await User.findById(decoded.id);
+            if (!user) {
+                return res.status(401).json({ 
+                    success: false,
+                    message: 'User not found' 
+                });
+            }
+            
+            // Tạo access token mới
+            const accessToken = jwt.sign(
+                { id: user.id || user._id, email: user.email, role: user.role }, 
+                process.env.JWT_SECRET, 
+                { expiresIn: process.env.JWT_ACCESS_EXPIRES || '1h' }
+            );
+            
+            res.json({
+                success: true,
+                message: 'Token refreshed successfully',
+                data: {
+                    accessToken
+                    // Giữ nguyên refreshToken (không rotation) hoặc tạo mới nếu muốn rotation
+                }
+            });
+        } catch (error) {
+            if (error.name === 'TokenExpiredError') {
+                return res.status(401).json({ 
+                    success: false,
+                    message: 'Refresh token has expired' 
+                });
+            }
+            if (error.name === 'JsonWebTokenError') {
+                return res.status(401).json({ 
+                    success: false,
+                    message: 'Invalid refresh token' 
+                });
+            }
+            console.error('Error in refreshToken:', error);
+            return res.status(500).json({ 
+                success: false,
+                message: 'Server error: ' + error.message 
             });
         }
     }

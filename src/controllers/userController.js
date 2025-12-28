@@ -229,16 +229,28 @@ const userController = {
                 role: user.role,
             };
 
-            const token = jwt.sign(payload, process.env.JWT_SECRET, {
-                expiresIn: process.env.JWT_ACCESS_EXPIRES
-            });
+            // Tạo Access Token (ngắn hạn - 1h)
+            const accessToken = jwt.sign(
+                payload, 
+                process.env.JWT_SECRET, 
+                { expiresIn: process.env.JWT_ACCESS_EXPIRES || '1h' }
+            );
+            
+            // Tạo Refresh Token (dài hạn - 7d)
+            const refreshToken = jwt.sign(
+                { id: user._id, type: 'refresh' }, 
+                process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET, 
+                { expiresIn: process.env.JWT_REFRESH_EXPIRES || '7d' }
+            );
 
             return res.json({
                 success: true,
                 message: 'Role switched successfully',
                 data: {
                     user: sanitizeUser(user),
-                    token,
+                    token: accessToken, // Backward compatibility
+                    accessToken: accessToken,
+                    refreshToken: refreshToken,
                 },
             });
         } catch (error) {
