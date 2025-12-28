@@ -1,5 +1,4 @@
 const jwt = require('jsonwebtoken');
-const { response } = require('../app');
 
 const authCommon = {
     generateToken(user) {
