@@ -236,7 +236,9 @@ async function createExam(req, res, next) {
           recipient: studentId,
           sender: req.user.userId || req.user.id,
           type: 'EXAM_PUBLISHED',
-          content: 'EXAM_PUBLISHED',
+          content: (createdExam.preExamNotification && createdExam.preExamNotificationText) 
+            ? createdExam.preExamNotificationText 
+            : 'EXAM_PUBLISHED',
           relatedId: createdExam._id,
           onModel: 'Exam'
         }));
@@ -331,12 +333,36 @@ async function getExamById(req, res, next) {
     }
 
     // Check permissions - only owner or admin can view
+    // Check permissions
     const isOwner = String(examData.ownerId) === String(req.user.id);
-    if (!(isOwner || isAdmin(req.user))) {
-      return res.status(403).json({ ok: false, message: 'Forbidden' });
+    
+    if (isOwner || isAdmin(req.user)) {
+      return res.json({ ok: true, data: examData });
+    }
+    
+    if (isStudent(req.user)) {
+      // Return limited data for students (notification popup view)
+      const publicExamData = {
+        _id: examData._id,
+        name: examData.name,
+        description: examData.description,
+        duration: examData.duration,
+        totalMarks: examData.totalMarks,
+        examPurpose: examData.examPurpose,
+        startTime: examData.startTime,
+        endTime: examData.endTime,
+        availableFrom: examData.availableFrom,
+        availableUntil: examData.availableUntil,
+        maxAttempts: examData.maxAttempts,
+        examPassword: examData.examPassword ? true : false,
+        owner: examData.owner || examData.ownerId,
+        subjectId: examData.subjectId,
+        questions: [] // Hide questions
+      };
+      return res.json({ ok: true, data: publicExamData });
     }
 
-    res.json({ ok: true, data: examData });
+    return res.status(403).json({ ok: false, message: 'Forbidden' });
   } catch (error) {
     next(error);
   }

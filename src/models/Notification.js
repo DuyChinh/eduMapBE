@@ -18,7 +18,7 @@ const NotificationSchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ['NEW_POST', 'NEW_COMMENT', 'CUSTOM', 'CLASS_REMOVAL', 'CLASS_ADDITION', 'EXAM_PUBLISHED', 'SUBMISSION_GRADED', 'LATE_SUBMISSION', 'MINDMAP_SHARED'],
+        enum: ['NEW_POST', 'NEW_COMMENT', 'COMMENT_REACTION', 'COMMENT_REPLY', 'CUSTOM', 'CLASS_REMOVAL', 'CLASS_ADDITION', 'EXAM_PUBLISHED', 'SUBMISSION_GRADED', 'LATE_SUBMISSION', 'MINDMAP_SHARED'],
         required: true
     },
     content: {
