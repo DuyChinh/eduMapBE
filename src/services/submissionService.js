@@ -147,7 +147,42 @@ async function startSubmission({ examId, user, orgId }) {
     throw { status: 403, message: 'Exam is no longer available' };
   }
 
+  // Check if exam has started (startTime)
+  if (exam.startTime && now < exam.startTime) {
+    const startTimeFormatted = new Date(exam.startTime).toLocaleString('vi-VN', {
+      timeZone: exam.timezone || 'Asia/Ho_Chi_Minh',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+    throw { 
+      status: 403, 
+      message: `Exam has not started yet. The exam will begin at ${startTimeFormatted}.` 
+    };
+  }
+
+  // Check if exam has ended (endTime)
+  if (exam.endTime && now > exam.endTime) {
+    const endTimeFormatted = new Date(exam.endTime).toLocaleString('vi-VN', {
+      timeZone: exam.timezone || 'Asia/Ho_Chi_Minh',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+    throw { 
+      status: 403, 
+      message: `Exam has ended. The exam ended at ${endTimeFormatted}.` 
+    };
+  }
+
   // Check late entry grace period (only if >= 0, -1 means no blocking)
+  // This check only applies if exam has started but we're checking if entry is still allowed
   if (exam.startTime && exam.lateEntryGracePeriod !== undefined && exam.lateEntryGracePeriod >= 0) {
     const gracePeriodMs = exam.lateEntryGracePeriod * 60 * 1000; // Convert minutes to milliseconds
     const cutoffTime = new Date(exam.startTime.getTime() + gracePeriodMs);
@@ -231,6 +266,8 @@ async function startSubmission({ examId, user, orgId }) {
     };
   }
 
+  // Note: startTime and endTime checks are already done above (lines 150-175)
+  // This section is for handling edge case where exam ended but user just submitted
   if (exam.endTime && now > exam.endTime) {
     const recentSubmission = await Submission.findOne({
       examId,
@@ -252,6 +289,8 @@ async function startSubmission({ examId, user, orgId }) {
       }
     }
 
+    // This should not be reached if endTime check above works correctly
+    // But keeping as fallback
     throw { status: 403, message: 'Exam has expired. The exam end time has passed.' };
   }
 
