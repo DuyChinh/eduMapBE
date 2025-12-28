@@ -12,6 +12,11 @@ const notificationController = {
             const notifications = await Notification.find({ recipient: req.user.userId || req.user.id })
                 .populate('sender', 'name avatar profile')
                 .populate('classId', 'name')
+                .populate({
+                    path: 'relatedId',
+                    select: 'classId name title', // select classId so we can fallback if notification.classId is missing
+                    strictPopulate: false // in case onModel is not set or schema differs
+                })
                 .sort({ createdAt: -1 })
                 .skip((page - 1) * limit)
                 .limit(limit);

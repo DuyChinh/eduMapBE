@@ -153,6 +153,7 @@ async function getExamById({ id }) {
   return Exam.findOne(examFilter)
     .populate('questions.questionId')
     .populate('subjectId', 'name name_en name_jp code')
+    .populate('ownerId', 'name')
     .exec();
 }
 
