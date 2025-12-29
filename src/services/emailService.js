@@ -2,7 +2,9 @@ const nodemailer = require('nodemailer');
 
 const createTransporter = () => {
   return nodemailer.createTransport({
-    service: 'gmail', // Hoặc service khác như 'outlook', 'yahoo'
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true, // true for 465, false for others
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS // App password cho Gmail
