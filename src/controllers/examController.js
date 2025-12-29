@@ -291,7 +291,7 @@ async function createExam(req, res, next) {
  */
 async function getAllExams(req, res, next) {
   try {
-    const { page, limit, sort, status, q, ownerId, subjectId } = req.query;
+    const { page, limit, sort, status, q, ownerId, subjectId, gradeId } = req.query;
 
     // Teachers can only view their own exams, admins can view all
     const filterOwnerId = isTeacher(req.user) && !ownerId ? req.user.id : ownerId;
@@ -303,7 +303,8 @@ async function getAllExams(req, res, next) {
       sort,
       status,
       q,
-      subjectId
+      subjectId,
+      gradeId
     });
 
     res.json({ ok: true, ...examData });
@@ -333,8 +334,10 @@ async function getExamById(req, res, next) {
     }
 
     // Check permissions - only owner or admin can view
-    // Check permissions
-    const isOwner = String(examData.ownerId) === String(req.user.id);
+    // Handle populated ownerId (object with _id) vs unpopulated (ObjectId)
+    const userId = req.user.userId || req.user.id;
+    const ownerIdValue = examData.ownerId?._id || examData.ownerId;
+    const isOwner = String(ownerIdValue) === String(userId);
     
     if (isOwner || isAdmin(req.user)) {
       return res.json({ ok: true, data: examData });
