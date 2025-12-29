@@ -19,7 +19,7 @@ const convertToObjectId = (value) =>
  * @param {string} params.q - Search query
  * @returns {Object} - MongoDB filter object
  */
-function buildExamFilter({ ownerId, status, q, subjectId }) {
+function buildExamFilter({ ownerId, status, q, subjectId, gradeId }) {
   const filter = {};
 
   const examOwnerId = convertToObjectId(ownerId);
@@ -29,6 +29,9 @@ function buildExamFilter({ ownerId, status, q, subjectId }) {
 
   const subjectObjectId = convertToObjectId(subjectId);
   if (subjectObjectId) filter.subjectId = subjectObjectId;
+
+  const gradeObjectId = convertToObjectId(gradeId);
+  if (gradeObjectId) filter.gradeId = gradeObjectId;
 
   if (q && typeof q === 'string' && q.trim()) {
     const searchRegex = new RegExp(q.trim(), 'i');
@@ -60,10 +63,11 @@ async function getAllExams(params) {
     sort = '-createdAt',
     status,
     q,
-    subjectId
+    subjectId,
+    gradeId
   } = params;
 
-  let examFilter = buildExamFilter({ ownerId, status, q: null, subjectId });
+  let examFilter = buildExamFilter({ ownerId, status, q: null, subjectId, gradeId });
 
   // If there's a search query, also search in subject names
   if (q && typeof q === 'string' && q.trim()) {
@@ -108,6 +112,7 @@ async function getAllExams(params) {
     Exam.find(examFilter)
       .populate('questions.questionId', 'name text type level')
       .populate('subjectId', 'name name_en name_jp code')
+      .populate('gradeId', 'name name_en name_jp level')
       .sort(sort)
       .skip(skipCount)
       .limit(pageLimit)
