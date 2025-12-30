@@ -26,8 +26,8 @@ const NotificationSchema = new mongoose.Schema({
         required: true
     },
     relatedId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'FeedPost'
+        type: mongoose.Schema.Types.Mixed, // Support both ObjectId (for FeedPost, Exam, etc.) and String (for Mindmap UUID)
+        // Note: Populate is handled conditionally in notificationController based on onModel
     },
     onModel: {
         type: String,

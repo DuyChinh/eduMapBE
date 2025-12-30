@@ -145,8 +145,11 @@ async function createExam(req, res, next) {
     }
 
     // Validate total marks vs questions marks
+    // Allow small difference (0.01) due to floating point precision when using auto-distribute
     const totalQuestionMarks = questions.reduce((sum, q) => sum + (q.marks || 1), 0);
-    if (totalQuestionMarks > totalMarks) {
+    const marksDifference = totalQuestionMarks - totalMarks;
+    // Allow small difference up to 0.01 due to floating point precision
+    if (marksDifference > 0.01) {
       return res.status(400).json({
         ok: false,
         message: `Total question marks (${totalQuestionMarks}) cannot exceed exam total marks (${totalMarks})`
@@ -434,6 +437,35 @@ async function updateExam(req, res, next) {
     const examId = req.params.id;
     if (!mongoose.isValidObjectId(examId)) {
       return res.status(400).json({ ok: false, message: 'Invalid exam ID format' });
+    }
+
+    // Validate total marks vs questions marks if both are provided
+    const { questions, totalMarks } = req.body;
+    if (questions && Array.isArray(questions) && questions.length > 0 && totalMarks !== undefined) {
+      // Validate each question
+      for (const question of questions) {
+        if (question.questionId && !mongoose.isValidObjectId(question.questionId)) {
+          return res.status(400).json({ ok: false, message: 'Invalid questionId format' });
+        }
+        if (question.order !== undefined && (typeof question.order !== 'number' || question.order < 1)) {
+          return res.status(400).json({ ok: false, message: 'Question order must be a positive integer' });
+        }
+        if (question.marks !== undefined && (typeof question.marks !== 'number' || question.marks < 0)) {
+          return res.status(400).json({ ok: false, message: 'Question marks must be a non-negative number' });
+        }
+      }
+
+      // Validate total marks vs questions marks
+      // Allow small difference (0.01) due to floating point precision when using auto-distribute
+      const totalQuestionMarks = questions.reduce((sum, q) => sum + (q.marks || 1), 0);
+      const marksDifference = totalQuestionMarks - totalMarks;
+      // Allow small difference up to 0.01 due to floating point precision
+      if (marksDifference > 0.01) {
+        return res.status(400).json({
+          ok: false,
+          message: `Total question marks (${totalQuestionMarks}) cannot exceed exam total marks (${totalMarks})`
+        });
+      }
     }
 
     // Enforce ownership for non-admin users
