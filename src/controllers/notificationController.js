@@ -9,17 +9,55 @@ const notificationController = {
             const page = parseInt(req.query.page) || 1;
             const limit = parseInt(req.query.limit) || 20;
 
-            const notifications = await Notification.find({ recipient: req.user.userId || req.user.id })
+            let notifications = await Notification.find({ recipient: req.user.userId || req.user.id })
                 .populate('sender', 'name avatar profile')
                 .populate('classId', 'name')
-                .populate({
-                    path: 'relatedId',
-                    select: 'classId name title', // select classId so we can fallback if notification.classId is missing
-                    strictPopulate: false // in case onModel is not set or schema differs
-                })
                 .sort({ createdAt: -1 })
                 .skip((page - 1) * limit)
                 .limit(limit);
+
+            // Populate relatedId based on onModel
+            const Mindmap = require('../models/Mindmap');
+            const FeedPost = require('../models/FeedPost');
+            const Exam = require('../models/Exam');
+            const Submission = require('../models/Submission');
+            const Class = require('../models/Class');
+
+            for (const notification of notifications) {
+                if (notification.relatedId && notification.onModel) {
+                    try {
+                        let relatedDoc = null;
+                        const relatedId = notification.relatedId;
+
+                        switch (notification.onModel) {
+                            case 'Mindmap':
+                                // Mindmap uses UUID (String) as _id
+                                relatedDoc = await Mindmap.findById(relatedId).select('title desc');
+                                break;
+                            case 'FeedPost':
+                                // FeedPost uses ObjectId
+                                relatedDoc = await FeedPost.findById(relatedId).select('classId name title');
+                                break;
+                            case 'Exam':
+                                relatedDoc = await Exam.findById(relatedId).select('name description');
+                                break;
+                            case 'Submission':
+                                relatedDoc = await Submission.findById(relatedId).select('score percentage');
+                                break;
+                            case 'Class':
+                                relatedDoc = await Class.findById(relatedId).select('name code');
+                                break;
+                        }
+
+                        if (relatedDoc) {
+                            notification.relatedId = relatedDoc;
+                        }
+                    } catch (err) {
+                        // If related document not found, keep relatedId as is
+                        console.error(`Error populating ${notification.onModel}:`, err);
+                    }
+                }
+            }
 
             const total = await Notification.countDocuments({ recipient: req.user.userId || req.user.id });
             const unreadCount = await Notification.countDocuments({ recipient: req.user.userId || req.user.id, isRead: false });
