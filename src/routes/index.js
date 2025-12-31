@@ -34,6 +34,7 @@ const configureRoutes = (app) => {
     v1.use('/mindmaps', mindmapRoutes);
     v1.use('/upload', uploadRoutes);
     v1.use('/feed', feedRoutes);
+    v1.use('/grades', require('./grades'));
     v1.use('/notifications', require('./notifications'));
     v1.use('/payment', require('./paymentRoutes'));
 

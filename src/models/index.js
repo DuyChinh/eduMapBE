@@ -3,6 +3,8 @@ const User = require('./User');
 const Class = require('./Class');
 const Question = require('./Question');
 const Exam = require('./Exam');
+const Subject = require('./Subject');
+const Grade = require('./Grade');
 
 const Assignment = require('./Assignment');
 const Submission = require('./Submission');
@@ -22,6 +24,8 @@ module.exports = {
   Class,
   Question,
   Exam,
+  Subject,
+  Grade,
   Assignment,
   Submission,
   ProctorLog,

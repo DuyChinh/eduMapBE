@@ -233,28 +233,63 @@ const feedController = {
         }
     },
 
-    // Toggle like
-    toggleLike: async (req, res) => {
+    // Toggle reaction (like, love, haha, wow, sad, angry)
+    toggleReaction: async (req, res) => {
         try {
             const { postId } = req.params;
+            const { type = 'like' } = req.body;
             const userId = req.user.userId || req.user.id;
+
+            const validTypes = ['like', 'love', 'haha', 'wow', 'sad', 'angry'];
+            if (!validTypes.includes(type)) {
+                return res.status(400).json({ message: 'Invalid reaction type' });
+            }
 
             const post = await FeedPost.findById(postId);
             if (!post) {
                 return res.status(404).json({ message: 'Post not found' });
             }
 
-            const likeIndex = post.likes.indexOf(userId);
-            if (likeIndex === -1) {
-                post.likes.push(userId);
+            // Initialize reactions array if it doesn't exist
+            if (!post.reactions) {
+                post.reactions = [];
+            }
+
+            // Find existing reaction by this user
+            const existingIndex = post.reactions.findIndex(
+                r => String(r.user) === String(userId)
+            );
+
+            if (existingIndex !== -1) {
+                // User already reacted
+                if (post.reactions[existingIndex].type === type) {
+                    // Same type - remove reaction (toggle off)
+                    post.reactions.splice(existingIndex, 1);
+                } else {
+                    // Different type - update reaction
+                    post.reactions[existingIndex].type = type;
+                }
             } else {
-                post.likes.splice(likeIndex, 1);
+                // Add new reaction
+                post.reactions.push({ user: userId, type });
             }
 
             await post.save();
-            res.json(post.likes);
+            
+            // Populate user info for reactions
+            const updatedPost = await FeedPost.findById(postId).populate('reactions.user', 'name profile');
+            
+            // Broadcast reaction update
+            const socketService = require('../services/socketService');
+            socketService.emitFeedUpdate(post.classId.toString(), { 
+                type: 'reaction_updated', 
+                postId: postId, 
+                reactions: updatedPost.reactions 
+            });
+
+            res.json(updatedPost.reactions);
         } catch (error) {
-            console.error('Error toggling like:', error);
+            console.error('Error toggling reaction:', error);
             res.status(500).json({ message: 'Internal server error' });
         }
     },
@@ -303,7 +338,11 @@ const feedController = {
                 content,
                 images: images || [],
                 files: files || [],
-                links: links || []
+                links: links || [],
+                mentions: req.body.mentions || [],
+                parentCommentId: req.body.parentCommentId || null,
+                replyToUserId: req.body.replyToUserId || null,
+                reactions: []
             };
 
             post.comments.push(newComment);
@@ -351,7 +390,8 @@ const feedController = {
                 socketService.emitFeedUpdate(post.classId.toString(), { 
                     type: 'NEW_COMMENT', 
                     postId: postId.toString(),
-                    commentId: addedComment._id.toString()
+                    commentId: addedComment._id.toString(),
+                    comment: addedComment // Pass full comment object for finding frontend to update
                 });
             } catch (error) {
                 console.error('Error creating notification:', error);
@@ -423,7 +463,15 @@ const feedController = {
             comment.deleteOne();
             await post.save();
 
-            res.json({ message: 'Comment deleted' });
+            // Broadcast comment deletion to all users viewing this class feed
+            const socketService = require('../services/socketService');
+            socketService.emitFeedUpdate(post.classId.toString(), { 
+                type: 'comment_deleted', 
+                postId: postId,
+                commentId: commentId 
+            });
+
+            res.json({ message: 'Comment deleted', commentId });
         } catch (error) {
             console.error('Error deleting comment:', error);
             res.status(500).json({ message: 'Internal server error' });
@@ -516,6 +564,108 @@ const feedController = {
         }
     },
 
+    // Toggle reaction on a comment
+    toggleCommentReaction: async (req, res) => {
+        try {
+            const { postId, commentId } = req.params;
+            const { type = 'like' } = req.body;
+            const userId = req.user.userId || req.user.id;
+
+            const validTypes = ['like', 'love', 'haha', 'wow', 'sad', 'angry'];
+            if (!validTypes.includes(type)) {
+                return res.status(400).json({ message: 'Invalid reaction type' });
+            }
+
+            const post = await FeedPost.findById(postId);
+            if (!post) {
+                return res.status(404).json({ message: 'Post not found' });
+            }
+
+            const comment = post.comments.id(commentId);
+            if (!comment) {
+                return res.status(404).json({ message: 'Comment not found' });
+            }
+
+            // Initialize reactions array if it doesn't exist
+            if (!comment.reactions) {
+                comment.reactions = [];
+            }
+
+            // Find existing reaction by this user
+            const existingIndex = comment.reactions.findIndex(
+                r => String(r.user) === String(userId)
+            );
+
+            let action = '';
+            if (existingIndex !== -1) {
+                if (comment.reactions[existingIndex].type === type) {
+                    // Same type - remove reaction (toggle off)
+                    comment.reactions.splice(existingIndex, 1);
+                    action = 'removed';
+                } else {
+                    // Different type - update reaction
+                    comment.reactions[existingIndex].type = type;
+                    action = 'updated';
+                }
+            } else {
+                // Add new reaction
+                comment.reactions.push({ user: userId, type });
+                action = 'added';
+            }
+
+            await post.save();
+
+            // Send notification to comment author if someone else reacted
+            if (action !== 'removed' && String(comment.author) !== String(userId)) {
+                const reactingUser = await User.findById(userId).select('name');
+                const emojiMap = {
+                    like: '👍',
+                    love: '❤️',
+                    haha: '😆',
+                    wow: '😮',
+                    sad: '😢',
+                    angry: '😠'
+                };
+                
+                const newNotification = await Notification.create({
+                    recipient: comment.author,
+                    sender: userId,
+                    type: 'COMMENT_REACTION',
+                    content: `${reactingUser.name} reacted ${emojiMap[type]} to your comment`,
+                    relatedId: post._id,
+                    onModel: 'FeedPost',
+                    classId: post.classId
+                });
+
+                // Emit real-time notification via Socket.IO
+                const socketService = require('../services/socketService');
+                socketService.emitNotification(comment.author, newNotification);
+            }
+
+            // Return updated comment reactions
+            const updatedPost = await FeedPost.findById(postId)
+                .populate('comments.reactions.user', 'name profile');
+            const updatedComment = updatedPost.comments.id(commentId);
+            
+            // Broadcast reaction update to all users viewing this class feed
+            const socketService = require('../services/socketService');
+            socketService.emitFeedUpdate(post.classId.toString(), { 
+                type: 'comment_reaction_updated', 
+                postId: postId,
+                commentId: commentId,
+                reactions: updatedComment.reactions
+            });
+
+            res.json({ 
+                reactions: updatedComment.reactions,
+                action 
+            });
+        } catch (error) {
+            console.error('Error toggling comment reaction:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    },
+
     // Update Post
     updatePost: async (req, res) => {
         try {
@@ -562,6 +712,49 @@ const feedController = {
             res.json({ isLocked: post.isLocked });
         } catch (error) {
             console.error('Error toggling lock:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    },
+
+    // Get class members for @mention
+    getClassMembers: async (req, res) => {
+        try {
+            const { classId } = req.params;
+            const { q = '' } = req.query;
+
+            const classData = await Class.findById(classId)
+                .populate('teacherId', 'name profile email')
+                .populate('studentIds', 'name profile email');
+
+            if (!classData) {
+                return res.status(404).json({ message: 'Class not found' });
+            }
+
+            let members = [];
+            
+            // Add teacher
+            if (classData.teacherId) {
+                members.push(classData.teacherId);
+            }
+            
+            // Add students
+            if (classData.studentIds && classData.studentIds.length > 0) {
+                members.push(...classData.studentIds);
+            }
+
+            // Filter by search query
+            if (q) {
+                members = members.filter(m => 
+                    m && m.name && m.name.toLowerCase().includes(q.toLowerCase())
+                );
+            }
+
+            // Limit results
+            members = members.slice(0, 20);
+
+            res.json(members);
+        } catch (error) {
+            console.error('Error getting class members:', error);
             res.status(500).json({ message: 'Internal server error' });
         }
     }
