@@ -1,3 +1,6 @@
+// Canvas polyfills for serverless - MUST be first import
+require('./utils/canvasPolyfill');
+
 const express = require('express');
 const app = express();
 const path = require('path');

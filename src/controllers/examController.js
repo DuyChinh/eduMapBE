@@ -145,8 +145,11 @@ async function createExam(req, res, next) {
     }
 
     // Validate total marks vs questions marks
+    // Allow small difference (0.01) due to floating point precision when using auto-distribute
     const totalQuestionMarks = questions.reduce((sum, q) => sum + (q.marks || 1), 0);
-    if (totalQuestionMarks > totalMarks) {
+    const marksDifference = totalQuestionMarks - totalMarks;
+    // Allow small difference up to 0.01 due to floating point precision
+    if (marksDifference > 0.01) {
       return res.status(400).json({
         ok: false,
         message: `Total question marks (${totalQuestionMarks}) cannot exceed exam total marks (${totalMarks})`
@@ -236,7 +239,9 @@ async function createExam(req, res, next) {
           recipient: studentId,
           sender: req.user.userId || req.user.id,
           type: 'EXAM_PUBLISHED',
-          content: 'EXAM_PUBLISHED',
+          content: (createdExam.preExamNotification && createdExam.preExamNotificationText) 
+            ? createdExam.preExamNotificationText 
+            : 'EXAM_PUBLISHED',
           relatedId: createdExam._id,
           onModel: 'Exam'
         }));
@@ -289,7 +294,7 @@ async function createExam(req, res, next) {
  */
 async function getAllExams(req, res, next) {
   try {
-    const { page, limit, sort, status, q, ownerId, subjectId } = req.query;
+    const { page, limit, sort, status, q, ownerId, subjectId, gradeId } = req.query;
 
     // Teachers can only view their own exams, admins can view all
     const filterOwnerId = isTeacher(req.user) && !ownerId ? req.user.id : ownerId;
@@ -301,7 +306,8 @@ async function getAllExams(req, res, next) {
       sort,
       status,
       q,
-      subjectId
+      subjectId,
+      gradeId
     });
 
     res.json({ ok: true, ...examData });
@@ -331,12 +337,38 @@ async function getExamById(req, res, next) {
     }
 
     // Check permissions - only owner or admin can view
-    const isOwner = String(examData.ownerId) === String(req.user.id);
-    if (!(isOwner || isAdmin(req.user))) {
-      return res.status(403).json({ ok: false, message: 'Forbidden' });
+    // Handle populated ownerId (object with _id) vs unpopulated (ObjectId)
+    const userId = req.user.userId || req.user.id;
+    const ownerIdValue = examData.ownerId?._id || examData.ownerId;
+    const isOwner = String(ownerIdValue) === String(userId);
+    
+    if (isOwner || isAdmin(req.user)) {
+      return res.json({ ok: true, data: examData });
+    }
+    
+    if (isStudent(req.user)) {
+      // Return limited data for students (notification popup view)
+      const publicExamData = {
+        _id: examData._id,
+        name: examData.name,
+        description: examData.description,
+        duration: examData.duration,
+        totalMarks: examData.totalMarks,
+        examPurpose: examData.examPurpose,
+        startTime: examData.startTime,
+        endTime: examData.endTime,
+        availableFrom: examData.availableFrom,
+        availableUntil: examData.availableUntil,
+        maxAttempts: examData.maxAttempts,
+        examPassword: examData.examPassword ? true : false,
+        owner: examData.owner || examData.ownerId,
+        subjectId: examData.subjectId,
+        questions: [] // Hide questions
+      };
+      return res.json({ ok: true, data: publicExamData });
     }
 
-    res.json({ ok: true, data: examData });
+    return res.status(403).json({ ok: false, message: 'Forbidden' });
   } catch (error) {
     next(error);
   }
@@ -405,6 +437,35 @@ async function updateExam(req, res, next) {
     const examId = req.params.id;
     if (!mongoose.isValidObjectId(examId)) {
       return res.status(400).json({ ok: false, message: 'Invalid exam ID format' });
+    }
+
+    // Validate total marks vs questions marks if both are provided
+    const { questions, totalMarks } = req.body;
+    if (questions && Array.isArray(questions) && questions.length > 0 && totalMarks !== undefined) {
+      // Validate each question
+      for (const question of questions) {
+        if (question.questionId && !mongoose.isValidObjectId(question.questionId)) {
+          return res.status(400).json({ ok: false, message: 'Invalid questionId format' });
+        }
+        if (question.order !== undefined && (typeof question.order !== 'number' || question.order < 1)) {
+          return res.status(400).json({ ok: false, message: 'Question order must be a positive integer' });
+        }
+        if (question.marks !== undefined && (typeof question.marks !== 'number' || question.marks < 0)) {
+          return res.status(400).json({ ok: false, message: 'Question marks must be a non-negative number' });
+        }
+      }
+
+      // Validate total marks vs questions marks
+      // Allow small difference (0.01) due to floating point precision when using auto-distribute
+      const totalQuestionMarks = questions.reduce((sum, q) => sum + (q.marks || 1), 0);
+      const marksDifference = totalQuestionMarks - totalMarks;
+      // Allow small difference up to 0.01 due to floating point precision
+      if (marksDifference > 0.01) {
+        return res.status(400).json({
+          ok: false,
+          message: `Total question marks (${totalQuestionMarks}) cannot exceed exam total marks (${totalMarks})`
+        });
+      }
     }
 
     // Enforce ownership for non-admin users
