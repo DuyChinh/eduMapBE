@@ -80,7 +80,13 @@
                                     <td><%= sub.score || 0 %> / <%= sub.maxScore || 0 %></td>
                                     <td><%= sub.percentage || 0 %>%</td>
                                     <td><%= Math.floor((sub.timeSpent || 0) / 60) %> minutes</td>
-                                    <td><%= sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString('en-US') : 'N/A' %></td>
+                                    <td><% 
+                                        if (sub.submittedAt) {
+                                            const subDate = new Date(sub.submittedAt);
+                                            const day = String(subDate.getDate()).padStart(2, '0');
+                                            const month = String(subDate.getMonth() + 1).padStart(2, '0');
+                                            const year = subDate.getFullYear();
+                                            %><%= `${day}/${month}/${year}` %><% } else { %>N/A<% } %></td>
                                     <td>
                                         <div class="btn-group" role="group">
                                             <a href="/admin/submissions/<%= sub._id %>" class="btn btn-sm btn-info" title="View Details">

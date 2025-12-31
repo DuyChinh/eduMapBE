@@ -106,7 +106,18 @@
                                         <% } %>
                                     </td>
                                     <td><%= log.orgId ? (log.orgId.name || 'N/A') : 'N/A' %></td>
-                                    <td><%= new Date(log.ts || log.createdAt).toLocaleString('en-US') %></td>
+                                    <td>
+                                        <% 
+                                            const logtslogcr = new Date(log.ts || log.createdAt);
+                                            const day = String(logtslogcr.getDate()).padStart(2, '0');
+                                            const month = String(logtslogcr.getMonth() + 1).padStart(2, '0');
+                                            const year = logtslogcr.getFullYear();
+                                            const hours = String(logtslogcr.getHours()).padStart(2, '0');
+                                            const minutes = String(logtslogcr.getMinutes()).padStart(2, '0');
+                                            const seconds = String(logtslogcr.getSeconds()).padStart(2, '0');
+                                        %>
+                                        <%= `${day}/${month}/${year} ${hours}:${minutes}:${seconds}` %>
+                                    </td>
                                     <td>
                                         <div class="btn-group" role="group">
                                             <a href="/admin/proctor-logs/<%= log._id %>" class="btn btn-sm btn-info" title="View Details">

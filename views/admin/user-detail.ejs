@@ -44,16 +44,34 @@
                     </span>
                 </div>
                 <div class="col-md-6 mb-3">
+                    <strong>Plan:</strong><br>
+                    <span class="badge bg-<%= (detailUser.subscription?.plan || 'free') === 'free' ? 'secondary' : (detailUser.subscription?.plan === 'plus' ? 'info' : 'warning') %>">
+                        <%= (detailUser.subscription?.plan || 'free') === 'free' ? 'Free' : (detailUser.subscription?.plan === 'plus' ? 'Plus' : 'Pro') %>
+                    </span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <strong>Subscription Expires:</strong><br>
+                    <% if (detailUser.subscription?.expiresAt) { %>
+                        <% const expDate = new Date(detailUser.subscription.expiresAt); const isExpired = expDate < new Date(); %>
+                        <span class="badge bg-<%= isExpired ? 'danger' : 'success' %>">
+                            <%= expDate.toLocaleDateString('vi-VN') %>
+                        </span>
+                        <% if (isExpired) { %><small class="text-danger ms-2">(Expired)</small><% } %>
+                    <% } else { %>
+                        <span class="text-muted">No expiration</span>
+                    <% } %>
+                </div>
+                <div class="col-md-6 mb-3">
                     <strong>Organization:</strong><br>
                     <%= detailUser.orgId ? (detailUser.orgId.name || 'N/A') : 'N/A' %>
                 </div>
                 <div class="col-md-6 mb-3">
                     <strong>Created At:</strong><br>
-                    <%= new Date(detailUser.createdAt).toLocaleString('en-US') %>
+                    <%= new Date(detailUser.createdAt).toLocaleDateString('vi-VN') + ' ' + new Date(detailUser.createdAt).toLocaleTimeString('vi-VN') %>
                 </div>
                 <div class="col-md-6 mb-3">
                     <strong>Updated At:</strong><br>
-                    <%= new Date(detailUser.updatedAt).toLocaleString('en-US') %>
+                    <%= new Date(detailUser.updatedAt).toLocaleDateString('vi-VN') + ' ' + new Date(detailUser.updatedAt).toLocaleTimeString('vi-VN') %>
                 </div>
             </div>
         </div>

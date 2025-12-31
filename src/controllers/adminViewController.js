@@ -32,11 +32,12 @@ async function renderDashboard(req, res, next) {
  */
 async function renderUsers(req, res, next) {
   try {
-    const { role, status, orgId, search, page = 1, limit = 20 } = req.query;
+    const { role, status, plan, orgId, search, page = 1, limit = 20 } = req.query;
 
     const result = await adminService.getUsers({
       role,
       status,
+      plan,
       orgId,
       search,
       page: parseInt(page),
@@ -48,7 +49,12 @@ async function renderUsers(req, res, next) {
       currentPage: 'users',
       user: req.user,
       users: result.users,
-      pagination: result.pagination
+      pagination: result.pagination,
+      // Pass current filter values to preserve selection
+      currentRole: role || '',
+      currentStatus: status || '',
+      currentPlan: plan || '',
+      currentSearch: search || ''
     });
   } catch (error) {
     next(error);

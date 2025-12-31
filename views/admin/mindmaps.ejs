@@ -89,7 +89,13 @@
                                             <i class="far fa-star text-muted"></i>
                                         <% } %>
                                     </td>
-                                    <td><%= mindmap.created_at ? new Date(mindmap.created_at).toLocaleDateString('en-US') : 'N/A' %></td>
+                                    <td><% 
+                                        if (mindmap.created_at) {
+                                            const mapDate = new Date(mindmap.created_at);
+                                            const day = String(mapDate.getDate()).padStart(2, '0');
+                                            const month = String(mapDate.getMonth() + 1).padStart(2, '0');
+                                            const year = mapDate.getFullYear();
+                                            %><%= `${day}/${month}/${year}` %><% } else { %>N/A<% } %></td>
                                     <td>
                                         <div class="btn-group" role="group">
                                             <a href="/admin/mindmaps/<%= mindmap._id %>" class="btn btn-sm btn-info" title="View Details">

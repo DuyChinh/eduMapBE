@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const submissionService = require('../services/submissionService');
+const auditLogService = require('../services/auditLogService');
 
 /**
  * Starts a new exam submission
@@ -32,6 +33,9 @@ async function startSubmission(req, res, next) {
       user,
       orgId: user.orgId || null
     });
+
+    // Audit log for submission creation
+    await auditLogService.logCreate('submissions', result._id || result.submission?._id, { examId, status: 'in_progress' }, req.user, req);
 
     res.status(201).json({ ok: true, data: result });
   } catch (error) {
@@ -93,6 +97,9 @@ async function submitExam(req, res, next) {
       submissionId: id,
       user
     });
+
+    // Audit log for submission update (submitted)
+    await auditLogService.logUpdate('submissions', id, { status: 'submitted', score: submission.score }, req.user, req);
 
     res.json({ ok: true, data: submission });
   } catch (error) {
