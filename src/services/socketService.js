@@ -29,7 +29,7 @@ function getIO() {
  */
 function registerUserSocket(userId, socketId) {
     if (!userId) return;
-    
+
     if (!userSockets.has(userId)) {
         userSockets.set(userId, new Set());
     }
@@ -43,7 +43,7 @@ function registerUserSocket(userId, socketId) {
  */
 function unregisterUserSocket(userId, socketId) {
     if (!userId || !userSockets.has(userId)) return;
-    
+
     userSockets.get(userId).delete(socketId);
     if (userSockets.get(userId).size === 0) {
         userSockets.delete(userId);
@@ -57,10 +57,10 @@ function unregisterUserSocket(userId, socketId) {
  */
 function emitNotification(userId, notification) {
     if (!io || !userId) return;
-    
+
     const userIdStr = userId.toString();
     const userSocketIds = userSockets.get(userIdStr);
-    
+
     if (userSocketIds && userSocketIds.size > 0) {
         userSocketIds.forEach(socketId => {
             io.to(socketId).emit('NEW_NOTIFICATION', notification);
@@ -75,7 +75,7 @@ function emitNotification(userId, notification) {
  */
 function emitNotificationToMany(userIds, notification) {
     if (!io || !userIds || !Array.isArray(userIds)) return;
-    
+
     userIds.forEach(userId => {
         emitNotification(userId, notification);
     });
@@ -108,5 +108,21 @@ module.exports = {
     emitNotification,
     emitNotificationToMany,
     broadcastNotification,
-    emitFeedUpdate
+    emitFeedUpdate,
+    emitPaymentUpdate: (userId, data) => {
+        if (!io || !userId) {
+            console.log('SocketService: IO or UserId missing', { io: !!io, userId });
+            return;
+        }
+        const userIdStr = userId.toString();
+        const userSocketIds = userSockets.get(userIdStr);
+
+        if (userSocketIds && userSocketIds.size > 0) {
+            userSocketIds.forEach(socketId => {
+                io.to(socketId).emit('PAYMENT_UPDATE', data);
+            });
+        } else {
+            console.log('SocketService: No active sockets for user', userIdStr);
+        }
+    }
 };
