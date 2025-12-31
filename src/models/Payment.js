@@ -32,18 +32,21 @@ const paymentSchema = new mongoose.Schema({
         required: true,
         unique: true
     },
-    // Fields from VNPAY response
-    vnpTransactionNo: String,
-    vnpBankCode: String,
-    vnpBankTranNo: String,
-    vnpCardType: String,
-    vnpPayDate: String,
-    vnpResponseCode: String,
-    vnpTmnCode: String,
-    vnpTransactionStatus: String,
-    statusDescription: String
+    // Generic Gateway Fields (Normalized for VNPay, SePay, etc.)
+    gatewayTransactionId: String, // Transaction ID from the Payment Gateway (e.g. SePay ID, VNPay TransactionNo)
+    gatewayBankCode: String,      // Bank Code (e.g. MB, VCB, NCB)
+    gatewayCardType: String,      // Card Type (e.g. ATM, QRCODE, VISA)
+    gatewayPayDate: String,       // Payment Date from Gateway
+    gatewayResponseCode: String,  // Response Code (e.g. 00, SUCCESS)
+    statusDescription: String     // Human readable status description
 }, {
     timestamps: true
+});
+
+// Auto-delete PENDING transactions after 24 hours to keep DB clean
+paymentSchema.index({ createdAt: 1 }, {
+    expireAfterSeconds: 86400,
+    partialFilterExpression: { status: 'PENDING' }
 });
 
 module.exports = mongoose.model('Payment', paymentSchema);

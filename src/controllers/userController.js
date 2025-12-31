@@ -125,6 +125,7 @@ const userController = {
             if (req.body.email) updateData.email = req.body.email;
             if (req.body.role) updateData.role = req.body.role;
             if (req.body.status) updateData.status = req.body.status;
+            if (req.body.language) updateData.language = req.body.language;
 
             // New fields
             if (req.body.dob) updateData.dob = req.body.dob;
@@ -231,15 +232,15 @@ const userController = {
 
             // Tạo Access Token (ngắn hạn - 1h)
             const accessToken = jwt.sign(
-                payload, 
-                process.env.JWT_SECRET, 
+                payload,
+                process.env.JWT_SECRET,
                 { expiresIn: process.env.JWT_ACCESS_EXPIRES || '1h' }
             );
-            
+
             // Tạo Refresh Token (dài hạn - 7d)
             const refreshToken = jwt.sign(
-                { id: user._id, type: 'refresh' }, 
-                process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET, 
+                { id: user._id, type: 'refresh' },
+                process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
                 { expiresIn: process.env.JWT_REFRESH_EXPIRES || '7d' }
             );
 
