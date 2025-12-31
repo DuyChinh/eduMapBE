@@ -16,9 +16,9 @@ router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // Call auth service
+        // Call auth service with admin flag to get longer token expiration
         const authService = require('../services/authService');
-        const result = await authService.login(email, password);
+        const result = await authService.login(email, password, true); // true = isAdmin
 
         // Check if user is admin
         if (result.user && result.user.role === 'admin') {
@@ -39,6 +39,27 @@ router.post('/login', async (req, res) => {
         console.error('Admin login error:', error);
         return res.redirect('/admin/login?error=login_failed');
     }
+});
+
+// Logout route (no auth required)
+router.get('/logout', (req, res) => {
+    // Clear admin_token cookie
+    res.clearCookie('admin_token', {
+        path: '/',
+        sameSite: 'Lax'
+    });
+    // Redirect to login page
+    res.redirect('/admin/login');
+});
+
+// API logout endpoint
+router.post('/logout', (req, res) => {
+    // Clear admin_token cookie
+    res.clearCookie('admin_token', {
+        path: '/',
+        sameSite: 'Lax'
+    });
+    res.json({ ok: true, message: 'Logged out successfully' });
 });
 
 // All other admin routes require authentication and admin role

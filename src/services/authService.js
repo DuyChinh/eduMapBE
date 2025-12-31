@@ -31,7 +31,7 @@ const authService = {
     },
 
 
-    async login(email, password) {
+    async login(email, password, isAdmin = false) {
         const user = await User.findOne({ email });
         if (!user) {
             throw new Error('User not found');
@@ -41,11 +41,16 @@ const authService = {
             throw new Error('Email or password is incorrect');
         }
         
-        // Tạo Access Token (ngắn hạn - 1h)
+        // Tạo Access Token
+        // Admin: 24h để đồng bộ với cookie, User thường: 1h
+        const tokenExpiresIn = isAdmin 
+            ? (process.env.JWT_ADMIN_EXPIRES || '24h')
+            : (process.env.JWT_ACCESS_EXPIRES || '1h');
+        
         const accessToken = jwt.sign(
             { id: user.id || user._id, email: user.email, role: user.role }, 
             process.env.JWT_SECRET, 
-            { expiresIn: process.env.JWT_ACCESS_EXPIRES || '1h' }
+            { expiresIn: tokenExpiresIn }
         );
         
         // Tạo Refresh Token (dài hạn - 7d)
