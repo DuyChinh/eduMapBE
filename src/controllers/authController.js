@@ -319,6 +319,23 @@ const authController = {
                 message: 'Server error: ' + error.message 
             });
         }
+    },
+
+    async logout(req, res) {
+        try {
+            // Logout is stateless with JWT, so we just return success
+            // Client should clear the token from storage
+            res.json({
+                success: true,
+                message: 'Logged out successfully'
+            });
+        } catch (error) {
+            console.error('Error in logout:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Server error: ' + error.message
+            });
+        }
     }
 }
 

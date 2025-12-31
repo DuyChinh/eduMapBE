@@ -1188,7 +1188,10 @@ async function renderPayments(req, res, next) {
       query.$or = [
         { txnRef: { $regex: search, $options: 'i' } },
         { orderInfo: { $regex: search, $options: 'i' } },
-        { vnpTransactionNo: { $regex: search, $options: 'i' } }
+        { gatewayTransactionId: { $regex: search, $options: 'i' } },
+        { vnpTransactionNo: { $regex: search, $options: 'i' } },
+        { gatewayBankCode: { $regex: search, $options: 'i' } },
+        { vnpBankCode: { $regex: search, $options: 'i' } }
       ];
     }
 
