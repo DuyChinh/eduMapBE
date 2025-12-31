@@ -51,11 +51,27 @@
                 </div>
                 <div class="col-md-6 mb-3">
                     <strong>Created At:</strong><br>
-                    <%= new Date(classDoc.createdAt).toLocaleString('en-US') %>
+                    <% 
+                        const classCreated = new Date(classDoc.createdAt);
+                        const day = String(classCreated.getDate()).padStart(2, '0');
+                        const month = String(classCreated.getMonth() + 1).padStart(2, '0');
+                        const year = classCreated.getFullYear();
+                        const hours = String(classCreated.getHours()).padStart(2, '0');
+                        const minutes = String(classCreated.getMinutes()).padStart(2, '0');
+                        const seconds = String(classCreated.getSeconds()).padStart(2, '0');
+                    %><%= `${day}/${month}/${year} ${hours}:${minutes}:${seconds}` %>
                 </div>
                 <div class="col-md-6 mb-3">
                     <strong>Updated At:</strong><br>
-                    <%= new Date(classDoc.updatedAt).toLocaleString('en-US') %>
+                    <% 
+                        const classUpdated = new Date(classDoc.updatedAt);
+                        const day = String(classUpdated.getDate()).padStart(2, '0');
+                        const month = String(classUpdated.getMonth() + 1).padStart(2, '0');
+                        const year = classUpdated.getFullYear();
+                        const hours = String(classUpdated.getHours()).padStart(2, '0');
+                        const minutes = String(classUpdated.getMinutes()).padStart(2, '0');
+                        const seconds = String(classUpdated.getSeconds()).padStart(2, '0');
+                    %><%= `${day}/${month}/${year} ${hours}:${minutes}:${seconds}` %>
                 </div>
             </div>
         </div>

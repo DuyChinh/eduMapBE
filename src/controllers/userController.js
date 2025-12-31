@@ -2,6 +2,7 @@ const User = require('../models/User');
 const { sanitizeUser, sanitizeUsers } = require('../utils/userUtils');
 const jwt = require('jsonwebtoken');
 const cloudinary = require('../config/cloudinary');
+const auditLogService = require('../services/auditLogService');
 
 const userController = {
     async getProfile(req, res) {
@@ -163,6 +164,9 @@ const userController = {
                 { new: true, runValidators: true }
             );
 
+            // Audit log for user profile update
+            await auditLogService.logUpdate('users', userId, { name: updatedUser.name, email: updatedUser.email }, req.user, req);
+
             res.json({
                 success: true,
                 message: 'Profile updated successfully',
@@ -180,7 +184,13 @@ const userController = {
     async deleteAccount(req, res) {
         try {
             const userId = req.user.userId || req.user.id || req.user._id || req.user.sub;
-            await User.findByIdAndDelete(userId);
+            const user = await User.findByIdAndDelete(userId);
+
+            // Audit log for user deletion
+            if (user) {
+                await auditLogService.logDelete('users', userId, { name: user.name, email: user.email }, req.user, req);
+            }
+
             res.json({
                 success: true,
                 message: 'User account deleted successfully'
@@ -289,6 +299,9 @@ const userController = {
                     message: 'User not found'
                 });
             }
+
+            // Audit log for user role update
+            await auditLogService.logUpdate('users', id, { name: user.name, email: user.email, role: user.role }, req.user, req);
 
             res.json({
                 success: true,

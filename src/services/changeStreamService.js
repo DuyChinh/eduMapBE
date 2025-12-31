@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 class ChangeStreamService {
     constructor(io) {
         this.io = io;
-        this.watchedCollections = ['users', 'exams', 'classes', 'questions']; // Collections to watch
+        this.watchedCollections = ['users', 'exams', 'classes', 'questions', 'submissions', 'auditlogs']; // Collections to watch
     }
 
     init() {

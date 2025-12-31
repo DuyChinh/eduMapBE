@@ -119,13 +119,14 @@ async function getDashboardStats() {
  * @param {Object} params - Parameters
  * @param {string} params.role - Filter by role
  * @param {string} params.status - Filter by status
+ * @param {string} params.plan - Filter by plan
  * @param {string} params.orgId - Filter by organization
  * @param {string} params.search - Search by name or email
  * @param {number} params.page - Page number
  * @param {number} params.limit - Items per page
  * @returns {Object} - Users list with pagination
  */
-async function getUsers({ role, status, orgId, search, page = 1, limit = 20 }) {
+async function getUsers({ role, status, plan, orgId, search, page = 1, limit = 20 }) {
   const query = {};
 
   if (role) {
@@ -134,6 +135,10 @@ async function getUsers({ role, status, orgId, search, page = 1, limit = 20 }) {
 
   if (status) {
     query.status = status;
+  }
+
+  if (plan) {
+    query['subscription.plan'] = plan;
   }
 
   if (orgId) {
@@ -188,6 +193,27 @@ async function updateUser({ userId, updates }) {
     }
   }
 
+  // Handle plan update
+  if (updates.plan !== undefined) {
+    if (!['free', 'plus', 'pro'].includes(updates.plan)) {
+      throw { status: 400, message: 'Invalid plan. Must be one of: free, plus, pro' };
+    }
+    updateData['subscription.plan'] = updates.plan;
+  }
+
+  // Handle expiresAt update
+  if (updates.expiresAt !== undefined) {
+    if (updates.expiresAt === null || updates.expiresAt === '') {
+      updateData['subscription.expiresAt'] = null;
+    } else {
+      const expiresDate = new Date(updates.expiresAt);
+      if (isNaN(expiresDate.getTime())) {
+        throw { status: 400, message: 'Invalid expiresAt date format' };
+      }
+      updateData['subscription.expiresAt'] = expiresDate;
+    }
+  }
+
   // Handle password update separately
   if (updates.password) {
     const bcrypt = require('bcryptjs');
@@ -220,6 +246,63 @@ async function updateUser({ userId, updates }) {
   return user;
 }
 
+/**
+ * Create user
+ * @param {Object} params - Parameters
+ * @param {string} params.name - User name
+ * @param {string} params.email - User email
+ * @param {string} params.password - User password
+ * @param {string} params.role - User role
+ * @param {string} params.status - User status
+ * @param {string} params.plan - Subscription plan
+ * @param {string} params.expiresAt - Subscription expiration date
+ * @returns {Object} - Created user
+ */
+async function createUser({ name, email, password, role, status, plan, expiresAt }) {
+  const bcrypt = require('bcryptjs');
+  const { validatePassword } = require('../utils/passwordValidator');
+
+  // Check if email already exists
+  const existingUser = await User.findOne({ email: email.toLowerCase() });
+  if (existingUser) {
+    throw { status: 400, message: 'Email already exists' };
+  }
+
+  // Validate password strength
+  const passwordValidation = validatePassword(password);
+  if (!passwordValidation.isValid) {
+    throw { status: 400, message: `Password validation failed: ${passwordValidation.errors.join(', ')}` };
+  }
+
+  // Hash password
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  // Build subscription object
+  const subscription = {
+    plan: plan || 'free'
+  };
+  if (expiresAt) {
+    const expDate = new Date(expiresAt);
+    if (!isNaN(expDate.getTime())) {
+      subscription.expiresAt = expDate;
+    }
+  }
+
+  // Create user
+  const user = await User.create({
+    name,
+    email: email.toLowerCase(),
+    password: hashedPassword,
+    role: role || 'student',
+    status: status || 'active',
+    subscription
+  });
+
+  // Return user without password
+  const userObj = user.toObject();
+  delete userObj.password;
+  return userObj;
+}
 /**
  * Get organizations with filters and pagination
  * @param {Object} params - Parameters
@@ -1244,6 +1327,7 @@ async function restoreMindmap(mindmapId) {
 module.exports = {
   getDashboardStats,
   getUsers,
+  createUser,
   updateUser,
   getOrganizations,
   updateOrganization,

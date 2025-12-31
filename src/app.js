@@ -56,6 +56,7 @@ if (require.main === module) {
     const { Server } = require('socket.io');
     const ChangeStreamService = require('./services/changeStreamService');
     const socketService = require('./services/socketService');
+    const auditLogService = require('./services/auditLogService');
     const jwt = require('jsonwebtoken');
 
     const PORT = process.env.PORT || 3000;
@@ -71,6 +72,9 @@ if (require.main === module) {
 
     // Set io instance in socketService for use in controllers
     socketService.setIO(io);
+
+    // Set io instance in auditLogService for realtime audit logs
+    auditLogService.setSocketIO(io);
 
     // Initialize Change Stream Service for audit logs
     const changeStreamService = new ChangeStreamService(io);

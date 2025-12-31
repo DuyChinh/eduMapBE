@@ -54,19 +54,51 @@
                 </div>
                 <div class="col-md-6 mb-3">
                     <strong>Started At:</strong><br>
-                    <%= submission.startedAt ? new Date(submission.startedAt).toLocaleString('en-US') : 'N/A' %>
+                    <%= submission.startedAt ? <% 
+    const submission = new Date(submission.startedAt);
+    const day = String(submission.getDate()).padStart(2, '0');
+    const month = String(submission.getMonth() + 1).padStart(2, '0');
+    const year = submission.getFullYear();
+    const hours = String(submission.getHours()).padStart(2, '0');
+    const minutes = String(submission.getMinutes()).padStart(2, '0');
+    const seconds = String(submission.getSeconds()).padStart(2, '0');
+  %><%= `${day}/${month}/${year} ${hours}:${minutes}:${seconds}` %> : 'N/A' %>
                 </div>
                 <div class="col-md-6 mb-3">
                     <strong>Submitted At:</strong><br>
-                    <%= submission.submittedAt ? new Date(submission.submittedAt).toLocaleString('en-US') : 'N/A' %>
+                    <%= submission.submittedAt ? <% 
+    const submission = new Date(submission.submittedAt);
+    const day = String(submission.getDate()).padStart(2, '0');
+    const month = String(submission.getMonth() + 1).padStart(2, '0');
+    const year = submission.getFullYear();
+    const hours = String(submission.getHours()).padStart(2, '0');
+    const minutes = String(submission.getMinutes()).padStart(2, '0');
+    const seconds = String(submission.getSeconds()).padStart(2, '0');
+  %><%= `${day}/${month}/${year} ${hours}:${minutes}:${seconds}` %> : 'N/A' %>
                 </div>
                 <div class="col-md-6 mb-3">
                     <strong>Created At:</strong><br>
-                    <%= new Date(submission.createdAt).toLocaleString('en-US') %>
+                    <%= <% 
+    const submission = new Date(submission.createdAt);
+    const day = String(submission.getDate()).padStart(2, '0');
+    const month = String(submission.getMonth() + 1).padStart(2, '0');
+    const year = submission.getFullYear();
+    const hours = String(submission.getHours()).padStart(2, '0');
+    const minutes = String(submission.getMinutes()).padStart(2, '0');
+    const seconds = String(submission.getSeconds()).padStart(2, '0');
+  %><%= `${day}/${month}/${year} ${hours}:${minutes}:${seconds}` %> %>
                 </div>
                 <div class="col-md-6 mb-3">
                     <strong>Updated At:</strong><br>
-                    <%= new Date(submission.updatedAt).toLocaleString('en-US') %>
+                    <%= <% 
+    const submission = new Date(submission.updatedAt);
+    const day = String(submission.getDate()).padStart(2, '0');
+    const month = String(submission.getMonth() + 1).padStart(2, '0');
+    const year = submission.getFullYear();
+    const hours = String(submission.getHours()).padStart(2, '0');
+    const minutes = String(submission.getMinutes()).padStart(2, '0');
+    const seconds = String(submission.getSeconds()).padStart(2, '0');
+  %><%= `${day}/${month}/${year} ${hours}:${minutes}:${seconds}` %> %>
                 </div>
             </div>
         </div>

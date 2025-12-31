@@ -64,7 +64,12 @@
                                     <td><%= classDoc.orgId ? (classDoc.orgId.name || 'N/A') : 'N/A' %></td>
                                     <td><%= classDoc.teacherId ? (classDoc.teacherId.name || 'N/A') : 'N/A' %></td>
                                     <td><%= classDoc.studentIds ? classDoc.studentIds.length : 0 %></td>
-                                    <td><%= new Date(classDoc.createdAt).toLocaleDateString('en-US') %></td>
+                                    <td><% 
+                                        const classDate = new Date(classDoc.createdAt);
+                                        const day = String(classDate.getDate()).padStart(2, '0');
+                                        const month = String(classDate.getMonth() + 1).padStart(2, '0');
+                                        const year = classDate.getFullYear();
+                                        %><%= `${day}/${month}/${year}` %></td>
                                     <td>
                                         <div class="btn-group" role="group">
                                             <a href="/admin/classes/<%= classDoc._id %>" class="btn btn-sm btn-info" title="View Details">
