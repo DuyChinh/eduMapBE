@@ -410,6 +410,8 @@ async function getExamByShareCode(req, res, next) {
       availableFrom: examData.availableFrom,
       availableUntil: examData.availableUntil,
       maxAttempts: examData.maxAttempts,
+      // Include isAllowUser to indicate if guests can take this exam
+      isAllowUser: examData.isAllowUser,
       // Include examPassword flag (not the actual password) to indicate if password is required
       examPassword: examData.examPassword ? true : false,
       // Don't include questions, answers, or settings

@@ -11,9 +11,7 @@ const Payment = require('../models/Payment');
  */
 async function renderDashboard(req, res, next) {
   try {
-    console.log('Rendering dashboard for user:', req.user?.email);
     const stats = await adminService.getDashboardStats();
-    console.log('Stats loaded:', Object.keys(stats));
     res.render('admin/dashboard', {
       title: 'Dashboard',
       currentPage: 'dashboard',
