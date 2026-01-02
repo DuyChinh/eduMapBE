@@ -82,11 +82,27 @@
                     <div class="card-body">
                         <div class="mb-3">
                             <label class="form-label">Created At</label>
-                            <input type="text" class="form-control" value="<%= mindmap.created_at ? new Date(mindmap.created_at).toLocaleString() : 'N/A' %>" disabled>
+                            <input type="text" class="form-control" value="<%= mindmap.created_at ? <% 
+    const mindmapcre = new Date(mindmap.created_at);
+    const day = String(mindmapcre.getDate()).padStart(2, '0');
+    const month = String(mindmapcre.getMonth() + 1).padStart(2, '0');
+    const year = mindmapcre.getFullYear();
+    const hours = String(mindmapcre.getHours()).padStart(2, '0');
+    const minutes = String(mindmapcre.getMinutes()).padStart(2, '0');
+    const seconds = String(mindmapcre.getSeconds()).padStart(2, '0');
+  %><%= `${day}/${month}/${year} ${hours}:${minutes}:${seconds}` %> : 'N/A' %>" disabled>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Updated At</label>
-                            <input type="text" class="form-control" value="<%= mindmap.updated_at ? new Date(mindmap.updated_at).toLocaleString() : 'N/A' %>" disabled>
+                            <input type="text" class="form-control" value="<%= mindmap.updated_at ? <% 
+    const mindmapupd = new Date(mindmap.updated_at);
+    const day = String(mindmapupd.getDate()).padStart(2, '0');
+    const month = String(mindmapupd.getMonth() + 1).padStart(2, '0');
+    const year = mindmapupd.getFullYear();
+    const hours = String(mindmapupd.getHours()).padStart(2, '0');
+    const minutes = String(mindmapupd.getMinutes()).padStart(2, '0');
+    const seconds = String(mindmapupd.getSeconds()).padStart(2, '0');
+  %><%= `${day}/${month}/${year} ${hours}:${minutes}:${seconds}` %> : 'N/A' %>" disabled>
                         </div>
                     </div>
                 </div>

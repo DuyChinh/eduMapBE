@@ -42,7 +42,12 @@
                                             <%= question.isPublic ? 'Yes' : 'No' %>
                                         </span>
                                     </td>
-                                    <td><%= new Date(question.createdAt).toLocaleDateString('en-US') %></td>
+                                    <td><% 
+                                        const qDate = new Date(question.createdAt);
+                                        const day = String(qDate.getDate()).padStart(2, '0');
+                                        const month = String(qDate.getMonth() + 1).padStart(2, '0');
+                                        const year = qDate.getFullYear();
+                                        %><%= `${day}/${month}/${year}` %></td>
                                     <td>
                                         <div class="btn-group" role="group">
                                             <a href="/admin/questions/<%= question._id %>" class="btn btn-sm btn-info" title="View Details">

@@ -6,6 +6,7 @@ const passport = require('passport');
 // Standard auth routes
 router.post('/register', authController.register);
 router.post('/login', authController.login);
+router.post('/logout', authController.logout);
 router.post('/refresh', authController.refreshToken);
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/verify-otp', authController.verifyOtp);

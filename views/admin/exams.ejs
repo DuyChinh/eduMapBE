@@ -78,7 +78,12 @@
                                     <td><%= exam.duration || 0 %> minutes</td>
                                     <td><%= exam.totalMarks || 0 %></td>
                                     <td><%= exam.questions ? exam.questions.length : 0 %></td>
-                                    <td><%= new Date(exam.createdAt).toLocaleDateString('en-US') %></td>
+                                    <td><% 
+                                        const examDate = new Date(exam.createdAt);
+                                        const day = String(examDate.getDate()).padStart(2, '0');
+                                        const month = String(examDate.getMonth() + 1).padStart(2, '0');
+                                        const year = examDate.getFullYear();
+                                        %><%= `${day}/${month}/${year}` %></td>
                                     <td>
                                         <div class="btn-group" role="group">
                                             <a href="/admin/exams/<%= exam._id %>" class="btn btn-sm btn-info" title="View Details">

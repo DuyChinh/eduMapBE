@@ -2,6 +2,7 @@ const User = require('../models/User');
 const { sanitizeUser, sanitizeUsers } = require('../utils/userUtils');
 const jwt = require('jsonwebtoken');
 const cloudinary = require('../config/cloudinary');
+const auditLogService = require('../services/auditLogService');
 
 const userController = {
     async getProfile(req, res) {
@@ -125,6 +126,7 @@ const userController = {
             if (req.body.email) updateData.email = req.body.email;
             if (req.body.role) updateData.role = req.body.role;
             if (req.body.status) updateData.status = req.body.status;
+            if (req.body.language) updateData.language = req.body.language;
 
             // New fields
             if (req.body.dob) updateData.dob = req.body.dob;
@@ -162,6 +164,9 @@ const userController = {
                 { new: true, runValidators: true }
             );
 
+            // Audit log for user profile update
+            await auditLogService.logUpdate('users', userId, { name: updatedUser.name, email: updatedUser.email }, req.user, req);
+
             res.json({
                 success: true,
                 message: 'Profile updated successfully',
@@ -179,7 +184,13 @@ const userController = {
     async deleteAccount(req, res) {
         try {
             const userId = req.user.userId || req.user.id || req.user._id || req.user.sub;
-            await User.findByIdAndDelete(userId);
+            const user = await User.findByIdAndDelete(userId);
+
+            // Audit log for user deletion
+            if (user) {
+                await auditLogService.logDelete('users', userId, { name: user.name, email: user.email }, req.user, req);
+            }
+
             res.json({
                 success: true,
                 message: 'User account deleted successfully'
@@ -231,15 +242,15 @@ const userController = {
 
             // Tạo Access Token (ngắn hạn - 1h)
             const accessToken = jwt.sign(
-                payload, 
-                process.env.JWT_SECRET, 
+                payload,
+                process.env.JWT_SECRET,
                 { expiresIn: process.env.JWT_ACCESS_EXPIRES || '1h' }
             );
-            
+
             // Tạo Refresh Token (dài hạn - 7d)
             const refreshToken = jwt.sign(
-                { id: user._id, type: 'refresh' }, 
-                process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET, 
+                { id: user._id, type: 'refresh' },
+                process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
                 { expiresIn: process.env.JWT_REFRESH_EXPIRES || '7d' }
             );
 
@@ -288,6 +299,9 @@ const userController = {
                     message: 'User not found'
                 });
             }
+
+            // Audit log for user role update
+            await auditLogService.logUpdate('users', id, { name: user.name, email: user.email, role: user.role }, req.user, req);
 
             res.json({
                 success: true,

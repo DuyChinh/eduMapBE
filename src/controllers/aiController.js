@@ -2,6 +2,7 @@ const aiService = require('../services/aiService');
 const { ChatHistory, ChatSession } = require('../models');
 const Submission = require('../models/Submission');
 const Exam = require('../models/Exam');
+const User = require('../models/User');
 const cloudinary = require('../config/cloudinary');
 const streamifier = require('streamifier');
 
@@ -21,6 +22,57 @@ const chat = async (req, res, next) => {
                 message: 'Message or file is required'
             });
         }
+
+        // --- AI Usage Limit Check ---
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(401).json({ ok: false, message: 'User not found' });
+        }
+
+        const PLAN_LIMITS = {
+            'free': 5,
+            'plus': 10,
+            'pro': 15
+        };
+
+        // Check if plan expired
+        let currentPlan = user.subscription?.plan || 'free';
+        if (user.subscription?.expiresAt && new Date() > new Date(user.subscription.expiresAt)) {
+            currentPlan = 'free'; // Downgrade if expired
+            // Optionally update DB here, but lazy check is fine for now
+        }
+
+        const limit = PLAN_LIMITS[currentPlan] || 5;
+
+        // Check daily reset
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        let lastUsed = user.aiUsage?.lastUsed ? new Date(user.aiUsage.lastUsed) : null;
+        if (lastUsed) lastUsed.setHours(0, 0, 0, 0);
+
+        let currentCount = user.aiUsage?.count || 0;
+
+        if (!lastUsed || lastUsed.getTime() !== today.getTime()) {
+            currentCount = 0; // Reset for new day
+        }
+
+        if (currentCount >= limit) {
+            return res.status(403).json({
+                ok: false,
+                message: `Daily limit reached for **${currentPlan}** plan (${limit} requests/day).\n\nUpgrade to get more.`,
+                error: 'LIMIT_REACHED',
+                currentPlan,
+                limit
+            });
+        }
+
+        // Increment usage
+        await User.findByIdAndUpdate(userId, {
+            'aiUsage.count': currentCount + 1,
+            'aiUsage.lastUsed': new Date()
+        });
+        // -----------------------------
 
         let currentSessionId = sessionId;
         let session;

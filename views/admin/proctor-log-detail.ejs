@@ -37,7 +37,15 @@
                 </div>
                 <div class="col-md-6 mb-3">
                     <strong>Timestamp:</strong><br>
-                    <%= new Date(log.ts || log.createdAt).toLocaleString('en-US') %>
+                    <%= <% 
+    const logtslogcr = new Date(log.ts || log.createdAt);
+    const day = String(logtslogcr.getDate()).padStart(2, '0');
+    const month = String(logtslogcr.getMonth() + 1).padStart(2, '0');
+    const year = logtslogcr.getFullYear();
+    const hours = String(logtslogcr.getHours()).padStart(2, '0');
+    const minutes = String(logtslogcr.getMinutes()).padStart(2, '0');
+    const seconds = String(logtslogcr.getSeconds()).padStart(2, '0');
+  %><%= `${day}/${month}/${year} ${hours}:${minutes}:${seconds}` %> %>
                 </div>
                 <div class="col-md-6 mb-3">
                     <strong>User:</strong><br>
@@ -69,7 +77,15 @@
                 </div>
                 <div class="col-md-6 mb-3">
                     <strong>Created At:</strong><br>
-                    <%= new Date(log.createdAt).toLocaleString('en-US') %>
+                    <%= <% 
+    const logcreated = new Date(log.createdAt);
+    const day = String(logcreated.getDate()).padStart(2, '0');
+    const month = String(logcreated.getMonth() + 1).padStart(2, '0');
+    const year = logcreated.getFullYear();
+    const hours = String(logcreated.getHours()).padStart(2, '0');
+    const minutes = String(logcreated.getMinutes()).padStart(2, '0');
+    const seconds = String(logcreated.getSeconds()).padStart(2, '0');
+  %><%= `${day}/${month}/${year} ${hours}:${minutes}:${seconds}` %> %>
                 </div>
             </div>
         </div>

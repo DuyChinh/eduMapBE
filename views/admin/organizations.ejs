@@ -79,7 +79,12 @@
                                     <td><%= org.userCount || 0 %></td>
                                     <td><%= org.settings?.maxStudents || 100 %></td>
                                     <td><%= org.settings?.maxExams || 10 %></td>
-                                    <td><%= new Date(org.createdAt).toLocaleDateString('en-US') %></td>
+                                    <td><% 
+                                        const orgDate = new Date(org.createdAt);
+                                        const day = String(orgDate.getDate()).padStart(2, '0');
+                                        const month = String(orgDate.getMonth() + 1).padStart(2, '0');
+                                        const year = orgDate.getFullYear();
+                                        %><%= `${day}/${month}/${year}` %></td>
                                     <td>
                                         <div class="btn-group" role="group">
                                             <a href="/admin/organizations/<%= org._id %>" class="btn btn-sm btn-info" title="View Details">

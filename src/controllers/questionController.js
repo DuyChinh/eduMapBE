@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const service = require('../services/questionService');
 const Question = require('../models/Question');
 const cloudinary = require('../config/cloudinary');
+const auditLogService = require('../services/auditLogService');
 
 const getPublicIdFromUrl = (url) => {
   if (!url) return null;
@@ -170,6 +171,10 @@ async function patch(req, res, next) {
     }
 
     const updated = await service.updatePartial({ id, payload, ownerIdEnforce: req.user.id });
+
+    // Audit log for question update
+    await auditLogService.logUpdate('questions', id, { name: updated.name, text: updated.text?.substring(0, 100), type: updated.type }, req.user, req);
+
     res.json({ ok: true, data: updated });
   } catch (e) { next(e); }
 }
@@ -341,6 +346,10 @@ async function create(req, res, next) {
     if (errors.length) return res.status(400).json({ ok: false, errors });
 
     const doc = await service.create({ payload: req.body, user: req.user });
+
+    // Audit log for question creation
+    await auditLogService.logCreate('questions', doc._id, { name: doc.name, text: doc.text?.substring(0, 100), type: doc.type }, req.user, req);
+
     res.status(201).json({ ok: true, data: doc });
   } catch (e) {
     next(e);
@@ -386,6 +395,10 @@ async function update(req, res, next) {
     }
 
     const updated = await service.update({ id, payload, ownerIdEnforce: req.user.id });
+
+    // Audit log for question update
+    await auditLogService.logUpdate('questions', id, { name: updated.name, text: updated.text?.substring(0, 100), type: updated.type }, req.user, req);
+
     res.json({ ok: true, data: updated });
   } catch (e) { next(e); }
 }
@@ -449,6 +462,10 @@ async function remove(req, res, next) {
     }
 
     const deleted = await service.hardDelete({ id, ownerIdEnforce: req.user.id });
+
+    // Audit log for question deletion
+    await auditLogService.logDelete('questions', id, { name: deleted?.name, text: deleted?.text?.substring(0, 100) }, req.user, req);
+
     res.json({ ok: true, message: 'Question deleted', data: deleted });
   } catch (e) { next(e); }
 }

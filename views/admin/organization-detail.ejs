@@ -51,11 +51,27 @@
                 </div>
                 <div class="col-md-6 mb-3">
                     <strong>Created At:</strong><br>
-                    <%= new Date(organization.createdAt).toLocaleString('en-US') %>
+                    <%= <% 
+    const organizati = new Date(organization.createdAt);
+    const day = String(organizati.getDate()).padStart(2, '0');
+    const month = String(organizati.getMonth() + 1).padStart(2, '0');
+    const year = organizati.getFullYear();
+    const hours = String(organizati.getHours()).padStart(2, '0');
+    const minutes = String(organizati.getMinutes()).padStart(2, '0');
+    const seconds = String(organizati.getSeconds()).padStart(2, '0');
+  %><%= `${day}/${month}/${year} ${hours}:${minutes}:${seconds}` %> %>
                 </div>
                 <div class="col-md-6 mb-3">
                     <strong>Updated At:</strong><br>
-                    <%= new Date(organization.updatedAt).toLocaleString('en-US') %>
+                    <%= <% 
+    const organizati = new Date(organization.updatedAt);
+    const day = String(organizati.getDate()).padStart(2, '0');
+    const month = String(organizati.getMonth() + 1).padStart(2, '0');
+    const year = organizati.getFullYear();
+    const hours = String(organizati.getHours()).padStart(2, '0');
+    const minutes = String(organizati.getMinutes()).padStart(2, '0');
+    const seconds = String(organizati.getSeconds()).padStart(2, '0');
+  %><%= `${day}/${month}/${year} ${hours}:${minutes}:${seconds}` %> %>
                 </div>
             </div>
         </div>

@@ -1,5 +1,15 @@
 const AuditLog = require('../models/AuditLog');
 
+// Store io instance for socket emit
+let ioInstance = null;
+
+/**
+ * Set the Socket.io instance for realtime notifications
+ */
+function setSocketIO(io) {
+    ioInstance = io;
+}
+
 /**
  * Create an audit log entry
  * @param {Object} params - Audit log parameters
@@ -28,7 +38,17 @@ async function createLog({ action, collectionName, documentId, documentData = {}
             userAgent
         };
 
-        await AuditLog.create(logData);
+        const log = await AuditLog.create(logData);
+
+        // Emit socket event for realtime update
+        if (ioInstance) {
+            ioInstance.emit('db_change', {
+                action: action,
+                collectionName: 'auditlogs',
+                documentId: log._id,
+                timestamp: new Date()
+            });
+        }
     } catch (err) {
         console.error('Failed to create AuditLog:', err.message);
     }
@@ -80,6 +100,7 @@ async function logDelete(collectionName, documentId, documentData, user, req) {
 }
 
 module.exports = {
+    setSocketIO,
     createLog,
     logCreate,
     logUpdate,
