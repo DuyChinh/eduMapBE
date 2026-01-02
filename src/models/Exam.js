@@ -64,7 +64,7 @@ const ExamSchema = new mongoose.Schema({
     default: 'Asia/Ho_Chi_Minh'
   },
   lateEntryGracePeriod: {
-    type: Number, 
+    type: Number,
     required: false,
     default: -1
   },
@@ -310,6 +310,16 @@ const ExamSchema = new mongoose.Schema({
     totalAttempts: { type: Number, default: 0 },
     averageScore: { type: Number, default: 0 },
     completionRate: { type: Number, default: 0 }
+  },
+
+  // AI Analysis for Class
+  aiAnalysis: {
+    type: String,
+    default: ''
+  },
+  analysisLanguage: {
+    type: String,
+    default: 'vi'
   }
 }, {
   timestamps: true

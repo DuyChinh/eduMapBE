@@ -15,5 +15,7 @@ router.delete('/sessions/:sessionId', auth, aiController.deleteSession);
 router.patch('/sessions/:sessionId', auth, aiController.renameSession);
 router.patch('/sessions/:sessionId/toggle-pin', auth, aiController.togglePinSession);
 router.put('/message/:messageId', auth, aiController.editMessage);
+router.post('/analyze/student', auth, aiController.analyzeStudentWeakness);
+router.post('/analyze/class', auth, aiController.analyzeClassWeakness);
 
 module.exports = router;

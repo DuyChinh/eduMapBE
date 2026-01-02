@@ -7,6 +7,8 @@ const auth = require('../middlewares/auth');
 router.post('/', auth, mindmapController.create);
 // Generate mindmap with AI
 router.post('/generate-ai', auth, mindmapController.generateWithAI);
+// Generate mindmap from exam review
+router.post('/generate-review', auth, mindmapController.generateFromExamReview);
 
 // Get all mindmaps for the current user
 router.get('/', auth, mindmapController.getAll);
