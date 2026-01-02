@@ -1,5 +1,7 @@
 const aiService = require('../services/aiService');
 const { ChatHistory, ChatSession } = require('../models');
+const Submission = require('../models/Submission');
+const Exam = require('../models/Exam');
 const cloudinary = require('../config/cloudinary');
 const streamifier = require('streamifier');
 
@@ -742,6 +744,181 @@ const togglePinSession = async (req, res, next) => {
     }
 };
 
+/**
+ * Analyze student weakness based on exam submission
+ * POST /v1/api/ai/analyze/student
+ */
+const analyzeStudentWeakness = async (req, res, next) => {
+    try {
+        const { submissionData, examData } = req.body;
+        const submissionId = req.body.submissionId || (submissionData ? (submissionData._id || submissionData.id) : null);
+
+        if ((!submissionData && !submissionId) || !examData) {
+            return res.status(400).json({
+                ok: false,
+                message: 'Submission and Exam data are required'
+            });
+        }
+
+        // Check compatibility with legacy frontend call
+        let submission = null;
+        const language = req.body.language || 'vi'; // Get language early
+
+        if (submissionId) {
+            submission = await Submission.findById(submissionId);
+
+            // If already analyzed AND language matches (or stored is undefined/vi and requested is vi)
+            // We assume null stored language is 'vi' for backward compatibility
+            const storedLang = submission.analysisLanguage || 'vi';
+
+            if (submission && submission.aiAnalysis && storedLang === language) {
+                return res.json({
+                    ok: true,
+                    data: { analysis: submission.aiAnalysis, fromCache: true }
+                });
+            }
+        }
+
+        // Prepare data for prompt (use DB data if available, else use request body)
+        const score = submission ? submission.score : submissionData.score;
+        const totalMarks = submission ? submission.maxScore : submissionData.totalMarks;
+        const percentage = submission ? submission.percentage : submissionData.percentage;
+        // Calculation for correct count might vary, stick to request data if submission detail is complex to re-calc
+        const correctCount = submissionData.correctCount;
+        const totalQuestions = submissionData.totalQuestions;
+        const timeSpent = submission ? Math.round(submission.timeSpent / 60) : submissionData.timeSpent;
+
+        const langMap = {
+            'vi': 'Tiếng Việt',
+            'en': 'Tiếng Anh (English)',
+            'jp': 'Tiếng Nhật (Japanese)'
+        };
+        const targetLang = langMap[language] || 'Tiếng Việt';
+
+        const prompt = `
+        Bạn là một trợ lý AI phân tích giáo dục. Hãy phân tích kết quả bài kiểm tra của học sinh dưới đây và chỉ ra các điểm yếu cần cải thiện bằng ${targetLang}.
+        
+        Thông tin bài thi:
+        - Tên đề: ${examData.name}
+        - Môn: ${examData.subject}
+        - Điểm số: ${score}/${totalMarks} (${percentage}%)
+        - Số câu đúng: ${correctCount}/${totalQuestions}
+        - Thời gian làm bài: ${timeSpent} phút
+        
+        Danh sách các câu sai (nếu có):
+        ${submissionData.wrongQuestions ? submissionData.wrongQuestions.map((q, i) => `${i + 1}. [${q.topic || 'Chủ đề khác'}] ${q.text?.substring(0, 100)}...`).join('\n') : 'Không có thông tin chi tiết'}
+        
+        Yêu cầu (Vui lòng trả lời hoàn toàn bằng ${targetLang}):
+        1. Nhận xét tổng quan ngắn gọn về kết quả.
+        2. Chỉ ra các chủ đề kiến thức hoặc dạng bài mà học sinh đang yếu dựa trên các câu sai.
+        3. Đưa ra 3 lời khuyên cụ thể để cải thiện các điểm yếu này.
+        4. Giọng văn khích lệ, xây dựng.
+        5. Cuối cùng, hãy gợi ý học sinh bấm vào nút "Create Improvement Roadmap (Mindmap)" bên dưới để tạo lộ trình ôn tập chi tiết.
+        `;
+
+        const response = await aiService.generateResponse(prompt, [], []);
+
+        // Save analysis to submission if ID exists
+        if (submissionId) {
+            await Submission.findByIdAndUpdate(submissionId, {
+                aiAnalysis: response,
+                analysisLanguage: language
+            });
+        }
+
+        res.json({
+            ok: true,
+            data: { analysis: response }
+        });
+
+    } catch (error) {
+        console.error('Error analyzing student weakness:', error);
+        next(error);
+    }
+};
+
+/**
+ * Analyze class weakness based on exam statistics
+ * POST /v1/api/ai/analyze/class
+ */
+const analyzeClassWeakness = async (req, res, next) => {
+    try {
+        const { statistics, examData } = req.body;
+        const examId = req.body.examId || (examData ? (examData._id || examData.id) : null);
+
+        if (!statistics || !examData) {
+            return res.status(400).json({
+                ok: false,
+                message: 'Statistics and Exam data are required'
+            });
+        }
+
+        // Check for existing analysis if examId is provided
+        const language = req.body.language || 'vi'; // Get language early
+
+        if (examId) {
+            const exam = await Exam.findById(examId);
+
+            // Check cache with language matching
+            const storedLang = exam.analysisLanguage || 'vi';
+
+            if (exam && exam.aiAnalysis && storedLang === language) {
+                return res.json({
+                    ok: true,
+                    data: { analysis: exam.aiAnalysis, fromCache: true }
+                });
+            }
+        }
+
+        const langMap = {
+            'vi': 'Tiếng Việt',
+            'en': 'Tiếng Anh (English)',
+            'jp': 'Tiếng Nhật (Japanese)'
+        };
+        const targetLang = langMap[language] || 'Tiếng Việt';
+
+        const prompt = `
+        Bạn là một trợ lý AI hỗ trợ giáo viên. Hãy phân tích thống kê kết quả bài kiểm tra của cả lớp dưới đây và chỉ ra các điểm yếu chung mà học sinh đang gặp phải bằng ${targetLang}.
+
+        Thông tin bài thi:
+        - Tên đề: ${examData.name}
+        - Môn: ${examData.subject}
+        - Số lượng bài nộp: ${statistics.totalSubmissions}
+        - Điểm trung bình: ${statistics.averageScore}
+        - Phổ điểm: ${JSON.stringify(statistics.scoreDistribution || {})}
+
+        Các câu hỏi sai nhiều nhất (Top 5):
+        ${statistics.mostWrongQuestions ? statistics.mostWrongQuestions.slice(0, 5).map((q, i) => `${i + 1}. [${q.topic || 'Chủ đề'}] ${q.text?.substring(0, 100)}... (Sai: ${q.wrongCount}/${q.totalAttempts})`).join('\n') : 'Chưa có dữ liệu'}
+
+        Yêu cầu (Vui lòng trả lời hoàn toàn bằng ${targetLang}):
+        1. Nhận xét tổng quan về tình hình làm bài của cả lớp.
+        2. Phân tích các lỗ hổng kiến thức chung mà đa số học sinh đang mắc phải (dựa trên các câu sai nhiều).
+        3. Gợi ý phương pháp giảng dạy hoặc ôn tập lại các phần kiến thức này cho giáo viên.
+        4. Trình bày ngắn gọn, súc tích (dưới 400 từ).
+        5. Cuối cùng, hãy gợi ý giáo viên bấm vào nút "Create Improvement Roadmap (Mindmap)" bên dưới để tạo lộ trình cải thiện cho cả lớp.
+        `;
+
+        const response = await aiService.generateResponse(prompt, [], []);
+
+        // Save analysis to Exam if ID exists
+        if (examId) {
+            await Exam.findByIdAndUpdate(examId, {
+                aiAnalysis: response,
+                analysisLanguage: language
+            });
+        }
+
+        res.json({
+            ok: true,
+            data: { analysis: response }
+        });
+
+    } catch (error) {
+        console.error('Error analyzing class weakness:', error);
+        next(error);
+    }
+};
+
 module.exports = {
     chat,
     getHistory,
@@ -752,5 +929,7 @@ module.exports = {
     deleteSession,
     renameSession,
     editMessage,
-    togglePinSession
+    togglePinSession,
+    analyzeStudentWeakness,
+    analyzeClassWeakness
 };

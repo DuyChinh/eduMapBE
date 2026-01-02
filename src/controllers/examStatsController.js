@@ -24,7 +24,7 @@ async function getExamStatistics(req, res, next) {
     }
 
     // Check exam exists and user has permission
-    const exam = await Exam.findById(examId);
+    const exam = await Exam.findById(examId).populate('questions.questionId');
     if (!exam) {
       return res.status(404).json({ ok: false, message: 'Exam not found' });
     }
@@ -73,6 +73,74 @@ async function getExamStatistics(req, res, next) {
     const allSubmissions = await Submission.countDocuments({ examId });
     const completionRate = (totalSubmissions / allSubmissions) * 100;
 
+
+
+    // Calculate question stats map
+    const questionStats = {};
+
+    // Initialize stats for all exam questions
+    if (exam.questions && exam.questions.length > 0) {
+      exam.questions.forEach(q => {
+        if (q.questionId) {
+          const qId = q.questionId._id.toString();
+          questionStats[qId] = {
+            id: qId,
+            text: q.questionId.text || q.questionId.name || 'Unknown Question',
+            correct: 0,
+            incorrect: 0,
+            unanswered: 0,
+            total: 0
+          };
+        }
+      });
+    }
+
+    submissions.forEach(sub => {
+      if (sub.answers && Array.isArray(sub.answers)) {
+        sub.answers.forEach(ans => {
+          // Handle both populated and unpopulated questionId
+          const qId = ans.questionId && ans.questionId._id
+            ? ans.questionId._id.toString()
+            : (ans.questionId ? ans.questionId.toString() : null);
+
+          if (qId && questionStats[qId]) {
+            questionStats[qId].total++;
+            if (ans.isCorrect) {
+              questionStats[qId].correct++;
+            } else {
+              questionStats[qId].incorrect++;
+            }
+          }
+        });
+      }
+    });
+
+    const statsArray = Object.values(questionStats);
+
+    // Most wrong: Sort by incorrect count descending
+    const mostWrongQuestions = [...statsArray]
+      .sort((a, b) => b.incorrect - a.incorrect)
+      .slice(0, 5)
+      .map(q => ({
+        id: q.id,
+        text: q.text.substring(0, 50) + (q.text.length > 50 ? '...' : ''),
+        count: q.incorrect,
+        total: q.total
+      }))
+      .filter(q => q.count > 0);
+
+    // Most correct: Sort by correct count descending
+    const mostCorrectQuestions = [...statsArray]
+      .sort((a, b) => b.correct - a.correct)
+      .slice(0, 5)
+      .map(q => ({
+        id: q.id,
+        text: q.text.substring(0, 50) + (q.text.length > 50 ? '...' : ''),
+        count: q.correct,
+        total: q.total
+      }))
+      .filter(q => q.count > 0);
+
     res.json({
       ok: true,
       data: {
@@ -82,7 +150,9 @@ async function getExamStatistics(req, res, next) {
         lowestScore,
         passRate: Math.round(passRate * 10) / 10,
         completionRate: Math.round(completionRate * 10) / 10,
-        totalMarks: exam.totalMarks
+        totalMarks: exam.totalMarks,
+        mostWrongQuestions,
+        mostCorrectQuestions
       }
     });
   } catch (error) {
