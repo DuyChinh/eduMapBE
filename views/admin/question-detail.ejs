@@ -89,11 +89,27 @@
                 <% } %>
                 <div class="col-md-6 mb-3">
                     <strong>Created At:</strong><br>
-                    <%= new Date(question.createdAt).toLocaleString('en-US') %>
+                    <% 
+                        const qCreated = new Date(question.createdAt);
+                        const day = String(qCreated.getDate()).padStart(2, '0');
+                        const month = String(qCreated.getMonth() + 1).padStart(2, '0');
+                        const year = qCreated.getFullYear();
+                        const hours = String(qCreated.getHours()).padStart(2, '0');
+                        const minutes = String(qCreated.getMinutes()).padStart(2, '0');
+                        const seconds = String(qCreated.getSeconds()).padStart(2, '0');
+                    %><%= `${day}/${month}/${year} ${hours}:${minutes}:${seconds}` %>
                 </div>
                 <div class="col-md-6 mb-3">
                     <strong>Updated At:</strong><br>
-                    <%= new Date(question.updatedAt).toLocaleString('en-US') %>
+                    <% 
+                        const qUpdated = new Date(question.updatedAt);
+                        const day = String(qUpdated.getDate()).padStart(2, '0');
+                        const month = String(qUpdated.getMonth() + 1).padStart(2, '0');
+                        const year = qUpdated.getFullYear();
+                        const hours = String(qUpdated.getHours()).padStart(2, '0');
+                        const minutes = String(qUpdated.getMinutes()).padStart(2, '0');
+                        const seconds = String(qUpdated.getSeconds()).padStart(2, '0');
+                    %><%= `${day}/${month}/${year} ${hours}:${minutes}:${seconds}` %>
                 </div>
             </div>
         </div>

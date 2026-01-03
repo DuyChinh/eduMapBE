@@ -37,6 +37,7 @@ const configureRoutes = (app) => {
     v1.use('/grades', require('./grades'));
     v1.use('/notifications', require('./notifications'));
     v1.use('/payment', require('./paymentRoutes'));
+    v1.use('/guest', require('./guest')); // Guest routes - no auth required
 
 
     v1.use('/dashboard', dashboardRoutes);

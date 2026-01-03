@@ -11,6 +11,7 @@ router.use(authMiddleware.isAdmin);
 router.get('/dashboard', adminController.getDashboard);
 router.get('/users', adminController.getUsers);
 router.get('/users/:userId', adminController.getUserById);
+router.post('/users', adminController.createUser);
 router.put('/users/:userId', adminController.updateUser);
 router.delete('/users/:userId', adminController.deleteUser);
 router.get('/organizations', adminController.getOrganizations);

@@ -93,11 +93,31 @@ currentPage: 'payments', user: user }) %>
               <td><%= payment.orderInfo %></td>
               <td><code><%= payment.txnRef %></code></td>
               <td>
-                <% if (payment.vnpTransactionNo) { %>
+                <% 
+                  // Helper function to clean trailing commas
+                  function cleanValue(value) {
+                    if (!value) return '';
+                    return String(value).replace(/,\s*$/, '').trim();
+                  }
+                  
+                  // Support both old field names (vnp*) and new field names (gateway*)
+                  const transactionNo = payment.gatewayTransactionId || payment.vnpTransactionNo;
+                  const bankCode = payment.gatewayBankCode || payment.vnpBankCode;
+                  const cardType = payment.gatewayCardType || payment.vnpCardType;
+                  
+                  const hasVnpInfo = transactionNo || bankCode || cardType;
+                %>
+                <% if (hasVnpInfo) { %>
                 <small>
-                  <strong>TranNo:</strong> <%= payment.vnpTransactionNo %><br />
-                  <strong>Bank:</strong> <%= payment.vnpBankCode %><br />
-                  <strong>Card:</strong> <%= payment.vnpCardType %>
+                  <% if (transactionNo) { %>
+                  <strong>TranNo:</strong> <%= cleanValue(transactionNo) %><br />
+                  <% } %>
+                  <% if (bankCode) { %>
+                  <strong>Bank:</strong> <%= cleanValue(bankCode) %><br />
+                  <% } %>
+                  <% if (cardType) { %>
+                  <strong>Card:</strong> <%= cleanValue(cardType) %>
+                  <% } %>
                 </small>
                 <% } else { %>
                 <span class="text-muted">-</span>

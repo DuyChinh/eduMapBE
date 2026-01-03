@@ -29,6 +29,11 @@ const UserSchema = new mongoose.Schema({
     default: 'student',
     index: true
   },
+  language: {
+    type: String,
+    enum: ['vi', 'en', 'jp'],
+    default: 'vi'
+  },
   status: {
     type: String,
     enum: ['active', 'suspended'],
@@ -52,6 +57,20 @@ const UserSchema = new mongoose.Schema({
   preferences: {
     language: { type: String, default: 'vi' },
     timezone: { type: String, default: 'Asia/Ho_Chi_Minh' }
+  },
+  subscription: {
+    plan: {
+      type: String,
+      enum: ['free', 'plus', 'pro'],
+      default: 'free'
+    },
+    expiresAt: {
+      type: Date
+    }
+  },
+  aiUsage: {
+    count: { type: Number, default: 0 },
+    lastUsed: { type: Date }
   }
 }, {
   timestamps: true

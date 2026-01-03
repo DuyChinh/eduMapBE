@@ -96,16 +96,40 @@
                         <% } %>
                         <tr>
                             <th>Created At:</th>
-                            <td><%= mindmap.created_at ? new Date(mindmap.created_at).toLocaleString() : 'N/A' %></td>
+                            <td><%= mindmap.created_at ? <% 
+    const mindmapcre = new Date(mindmap.created_at);
+    const day = String(mindmapcre.getDate()).padStart(2, '0');
+    const month = String(mindmapcre.getMonth() + 1).padStart(2, '0');
+    const year = mindmapcre.getFullYear();
+    const hours = String(mindmapcre.getHours()).padStart(2, '0');
+    const minutes = String(mindmapcre.getMinutes()).padStart(2, '0');
+    const seconds = String(mindmapcre.getSeconds()).padStart(2, '0');
+  %><%= `${day}/${month}/${year} ${hours}:${minutes}:${seconds}` %> : 'N/A' %></td>
                         </tr>
                         <tr>
                             <th>Updated At:</th>
-                            <td><%= mindmap.updated_at ? new Date(mindmap.updated_at).toLocaleString() : 'N/A' %></td>
+                            <td><%= mindmap.updated_at ? <% 
+    const mindmapupd = new Date(mindmap.updated_at);
+    const day = String(mindmapupd.getDate()).padStart(2, '0');
+    const month = String(mindmapupd.getMonth() + 1).padStart(2, '0');
+    const year = mindmapupd.getFullYear();
+    const hours = String(mindmapupd.getHours()).padStart(2, '0');
+    const minutes = String(mindmapupd.getMinutes()).padStart(2, '0');
+    const seconds = String(mindmapupd.getSeconds()).padStart(2, '0');
+  %><%= `${day}/${month}/${year} ${hours}:${minutes}:${seconds}` %> : 'N/A' %></td>
                         </tr>
                         <% if (mindmap.deleted_at) { %>
                         <tr>
                             <th>Deleted At:</th>
-                            <td><span class="text-danger"><%= new Date(mindmap.deleted_at).toLocaleString() %></span></td>
+                            <td><span class="text-danger"><%= <% 
+    const mindmapdel = new Date(mindmap.deleted_at);
+    const day = String(mindmapdel.getDate()).padStart(2, '0');
+    const month = String(mindmapdel.getMonth() + 1).padStart(2, '0');
+    const year = mindmapdel.getFullYear();
+    const hours = String(mindmapdel.getHours()).padStart(2, '0');
+    const minutes = String(mindmapdel.getMinutes()).padStart(2, '0');
+    const seconds = String(mindmapdel.getSeconds()).padStart(2, '0');
+  %><%= `${day}/${month}/${year} ${hours}:${minutes}:${seconds}` %> %></span></td>
                         </tr>
                         <% } %>
                     </table>

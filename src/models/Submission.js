@@ -36,8 +36,17 @@ const SubmissionSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
+    required: false, // Optional for guest submissions
     index: true
+  },
+  guestName: {
+    type: String,
+    trim: true,
+    maxlength: 128
+  },
+  isGuest: {
+    type: Boolean,
+    default: false
   },
   version: {
     type: Number,

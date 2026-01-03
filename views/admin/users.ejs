@@ -3,6 +3,9 @@
 <div class="users-page">
     <div class="page-header">
         <div class="page-actions">
+            <button class="btn btn-success me-2" onclick="openCreateUserModal()">
+                <i class="fas fa-plus"></i> Create User
+            </button>
             <button class="btn btn-primary" onclick="refreshUsers()">
                 <i class="fas fa-sync-alt"></i> Refresh
             </button>
@@ -21,22 +24,31 @@
                         <label class="form-label">Role</label>
                         <select name="role" id="roleFilter" class="form-select">
                             <option value="">All</option>
-                            <option value="admin">Admin</option>
-                            <option value="teacher">Teacher</option>
-                            <option value="student">Student</option>
+                            <option value="admin" <%= typeof currentRole !== 'undefined' && currentRole === 'admin' ? 'selected' : '' %>>Admin</option>
+                            <option value="teacher" <%= typeof currentRole !== 'undefined' && currentRole === 'teacher' ? 'selected' : '' %>>Teacher</option>
+                            <option value="student" <%= typeof currentRole !== 'undefined' && currentRole === 'student' ? 'selected' : '' %>>Student</option>
                         </select>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label">Status</label>
                         <select name="status" id="statusFilter" class="form-select">
                             <option value="">All</option>
-                            <option value="active">Active</option>
-                            <option value="suspended">Suspended</option>
+                            <option value="active" <%= typeof currentStatus !== 'undefined' && currentStatus === 'active' ? 'selected' : '' %>>Active</option>
+                            <option value="suspended" <%= typeof currentStatus !== 'undefined' && currentStatus === 'suspended' ? 'selected' : '' %>>Suspended</option>
                         </select>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-2">
+                        <label class="form-label">Plan</label>
+                        <select name="plan" id="planFilter" class="form-select">
+                            <option value="">All</option>
+                            <option value="free" <%= typeof currentPlan !== 'undefined' && currentPlan === 'free' ? 'selected' : '' %>>Free</option>
+                            <option value="plus" <%= typeof currentPlan !== 'undefined' && currentPlan === 'plus' ? 'selected' : '' %>>Plus</option>
+                            <option value="pro" <%= typeof currentPlan !== 'undefined' && currentPlan === 'pro' ? 'selected' : '' %>>Pro</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
                         <label class="form-label">Search</label>
-                        <input type="text" name="search" id="searchFilter" class="form-control" placeholder="Name or email...">
+                        <input type="text" name="search" id="searchFilter" class="form-control" placeholder="Name or email..." value="<%= typeof currentSearch !== 'undefined' ? currentSearch : '' %>">
                     </div>
                     <div class="col-md-2 d-flex align-items-end">
                         <button type="submit" class="btn btn-primary me-2">
@@ -65,8 +77,10 @@
                             <th>Name</th>
                             <th>Email</th>
                             <th>Role</th>
+                            <th>Plan</th>
+                            <th>Expires</th>
                             <th>Status</th>
-                            <th>Organization</th>
+                            <th class="text-center">Organization</th>
                             <th>Created At</th>
                             <th>Actions</th>
                         </tr>
@@ -84,12 +98,27 @@
                                         </span>
                                     </td>
                                     <td>
+                                        <span class="badge bg-<%= (user.subscription?.plan || 'free') === 'free' ? 'secondary' : (user.subscription?.plan === 'plus' ? 'info' : 'warning') %>">
+                                            <%= (user.subscription?.plan || 'free') === 'free' ? 'Free' : (user.subscription?.plan === 'plus' ? 'Plus' : 'Pro') %>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <% if (user.subscription?.expiresAt) { %>
+                                            <% const expDate = new Date(user.subscription.expiresAt); const isExpired = expDate < new Date(); %>
+                                            <span class="badge bg-<%= isExpired ? 'danger' : 'success' %>">
+                                                <%= expDate.toLocaleDateString('vi-VN') %>
+                                            </span>
+                                        <% } else { %>
+                                            <span class="text-muted">-</span>
+                                        <% } %>
+                                    </td>
+                                    <td>
                                         <span class="badge bg-<%= user.status === 'active' ? 'success' : 'warning' %>">
                                             <%= user.status === 'active' ? 'Active' : 'Suspended' %>
                                         </span>
                                     </td>
-                                    <td><%= user.orgId ? (user.orgId.name || 'N/A') : 'N/A' %></td>
-                                    <td><%= new Date(user.createdAt).toLocaleDateString('en-US') %></td>
+                                    <td class="text-center"><%= user.orgId ? (user.orgId.name || 'N/A') : 'N/A' %></td>
+                                    <td><%= new Date(user.createdAt).toLocaleDateString('vi-VN') %></td>
                                     <td>
                                         <div class="btn-group" role="group">
                                             <a href="/admin/users/<%= user._id %>" class="btn btn-sm btn-info" title="View Details">
@@ -107,7 +136,7 @@
                             <% }); %>
                         <% } else { %>
                             <tr>
-                                <td colspan="8" class="text-center">No data available</td>
+                                <td colspan="10" class="text-center">No data available</td>
                             </tr>
                         <% } %>
                     </tbody>
@@ -150,7 +179,27 @@
 
 <script>
     let currentPage = <%= pagination?.page || 1 %>;
-    let currentFilters = {};
+    let currentFilters = {
+        role: '<%= typeof currentRole !== "undefined" ? currentRole : "" %>',
+        status: '<%= typeof currentStatus !== "undefined" ? currentStatus : "" %>',
+        plan: '<%= typeof currentPlan !== "undefined" ? currentPlan : "" %>',
+        search: '<%= typeof currentSearch !== "undefined" ? currentSearch : "" %>'
+    };
+
+    // Toggle password visibility
+    function togglePassword(inputId, btn) {
+        const input = document.getElementById(inputId);
+        const icon = btn.querySelector('i');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    }
 
     function filterUsers(e) {
         e.preventDefault();
@@ -158,6 +207,7 @@
         currentFilters = {
             role: formData.get('role') || '',
             status: formData.get('status') || '',
+            plan: formData.get('plan') || '',
             search: formData.get('search') || ''
         };
         currentPage = 1;
@@ -167,6 +217,7 @@
     function clearFilters() {
         document.getElementById('roleFilter').value = '';
         document.getElementById('statusFilter').value = '';
+        document.getElementById('planFilter').value = '';
         document.getElementById('searchFilter').value = '';
         currentFilters = {};
         currentPage = 1;
@@ -226,6 +277,134 @@
         }
         return '';
     }
+
+    // Create User Modal Functions
+    function openCreateUserModal() {
+        document.getElementById('createUserModal').style.display = 'block';
+        document.getElementById('createUserForm').reset();
+    }
+
+    function closeCreateUserModal() {
+        document.getElementById('createUserModal').style.display = 'none';
+    }
+
+    function createUser(e) {
+        e.preventDefault();
+        const expiresAtValue = document.getElementById('createUserExpiresAt').value;
+        const formData = {
+            name: document.getElementById('createUserName').value,
+            email: document.getElementById('createUserEmail').value,
+            password: document.getElementById('createUserPassword').value,
+            role: document.getElementById('createUserRole').value,
+            status: document.getElementById('createUserStatus').value,
+            plan: document.getElementById('createUserPlan').value,
+            expiresAt: expiresAtValue || null
+        };
+
+        if (formData.password.length < 8) {
+            showNotification('Password must be at least 8 characters long', 'warning');
+            return;
+        }
+
+        fetch('/v1/api/admin/users', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${getToken()}`
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.ok) {
+                showNotification('User created successfully!', 'success');
+                closeCreateUserModal();
+                loadUsers();
+            } else {
+                showNotification('Error: ' + (data.message || 'Failed to create user'), 'danger');
+            }
+        })
+        .catch(err => {
+            console.error('Error creating user:', err);
+            showNotification('Error creating user', 'danger');
+        });
+    }
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        const modal = document.getElementById('createUserModal');
+        if (event.target === modal) {
+            closeCreateUserModal();
+        }
+    }
 </script>
+
+<!-- Create User Modal -->
+<div id="createUserModal" class="modal" style="display: none; position: fixed; z-index: 1050; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+    <div class="modal-dialog" style="position: relative; margin: 10% auto; max-width: 500px;">
+        <div class="modal-content" style="background-color: #fff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div class="modal-header" style="padding: 1rem; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center;">
+                <h5 class="modal-title mb-0">Create New User</h5>
+                <button type="button" class="btn-close" onclick="closeCreateUserModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 1rem;">
+                <form id="createUserForm" onsubmit="createUser(event)">
+                    <div class="mb-3">
+                        <label class="form-label">Name <span class="text-danger">*</span></label>
+                        <input type="text" id="createUserName" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email <span class="text-danger">*</span></label>
+                        <input type="email" id="createUserEmail" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Password <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="password" id="createUserPassword" class="form-control" required minlength="8">
+                            <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('createUserPassword', this)">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <small class="text-muted">Minimum 8 characters</small>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Role</label>
+                            <select id="createUserRole" class="form-select">
+                                <option value="student">Student</option>
+                                <option value="teacher">Teacher</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Status</label>
+                            <select id="createUserStatus" class="form-select">
+                                <option value="active">Active</option>
+                                <option value="suspended">Suspended</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Plan</label>
+                        <select id="createUserPlan" class="form-select">
+                            <option value="free">Free</option>
+                            <option value="plus">Plus</option>
+                            <option value="pro">Pro</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Subscription Expires At</label>
+                        <input type="date" id="createUserExpiresAt" class="form-control">
+                        <small class="text-muted">Leave empty for no expiration</small>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-secondary" onclick="closeCreateUserModal()">Cancel</button>
+                        <button type="submit" class="btn btn-success"><i class="fas fa-plus"></i> Create User</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 
 <%- include('../partials/footer') %>

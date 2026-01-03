@@ -1,4 +1,5 @@
 const adminService = require('../services/adminService');
+const auditLogService = require('../services/auditLogService');
 const mongoose = require('mongoose');
 
 /**
@@ -23,11 +24,12 @@ async function getDashboard(req, res, next) {
  */
 async function getUsers(req, res, next) {
   try {
-    const { role, status, orgId, search, page, limit } = req.query;
+    const { role, status, plan, orgId, search, page, limit } = req.query;
     
     const result = await adminService.getUsers({
       role,
       status,
+      plan,
       orgId,
       search,
       page: parseInt(page) || 1,
@@ -115,6 +117,9 @@ async function updateUser(req, res, next) {
 
     const user = await adminService.updateUser({ userId, updates });
 
+    // Audit log for user update
+    await auditLogService.logUpdate('users', userId, { name: user.name, email: user.email, role: user.role }, req.user, req);
+
     res.json({
       ok: true,
       data: user,
@@ -175,6 +180,10 @@ async function updateSubmission(req, res, next) {
       });
     }
     const submission = await adminService.updateSubmission(submissionId, req.body);
+
+    // Audit log for submission update
+    await auditLogService.logUpdate('submissions', submissionId, { score: submission.score, status: submission.status }, req.user, req);
+
     res.json({
       ok: true,
       data: submission,
@@ -223,11 +232,98 @@ async function deleteUser(req, res, next) {
       });
     }
 
+    // Audit log for user deletion
+    await auditLogService.logDelete('users', userId, { name: user.name, email: user.email }, req.user, req);
+
     res.json({
       ok: true,
       message: 'User deleted successfully'
     });
   } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Create user
+ * POST /v1/api/admin/users
+ */
+async function createUser(req, res, next) {
+  try {
+    const { name, email, password, role, status, plan, expiresAt } = req.body;
+
+    // Validate required fields
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Name, email and password are required'
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Invalid email format'
+      });
+    }
+
+    // Validate role if provided
+    if (role && !['teacher', 'student', 'admin'].includes(role)) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Invalid role. Must be one of: teacher, student, admin'
+      });
+    }
+
+    // Validate status if provided
+    if (status && !['active', 'suspended'].includes(status)) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Invalid status. Must be one of: active, suspended'
+      });
+    }
+
+    // Validate plan if provided
+    if (plan && !['free', 'plus', 'pro'].includes(plan)) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Invalid plan. Must be one of: free, plus, pro'
+      });
+    }
+
+    const user = await adminService.createUser({
+      name,
+      email,
+      password,
+      role: role || 'student',
+      status: status || 'active',
+      plan: plan || 'free',
+      expiresAt: expiresAt || null
+    });
+
+    // Audit log for user creation
+    await auditLogService.logCreate('users', user._id, { name: user.name, email: user.email, role: user.role }, req.user, req);
+
+    res.status(201).json({
+      ok: true,
+      data: user,
+      message: 'User created successfully'
+    });
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({
+        ok: false,
+        message: error.message
+      });
+    }
+    if (error.code === 11000) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Email already exists'
+      });
+    }
     next(error);
   }
 }
@@ -677,6 +773,10 @@ async function updateQuestion(req, res, next) {
       });
     }
     const question = await adminService.updateQuestion(questionId, req.body);
+
+    // Audit log for question update
+    await auditLogService.logUpdate('questions', questionId, { content: question.content?.substring(0, 100), type: question.type }, req.user, req);
+
     res.json({
       ok: true,
       data: question,
@@ -707,6 +807,10 @@ async function deleteQuestion(req, res, next) {
       });
     }
     await adminService.deleteQuestion(questionId);
+
+    // Audit log for question deletion
+    await auditLogService.logDelete('questions', questionId, {}, req.user, req);
+
     res.json({
       ok: true,
       message: 'Question deleted successfully'
@@ -736,6 +840,10 @@ async function deleteSubmission(req, res, next) {
       });
     }
     await adminService.deleteSubmission(submissionId);
+
+    // Audit log for submission deletion
+    await auditLogService.logDelete('submissions', submissionId, {}, req.user, req);
+
     res.json({
       ok: true,
       message: 'Submission deleted successfully'
@@ -828,6 +936,9 @@ async function updateClass(req, res, next) {
 
     const classDoc = await adminService.updateClass(classId, req.body);
 
+    // Audit log for class update
+    await auditLogService.logUpdate('classes', classId, { name: classDoc.name, code: classDoc.code }, req.user, req);
+
     res.json({
       ok: true,
       message: 'Class updated successfully',
@@ -864,6 +975,9 @@ async function deleteClass(req, res, next) {
     }
 
     await adminService.deleteClass(classId);
+
+    // Audit log for class deletion
+    await auditLogService.logDelete('classes', classId, {}, req.user, req);
 
     res.json({
       ok: true,
@@ -1099,6 +1213,7 @@ module.exports = {
   getDashboard,
   getUsers,
   getUserById,
+  createUser,
   updateUser,
   deleteUser,
   getOrganizations,

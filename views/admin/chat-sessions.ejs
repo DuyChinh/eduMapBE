@@ -67,8 +67,24 @@
                                     </td>
                                     <td><%= session.title || 'New Chat' %></td>
                                     <td><%= (session.lastMessage || '').substring(0, 50) %><%= (session.lastMessage && session.lastMessage.length > 50) ? '...' : '' %></td>
-                                    <td><%= new Date(session.createdAt).toLocaleString('en-US') %></td>
-                                    <td><%= new Date(session.updatedAt).toLocaleString('en-US') %></td>
+                                    <td><% 
+                                        const sessionCreated = new Date(session.createdAt);
+                                        const day = String(sessionCreated.getDate()).padStart(2, '0');
+                                        const month = String(sessionCreated.getMonth() + 1).padStart(2, '0');
+                                        const year = sessionCreated.getFullYear();
+                                        const hours = String(sessionCreated.getHours()).padStart(2, '0');
+                                        const minutes = String(sessionCreated.getMinutes()).padStart(2, '0');
+                                        const seconds = String(sessionCreated.getSeconds()).padStart(2, '0');
+                                    %><%= `${day}/${month}/${year} ${hours}:${minutes}:${seconds}` %></td>
+                                    <td><% 
+                                        const sessionUpdated = new Date(session.updatedAt);
+                                        const day = String(sessionUpdated.getDate()).padStart(2, '0');
+                                        const month = String(sessionUpdated.getMonth() + 1).padStart(2, '0');
+                                        const year = sessionUpdated.getFullYear();
+                                        const hours = String(sessionUpdated.getHours()).padStart(2, '0');
+                                        const minutes = String(sessionUpdated.getMinutes()).padStart(2, '0');
+                                        const seconds = String(sessionUpdated.getSeconds()).padStart(2, '0');
+                                    %><%= `${day}/${month}/${year} ${hours}:${minutes}:${seconds}` %></td>
                                     <td>
                                         <div class="btn-group" role="group">
                                             <a href="/admin/chat-sessions/<%= session._id %>" class="btn btn-sm btn-info" title="View Details">

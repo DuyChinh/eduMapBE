@@ -3,6 +3,7 @@ const service = require('../services/classService');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const FeedPost = require('../models/FeedPost');
+const auditLogService = require('../services/auditLogService');
 
 const getOrgIdSoft = (req) =>
   req.user?.orgId || req.user?.org?.id || req.body?.orgId || req.query?.orgId || null;
@@ -70,6 +71,9 @@ async function create(req, res, next) {
       teacherId,
       payload
     });
+
+    // Audit log for class creation
+    await auditLogService.logCreate('classes', doc._id, { name: doc.name, code: doc.code }, req.user, req);
 
     return res.status(201).json({ ok: true, data: doc });
   } catch (e) {
@@ -326,6 +330,9 @@ async function patch(req, res, next) {
     });
     if (!updated) return res.status(403).json({ ok: false, message: 'Forbidden or not found' });
 
+    // Audit log for class update
+    await auditLogService.logUpdate('classes', id, { name: updated.name, code: updated.code }, req.user, req);
+
     res.json({ ok: true, data: updated });
   } catch (e) { next(e); }
 }
@@ -346,6 +353,9 @@ async function remove(req, res, next) {
 
     const deleted = await service.hardDelete({ id, ownerIdEnforce, orgId });
     if (!deleted) return res.status(403).json({ ok: false, message: 'Forbidden or not found' });
+
+    // Audit log for class deletion
+    await auditLogService.logDelete('classes', id, { name: deleted.name, code: deleted.code }, req.user, req);
 
     res.json({ ok: true, message: 'Class deleted', data: deleted });
   } catch (e) { next(e); }

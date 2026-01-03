@@ -98,7 +98,15 @@
                                             <span class="badge bg-success">OK</span>
                                         <% } %>
                                     </td>
-                                    <td><%= new Date(item.createdAt).toLocaleString('en-US') %></td>
+                                    <td><%= <% 
+    const itemcreate = new Date(item.createdAt);
+    const day = String(itemcreate.getDate()).padStart(2, '0');
+    const month = String(itemcreate.getMonth() + 1).padStart(2, '0');
+    const year = itemcreate.getFullYear();
+    const hours = String(itemcreate.getHours()).padStart(2, '0');
+    const minutes = String(itemcreate.getMinutes()).padStart(2, '0');
+    const seconds = String(itemcreate.getSeconds()).padStart(2, '0');
+  %><%= `${day}/${month}/${year} ${hours}:${minutes}:${seconds}` %> %></td>
                                     <td>
                                         <div class="btn-group" role="group">
                                             <a href="/admin/chat-history/<%= item._id %>" class="btn btn-sm btn-info" title="View Details">
