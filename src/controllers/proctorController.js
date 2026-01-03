@@ -46,12 +46,12 @@ async function logEvent(req, res, next) {
         ip: req.ip || req.connection.remoteAddress
       }
     };
-    
+
     // Only add orgId if it exists
     if (user.orgId || submission.orgId) {
       logData.orgId = user.orgId || submission.orgId;
     }
-    
+
     const log = new ProctorLog(logData);
 
     await log.save();
@@ -66,7 +66,7 @@ async function logEvent(req, res, next) {
         };
       }
 
-      if (event === 'tab_switch' || event === 'copy_paste' || event === 'right_click') {
+      if (['tab_switch', 'copy_paste', 'right_click', 'multiple_faces', 'camera_denied'].includes(event)) {
         submission.proctoringData.violations.push(`${event}: ${new Date().toISOString()}`);
       } else {
         submission.proctoringData.warnings.push(`${event}: ${new Date().toISOString()}`);

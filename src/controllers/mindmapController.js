@@ -1,5 +1,7 @@
 const Mindmap = require('../models/Mindmap');
 const User = require('../models/User');
+const Submission = require('../models/Submission');
+const Exam = require('../models/Exam');
 const crypto = require('crypto');
 const { generateResponse } = require('../services/aiService');
 const { deleteImageInternal, getPublicIdFromUrl } = require('./uploadController');
@@ -387,7 +389,7 @@ const mindmapController = {
                 content: 'MINDMAP_SHARED',
                 relatedId: mindmap._id,
                 onModel: 'Mindmap' // We need to update Notification model enum if 'Mindmap' is not in allowed values for relatedModel/onModel? 
-                                   // The model says: enum: ['FeedPost', 'Class']. We need to update that too.
+                // The model says: enum: ['FeedPost', 'Class']. We need to update that too.
             });
 
             res.json({
@@ -610,6 +612,237 @@ const mindmapController = {
             });
         } catch (error) {
             console.error('Error fetching share info:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Server error: ' + error.message
+            });
+        }
+    },
+
+    // Generate Mindmap from Exam Review
+    async generateFromExamReview(req, res) {
+        try {
+            const userId = req.user.userId || req.user.id || req.user._id || req.user.sub;
+            const { submissionId, examId, type, language } = req.body;
+
+            let prompt = "";
+            let contextTitle = "";
+
+            if (type === 'student_review' && submissionId) {
+                // Fetch submission
+                const submission = await Submission.findById(submissionId)
+                    .populate('examId')
+                    .populate({
+                        path: 'answers.questionId',
+                        select: 'text tags explanation name'
+                    });
+
+                if (!submission) {
+                    return res.status(404).json({ success: false, message: 'Submission not found' });
+                }
+
+                // Check ownership (student own submission)
+                if (submission.userId.toString() !== userId) {
+                    return res.status(403).json({ success: false, message: 'Unauthorized' });
+                }
+
+                const wrongAnswers = submission.answers.filter(a => a.isCorrect === false && a.questionId);
+
+                // If perfect score, maybe suggest advanced topics?
+                if (wrongAnswers.length === 0) {
+                    // Fallback for perfect score
+                    prompt = `Create an advanced study roadmap for a student who perfectly mastered: ${submission.examId?.name}. Suggest advanced related topics to explore next.`;
+                    contextTitle = `Advanced Plan: ${submission.examId?.name}`;
+                } else {
+                    const wrongTopics = wrongAnswers.slice(0, 10).map((a, index) => { // Limit to 10 to avoid token limits
+                        const q = a.questionId;
+                        return `- Question: ${q.text ? q.text.substring(0, 100).replace(/\n/g, ' ') : 'N/A'}... (Tags: ${q.tags?.join(', ') || 'General'})`;
+                    }).join('\n');
+
+                    prompt = `Create a remedial study roadmap (mindmap) for a student who failed these questions:\n${wrongTopics}\n\nFocus on explaining the core concepts behind these mistakes and providing a step-by-step improvement plan.`;
+                    contextTitle = `Review: ${submission.examId?.name || 'Exam'}`;
+                }
+
+            } else if (type === 'class_review' && examId) {
+                // Teacher flow
+                // Check if user is owner of exam or admin
+
+                const submissions = await Submission.find({ examId: examId, status: { $in: ['submitted', 'graded', 'late'] } })
+                    .populate({
+                        path: 'answers.questionId',
+                        select: 'text tags name'
+                    });
+
+                if (!submissions || submissions.length === 0) {
+                    return res.status(404).json({ success: false, message: 'No submissions found for this exam' });
+                }
+
+                // Calculate stats
+                const questionStats = {};
+                submissions.forEach(sub => {
+                    sub.answers.forEach(ans => {
+                        if (ans.questionId) {
+                            const qId = ans.questionId._id.toString();
+                            if (!questionStats[qId]) {
+                                questionStats[qId] = {
+                                    count: 0,
+                                    wrong: 0,
+                                    text: ans.questionId.text,
+                                    tags: ans.questionId.tags
+                                };
+                            }
+                            questionStats[qId].count++;
+                            if (!ans.isCorrect) questionStats[qId].wrong++;
+                        }
+                    });
+                });
+
+                // Filter for high wrong rate (> 30% wrong for example, or top 5)
+                const hardQuestions = Object.values(questionStats)
+                    .filter(s => s.count > 0 && (s.wrong / s.count) > 0.0) // Any wrong answers allowed for now
+                    .sort((a, b) => (b.wrong / b.count) - (a.wrong / a.count))
+                    .slice(0, 10); // Top 10 hard questions
+
+                if (hardQuestions.length === 0) {
+                    prompt = `Create an advanced teaching plan for a class that perfectly mastered: ${examId}. Suggest challenging activities.`;
+                    contextTitle = `Advanced Class Plan`;
+                } else {
+                    const hardTopics = hardQuestions.map((q, i) => {
+                        return `- Concept ${i + 1}: ${q.text ? q.text.substring(0, 100).replace(/\n/g, ' ') : 'N/A'}... (Failure Rate: ${Math.round((q.wrong / q.count) * 100)}%, Tags: ${q.tags?.join(', ') || ''})`;
+                    }).join('\n');
+
+                    prompt = `Create a classroom teaching strategy (mindmap) to help students master these difficult concepts where they failed:\n${hardTopics}\n\nSuggest teaching methods, analogies, and review activities.`;
+
+                    // Get exam name
+                    const exam = await Exam.findById(examId);
+                    contextTitle = `Class Strategy: ${exam?.name || 'Exam'}`;
+                }
+            } else {
+                return res.status(400).json({ success: false, message: 'Invalid request parameters' });
+            }
+
+            // --- AI Generation Logic (Reused) ---
+            // --- AI Generation Logic (Reused) ---
+            const targetLanguage = (language === 'en' || language === 'en-US') ? 'English' : (language === 'jp' || language === 'ja' || language === 'ja-JP') ? 'Japanese' : 'Vietnamese';
+            const aiPrompt = `You are an expert mindmap creator. Create a mindmap based on the following request:
+
+"${prompt}"
+
+IMPORTANT LANGUAGE RULE: 
+- The user's system language is ${targetLanguage}.
+- Generate ALL content in ${targetLanguage}.
+- Do NOT output in any other language, even if the input content is different.
+- Translate concepts if necessary to match ${targetLanguage}.
+- IF the input is in a different language (e.g. Vietnamese), you MUST translate it to ${targetLanguage}.
+
+Requirements:
+1. Create a hierarchical mindmap structure with root node and child nodes
+2. Root node should be the main topic based on "${contextTitle}" but TRANSLATED to ${targetLanguage}.
+3. Create at least 3-5 main branches from root node
+4. Each main branch can have 2-4 sub-branches
+5. Use ${targetLanguage} for all node topics
+
+Return JSON with the exact format below (NO explanatory text, ONLY return JSON):
+
+{
+  "nodeData": {
+    "id": "root",
+    "topic": "${contextTitle}",
+    "root": true,
+    "children": [
+      {
+        "id": "node1",
+        "topic": "Branch 1",
+        "children": [ ... ]
+      }
+    ]
+  },
+  "arrows": [],
+  "summaries": [],
+  "direction": 2,
+  "theme": {
+    "name": "Custom",
+    "palette": ["#FF5722", "#FFC107", "#8BC34A", "#03A9F4", "#9C27B0", "#009688", "#E91E63", "#3F51B5"],
+    "cssVar": {
+      "--main-color": "#444446",
+      "--main-bgcolor": "#ffffff",
+      "--color": "#777777",
+      "--bgcolor": "#f6f6f6",
+      "--panel-color": "#444446",
+      "--panel-bgcolor": "#ffffff",
+      "--root-color": "#ffffff",
+      "--root-bgcolor": "#2c3e50",
+      "--root-radius": "5px",
+      "--main-radius": "5px",
+      "--main-gap-x": "30px",
+      "--main-gap-y": "30px",
+      "--node-gap-x": "30px",
+      "--node-gap-y": "30px"
+    }
+  }
+}
+
+Notes:
+- Each node must have a unique id
+- Root node always has id="root" and root=true
+- Only return JSON, do not add markdown code blocks or other text`;
+
+            const aiResponse = await generateResponse(aiPrompt);
+
+            // Extract JSON from response
+            let mindmapData;
+            try {
+                // Try to find JSON in response
+                const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+                if (!jsonMatch) {
+                    throw new Error('AI response không chứa JSON hợp lệ');
+                }
+
+                mindmapData = JSON.parse(jsonMatch[0]);
+
+                // Ensure basic structure safety
+                if (!mindmapData.nodeData) mindmapData.nodeData = { id: 'root', topic: contextTitle, root: true, children: [] };
+                if (mindmapData.nodeData.id !== 'root') {
+                    mindmapData.nodeData.id = 'root';
+                    mindmapData.nodeData.root = true;
+                }
+                if (!mindmapData.theme) {
+                    mindmapData.theme = {
+                        name: "Custom",
+                        palette: ["#FF5722", "#FFC107", "#8BC34A", "#03A9F4", "#9C27B0", "#009688", "#E91E63", "#3F51B5"],
+                    };
+                }
+
+            } catch (parseError) {
+                console.error('Error parsing AI response:', parseError);
+                return res.status(500).json({
+                    success: false,
+                    message: 'AI Error: ' + parseError.message
+                });
+            }
+
+            // Create mindmap
+            const newMindmap = new Mindmap({
+                _id: crypto.randomUUID(),
+                user_id: userId,
+                title: mindmapData.nodeData?.topic || contextTitle,
+                desc: `Generated from Exam Review`,
+                data: mindmapData,
+                status: true,
+                favorite: false,
+                shared_with: [],
+                is_public: false
+            });
+
+            await newMindmap.save();
+
+            res.status(201).json({
+                success: true,
+                data: newMindmap
+            });
+
+        } catch (error) {
+            console.error('Error generating review mindmap:', error);
             res.status(500).json({
                 success: false,
                 message: 'Server error: ' + error.message

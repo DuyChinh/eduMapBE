@@ -87,6 +87,14 @@ const SubmissionSchema = new mongoose.Schema({
     violations: [String],
     screenshots: [String],
     warnings: [String]
+  },
+  aiAnalysis: {
+    type: String,
+    default: ""
+  },
+  analysisLanguage: {
+    type: String,
+    default: "vi"
   }
 }, {
   timestamps: true
@@ -99,7 +107,7 @@ SubmissionSchema.index({ orgId: 1, userId: 1, status: 1 });
 SubmissionSchema.index({ orgId: 1, submittedAt: 1 });
 
 // Calculate percentage before save
-SubmissionSchema.pre('save', function(next) {
+SubmissionSchema.pre('save', function (next) {
   if (this.maxScore > 0) {
     this.percentage = Math.round((this.score / this.maxScore) * 100);
   }
