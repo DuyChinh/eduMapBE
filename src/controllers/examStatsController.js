@@ -203,6 +203,9 @@ async function getExamLeaderboard(req, res, next) {
     // Group submissions by userId and get the latest submission for each user
     const userSubmissionsMap = {};
     submissions.forEach(sub => {
+      // Skip if userId is missing (user might be deleted)
+      if (!sub.userId || !sub.userId._id) return;
+
       const userId = String(sub.userId._id);
       if (!userSubmissionsMap[userId]) {
         userSubmissionsMap[userId] = sub;
@@ -341,6 +344,9 @@ async function getExamSubmissions(req, res, next) {
       // Group submissions by userId and get the most recent one for each user
       const userSubmissionsMap = {};
       submissions.forEach(sub => {
+        // Skip if userId is missing (user might be deleted)
+        if (!sub.userId || !sub.userId._id) return;
+
         const userId = String(sub.userId._id);
         if (!userSubmissionsMap[userId]) {
           userSubmissionsMap[userId] = sub;
@@ -394,11 +400,11 @@ async function getExamSubmissions(req, res, next) {
     const formattedSubmissions = paginatedSubmissions.map(submission => ({
       _id: submission._id,
       student: {
-        _id: submission.userId._id,
-        name: submission.userId.name,
-        email: submission.userId.email,
-        avatar: submission.userId.profile?.avatar || null,
-        studentCode: submission.userId.studentCode
+        _id: submission.userId?._id,
+        name: submission.userId?.name || 'Unknown User',
+        email: submission.userId?.email || '',
+        avatar: submission.userId?.profile?.avatar || null,
+        studentCode: submission.userId?.studentCode || ''
       },
       status: submission.status,
       score: submission.score,
@@ -1005,6 +1011,9 @@ async function getScoreDistribution(req, res, next) {
     // Group submissions by userId
     const userSubmissionsMap = {};
     submissions.forEach(sub => {
+      // Skip if userId is missing
+      if (!sub.userId || !sub.userId._id) return;
+
       const userId = String(sub.userId._id);
       if (!userSubmissionsMap[userId]) {
         userSubmissionsMap[userId] = [];

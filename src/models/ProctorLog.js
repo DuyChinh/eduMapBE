@@ -20,7 +20,7 @@ const ProctorLogSchema = new mongoose.Schema({
   },
   event: {
     type: String,
-    enum: ['visibility', 'fullscreen', 'beforeunload', 'warning', 'tab_switch', 'copy_paste', 'right_click'],
+    enum: ['visibility', 'fullscreen', 'beforeunload', 'warning', 'tab_switch', 'copy_paste', 'right_click', 'no_face', 'multiple_faces', 'camera_denied'],
     required: true
   },
   severity: {
